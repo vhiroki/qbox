@@ -1,0 +1,266 @@
+import uuid
+from abc import ABC, abstractmethod
+from typing import Any, Optional
+
+import duckdb
+from app.models.schemas import (
+    ConnectionConfig,
+    DataSourceType,
+    PostgresConnectionConfig,
+    TableSchema,
+)
+from app.services.connection_repository import connection_repository
+
+
+class DataSource(ABC):
+    """Abstract base class for data sources."""
+
+    def __init__(self, connection_id: str, config: dict[str, Any]):
+        self.connection_id = connection_id
+        self.config = config
+        self.duckdb_conn: Optional[duckdb.DuckDBPyConnection] = None
+
+    @abstractmethod
+    async def connect(self) -> bool:
+        """Establish connection to the data source."""
+        pass
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """Close connection to the data source."""
+        pass
+
+    @abstractmethod
+    async def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any]]]:
+        """Execute a query and return results."""
+        pass
+
+    @abstractmethod
+    async def get_schema(self) -> list[TableSchema]:
+        """Get schema information from the data source."""
+        pass
+
+
+class PostgresDataSource(DataSource):
+    """PostgreSQL data source using DuckDB's postgres extension."""
+
+    def __init__(self, connection_id: str, config: PostgresConnectionConfig):
+        super().__init__(connection_id, config.model_dump())
+        self.postgres_config = config
+
+    async def connect(self) -> bool:
+        """Connect to PostgreSQL using DuckDB."""
+        try:
+            # Create a new DuckDB connection
+            self.duckdb_conn = duckdb.connect(":memory:")
+
+            # Install and load postgres extension
+            self.duckdb_conn.execute("INSTALL postgres")
+            self.duckdb_conn.execute("LOAD postgres")
+
+            # Attach PostgreSQL database
+            attach_query = f"""
+                ATTACH 'host={self.postgres_config.host}
+                port={self.postgres_config.port}
+                dbname={self.postgres_config.database}
+                user={self.postgres_config.username}
+                password={self.postgres_config.password}'
+                AS pg (TYPE POSTGRES, SCHEMA '{self.postgres_config.schema_name}')
+            """
+            self.duckdb_conn.execute(attach_query)
+
+            return True
+        except Exception as e:
+            print(f"Failed to connect to PostgreSQL: {e}")
+            return False
+
+    async def disconnect(self) -> None:
+        """Close DuckDB connection."""
+        if self.duckdb_conn:
+            self.duckdb_conn.close()
+            self.duckdb_conn = None
+
+    async def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any]]]:
+        """Execute a SQL query."""
+        if not self.duckdb_conn:
+            raise RuntimeError("Not connected to database")
+
+        result = self.duckdb_conn.execute(query)
+        columns = [desc[0] for desc in result.description]
+        rows = [dict(zip(columns, row)) for row in result.fetchall()]
+
+        return columns, rows
+
+    async def get_schema(self) -> list[TableSchema]:
+        """Get schema information from PostgreSQL."""
+        if not self.duckdb_conn:
+            raise RuntimeError("Not connected to database")
+
+        schema = self.postgres_config.schema_name or "public"
+
+        # Query to get tables and their columns
+        query = f"""
+            SELECT 
+                table_name,
+                column_name,
+                data_type,
+                is_nullable
+            FROM pg.information_schema.columns
+            WHERE table_schema = '{schema}'
+            ORDER BY table_name, ordinal_position
+        """
+
+        result = self.duckdb_conn.execute(query)
+        rows = result.fetchall()
+
+        # Group columns by table
+        tables_dict: dict[str, list[dict[str, str]]] = {}
+        for row in rows:
+            table_name, column_name, data_type, is_nullable = row
+            if table_name not in tables_dict:
+                tables_dict[table_name] = []
+            tables_dict[table_name].append(
+                {
+                    "name": column_name,
+                    "type": data_type,
+                    "nullable": is_nullable == "YES",
+                }
+            )
+
+        # Create TableSchema objects
+        schemas = []
+        for table_name, columns in tables_dict.items():
+            # Get row count for each table
+            try:
+                count_result = self.duckdb_conn.execute(
+                    f"SELECT COUNT(*) FROM pg.{schema}.{table_name}"
+                )
+                row_count = count_result.fetchone()[0]
+            except Exception:
+                row_count = None
+
+            schemas.append(TableSchema(table_name=table_name, columns=columns, row_count=row_count))
+
+        return schemas
+
+
+class ConnectionManager:
+    """Manages data source connections."""
+
+    def __init__(self):
+        self.connections: dict[str, DataSource] = {}
+
+    async def create_connection(
+        self, config: ConnectionConfig, save: bool = True
+    ) -> tuple[bool, str, str]:
+        """
+        Create a new connection.
+
+        Args:
+            config: Connection configuration
+            save: Whether to save the connection to the repository
+
+        Returns:
+            tuple: (success, message, connection_id)
+        """
+        connection_id = str(uuid.uuid4())
+
+        try:
+            if config.type == DataSourceType.POSTGRES:
+                postgres_config = PostgresConnectionConfig(**config.config)
+                datasource = PostgresDataSource(connection_id, postgres_config)
+            else:
+                return False, f"Unsupported data source type: {config.type}", ""
+
+            # Attempt to connect
+            success = await datasource.connect()
+            if not success:
+                return False, "Failed to establish connection", ""
+
+            # Store the connection in memory
+            self.connections[connection_id] = datasource
+
+            # Save to repository if requested
+            if save:
+                connection_repository.save(connection_id, config)
+
+            return True, f"Successfully connected to {config.name}", connection_id
+
+        except Exception as e:
+            return False, f"Error creating connection: {str(e)}", ""
+
+    async def reconnect(self, connection_id: str) -> tuple[bool, str]:
+        """
+        Reconnect to a saved connection.
+
+        Returns:
+            tuple: (success, message)
+        """
+        # Get config from repository
+        config = connection_repository.get(connection_id)
+        if not config:
+            return False, "Connection configuration not found"
+
+        try:
+            if config.type == DataSourceType.POSTGRES:
+                postgres_config = PostgresConnectionConfig(**config.config)
+                datasource = PostgresDataSource(connection_id, postgres_config)
+            else:
+                return False, f"Unsupported data source type: {config.type}"
+
+            # Attempt to connect
+            success = await datasource.connect()
+            if not success:
+                return False, "Failed to establish connection"
+
+            # Store the connection in memory
+            self.connections[connection_id] = datasource
+
+            return True, f"Successfully reconnected to {config.name}"
+
+        except Exception as e:
+            return False, f"Error reconnecting: {str(e)}"
+
+    async def get_connection(self, connection_id: str) -> Optional[DataSource]:
+        """Get an active connection by ID. Attempts to reconnect if not active."""
+        datasource = self.connections.get(connection_id)
+
+        # If not in memory, try to reconnect from saved config
+        if not datasource and connection_repository.exists(connection_id):
+            success, _ = await self.reconnect(connection_id)
+            if success:
+                datasource = self.connections.get(connection_id)
+
+        return datasource
+
+    async def disconnect(self, connection_id: str, delete_saved: bool = False) -> bool:
+        """
+        Disconnect and remove a connection.
+
+        Args:
+            connection_id: The connection ID to disconnect
+            delete_saved: Whether to also delete the saved configuration
+        """
+        datasource = self.connections.get(connection_id)
+        if datasource:
+            await datasource.disconnect()
+            del self.connections[connection_id]
+
+        if delete_saved:
+            connection_repository.delete(connection_id)
+
+        return datasource is not None
+
+    async def list_connections(self) -> list[dict[str, str]]:
+        """List all active connections."""
+        return [
+            {"id": conn_id, "type": type(ds).__name__} for conn_id, ds in self.connections.items()
+        ]
+
+    def list_saved_connections(self) -> list[dict[str, Any]]:
+        """List all saved connection configurations."""
+        return connection_repository.get_all()
+
+
+# Global connection manager instance
+connection_manager = ConnectionManager()

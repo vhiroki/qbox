@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import type { AIQueryRequest, QueryResult } from '../types';
 import { api } from '../services/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 interface AIQueryProps {
   connectionId: string | null;
@@ -39,192 +46,95 @@ export default function AIQuery({ connectionId }: AIQueryProps) {
   };
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>AI Query</h2>
-      
-      {!connectionId && (
-        <div style={styles.warning}>
-          Please connect to a database first
-        </div>
-      )}
+    <div className="max-w-6xl mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Query</CardTitle>
+          <CardDescription>
+            {!connectionId
+              ? 'Please connect to a database first'
+              : 'Ask a question in natural language and let AI generate SQL for you'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="prompt">Natural Language Query</Label>
+            <Textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="e.g., Show me all users who signed up in the last month"
+              rows={3}
+              disabled={!connectionId}
+            />
+          </div>
 
-      <div style={styles.inputGroup}>
-        <label style={styles.label}>Natural Language Query</label>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="e.g., Show me all users who signed up in the last month"
-          style={styles.textarea}
-          rows={3}
-          disabled={!connectionId}
-        />
-      </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => handleGenerate(false)}
+              disabled={loading || !connectionId || !prompt.trim()}
+              variant="outline"
+            >
+              {loading ? 'Generating...' : 'Generate SQL'}
+            </Button>
+            <Button
+              onClick={() => handleGenerate(true)}
+              disabled={loading || !connectionId || !prompt.trim()}
+            >
+              {loading ? 'Running...' : 'Generate & Execute'}
+            </Button>
+          </div>
 
-      <div style={styles.buttonGroup}>
-        <button
-          onClick={() => handleGenerate(false)}
-          disabled={loading || !connectionId || !prompt.trim()}
-          style={styles.button}
-        >
-          {loading ? 'Generating...' : 'Generate SQL'}
-        </button>
-        <button
-          onClick={() => handleGenerate(true)}
-          disabled={loading || !connectionId || !prompt.trim()}
-          style={{ ...styles.button, backgroundColor: '#28a745' }}
-        >
-          {loading ? 'Running...' : 'Generate & Execute'}
-        </button>
-      </div>
+          {result && (
+            <div className="space-y-4">
+              {result.generated_sql && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Generated SQL:</h3>
+                  <pre className="p-4 bg-slate-100 border border-slate-200 rounded-lg overflow-auto text-sm font-mono">
+                    {result.generated_sql}
+                  </pre>
+                </div>
+              )}
 
-      {result && (
-        <div style={styles.resultContainer}>
-          {result.generated_sql && (
-            <div style={styles.sqlContainer}>
-              <h3 style={styles.subtitle}>Generated SQL:</h3>
-              <pre style={styles.sql}>{result.generated_sql}</pre>
-            </div>
-          )}
-
-          {result.success && result.rows && (
-            <div style={styles.dataContainer}>
-              <h3 style={styles.subtitle}>Results ({result.row_count} rows):</h3>
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      {result.columns?.map((col) => (
-                        <th key={col} style={styles.th}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.rows.map((row, idx) => (
-                      <tr key={idx}>
-                        {result.columns?.map((col) => (
-                          <td key={col} style={styles.td}>
-                            {JSON.stringify(row[col])}
-                          </td>
+              {result.success && result.rows && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Results ({result.row_count} rows):</h3>
+                  <div className="border rounded-lg overflow-auto max-h-96">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {result.columns?.map((col) => (
+                            <TableHead key={col}>{col}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {result.rows.map((row, idx) => (
+                          <TableRow key={idx}>
+                            {result.columns?.map((col) => (
+                              <TableCell key={col}>
+                                {JSON.stringify(row[col])}
+                              </TableCell>
+                            ))}
+                          </TableRow>
                         ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
 
-          {result.error && (
-            <div style={styles.errorMessage}>
-              <strong>Error:</strong> {result.error}
+              {result.error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{result.error}</AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
-        </div>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    padding: '20px',
-    maxWidth: '1000px',
-    margin: '0 auto',
-  },
-  title: {
-    fontSize: '24px',
-    marginBottom: '20px',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: '18px',
-    marginBottom: '10px',
-    color: '#555',
-  },
-  warning: {
-    padding: '10px',
-    backgroundColor: '#fff3cd',
-    color: '#856404',
-    borderRadius: '4px',
-    marginBottom: '20px',
-  },
-  inputGroup: {
-    marginBottom: '15px',
-  },
-  label: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#555',
-    marginBottom: '5px',
-  },
-  textarea: {
-    width: '100%',
-    padding: '10px',
-    fontSize: '14px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontFamily: 'inherit',
-    resize: 'vertical',
-  },
-  buttonGroup: {
-    display: 'flex',
-    gap: '10px',
-    marginBottom: '20px',
-  },
-  button: {
-    padding: '10px 20px',
-    fontSize: '16px',
-    fontWeight: '500',
-    color: '#fff',
-    backgroundColor: '#007bff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  resultContainer: {
-    marginTop: '20px',
-  },
-  sqlContainer: {
-    marginBottom: '20px',
-  },
-  sql: {
-    padding: '15px',
-    backgroundColor: '#f5f5f5',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    overflow: 'auto',
-    fontSize: '14px',
-    fontFamily: 'monospace',
-  },
-  dataContainer: {
-    marginTop: '20px',
-  },
-  tableWrapper: {
-    overflow: 'auto',
-    maxHeight: '400px',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '14px',
-  },
-  th: {
-    padding: '10px',
-    backgroundColor: '#f8f9fa',
-    borderBottom: '2px solid #dee2e6',
-    textAlign: 'left',
-    fontWeight: '600',
-  },
-  td: {
-    padding: '10px',
-    borderBottom: '1px solid #dee2e6',
-  },
-  errorMessage: {
-    marginTop: '20px',
-    padding: '10px',
-    backgroundColor: '#f8d7da',
-    color: '#721c24',
-    borderRadius: '4px',
-  },
-};

@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import ConnectionForm from './components/ConnectionForm';
+import ConnectionManager from './components/ConnectionManager';
 import AIQuery from './components/AIQuery';
 import { api } from './services/api';
-import './App.css';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { ThemeProvider } from '@/components/theme-provider';
 
 function App() {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [connectionName, setConnectionName] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'connect' | 'query'>('connect');
+  const [activeTab, setActiveTab] = useState<'connect' | 'manage' | 'query'>('connect');
 
   // Load saved connection from localStorage on mount
   useEffect(() => {
@@ -53,61 +56,67 @@ function App() {
     setActiveTab('connect');
   };
 
+  const handleConnectionDeleted = (deletedConnectionId: string) => {
+    // If the deleted connection is the current one, clear it
+    if (connectionId === deletedConnectionId) {
+      handleDisconnect();
+    }
+  };
+
   return (
-    <div className="app">
-      <header className="header">
-        <h1>QBox</h1>
-        <p>AI-Powered Data Query Application</p>
-        {connectionName && (
-          <div style={{ marginTop: '10px', fontSize: '14px', opacity: 0.9 }}>
-            Connected to: <strong>{connectionName}</strong>
-            <button
-              onClick={handleDisconnect}
-              style={{
-                marginLeft: '10px',
-                padding: '5px 10px',
-                fontSize: '12px',
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.4)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Disconnect
-            </button>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <header className="border-b border-border py-8 px-6">
+          <div className="container mx-auto">
+            <h1 className="text-4xl font-bold mb-2">QBox</h1>
+            <p className="text-muted-foreground">AI-Powered Data Query Application</p>
+            {connectionName && (
+              <div className="mt-4 flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">
+                  Connected to: <strong>{connectionName}</strong>
+                </span>
+                <Button
+                  onClick={handleDisconnect}
+                size="sm"
+                >
+                  Disconnect
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-      </header>
+        </header>
 
-      <nav className="nav">
-        <button
-          className={activeTab === 'connect' ? 'active' : ''}
-          onClick={() => setActiveTab('connect')}
-        >
-          Connect
-        </button>
-        <button
-          className={activeTab === 'query' ? 'active' : ''}
-          onClick={() => setActiveTab('query')}
-        >
-          Query
-        </button>
-      </nav>
+        <main className="flex-1 container mx-auto py-8 px-4">
+          <Tabs defaultValue="connect" value={activeTab} onValueChange={(value) => setActiveTab(value as 'connect' | 'manage' | 'query')} className="w-full">
+            <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-3 mb-8">
+              <TabsTrigger value="connect">Connect</TabsTrigger>
+              <TabsTrigger value="manage">Manage</TabsTrigger>
+              <TabsTrigger value="query">Query</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="connect" className="mt-0">
+              <ConnectionForm onConnectionSuccess={handleConnectionSuccess} />
+            </TabsContent>
+            
+            <TabsContent value="manage" className="mt-0">
+              <ConnectionManager 
+                onConnect={handleConnectionSuccess} 
+                onDisconnect={handleConnectionDeleted}
+                currentConnectionId={connectionId}
+              />
+            </TabsContent>
+            
+            <TabsContent value="query" className="mt-0">
+              <AIQuery connectionId={connectionId} />
+            </TabsContent>
+          </Tabs>
+        </main>
 
-      <main className="main">
-        {activeTab === 'connect' && (
-          <ConnectionForm onConnectionSuccess={handleConnectionSuccess} />
-        )}
-        {activeTab === 'query' && (
-          <AIQuery connectionId={connectionId} />
-        )}
-      </main>
-
-      <footer className="footer">
-        <p>QBox v0.1.0 - Powered by DuckDB & OpenAI</p>
-      </footer>
-    </div>
+        <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
+          <p>QBox v0.1.0 - Powered by DuckDB & OpenAI</p>
+        </footer>
+      </div>
+    </ThemeProvider>
   );
 }
 

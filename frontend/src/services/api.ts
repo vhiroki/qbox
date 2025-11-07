@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 import type {
   ConnectionConfig,
   ConnectionStatus,
@@ -8,9 +8,9 @@ import type {
   QueryRequest,
   AIQueryRequest,
   QueryResult,
-} from '../types';
+} from "../types";
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = "/api";
 
 export const api = {
   // Connection endpoints
@@ -29,30 +29,60 @@ export const api = {
     return response.data.connections;
   },
 
-  async reconnectConnection(connectionId: string): Promise<ConnectionStatus> {
-    const response = await axios.post(`${API_BASE_URL}/connections/reconnect/${connectionId}`);
+  async getSavedConnection(connectionId: string): Promise<any> {
+    const response = await axios.get(
+      `${API_BASE_URL}/connections/saved/${connectionId}`
+    );
     return response.data;
   },
 
-  async deleteConnection(connectionId: string, deleteSaved: boolean = false): Promise<void> {
+  async updateSavedConnection(
+    connectionId: string,
+    config: ConnectionConfig
+  ): Promise<void> {
+    await axios.put(
+      `${API_BASE_URL}/connections/saved/${connectionId}`,
+      config
+    );
+  },
+
+  async reconnectConnection(connectionId: string): Promise<ConnectionStatus> {
+    const response = await axios.post(
+      `${API_BASE_URL}/connections/reconnect/${connectionId}`
+    );
+    return response.data;
+  },
+
+  async deleteConnection(
+    connectionId: string,
+    deleteSaved: boolean = false
+  ): Promise<void> {
     await axios.delete(`${API_BASE_URL}/connections/${connectionId}`, {
-      params: { delete_saved: deleteSaved }
+      params: { delete_saved: deleteSaved },
     });
   },
 
   async getSchema(connectionId: string): Promise<TableSchema[]> {
-    const response = await axios.get(`${API_BASE_URL}/connections/${connectionId}/schema`);
+    const response = await axios.get(
+      `${API_BASE_URL}/connections/${connectionId}/schema`
+    );
     return response.data.schema;
   },
 
   // Query endpoints
   async executeQuery(request: QueryRequest): Promise<QueryResult> {
-    const response = await axios.post(`${API_BASE_URL}/queries/execute`, request);
+    const response = await axios.post(
+      `${API_BASE_URL}/queries/execute`,
+      request
+    );
     return response.data;
   },
 
   async aiGenerateQuery(request: AIQueryRequest): Promise<QueryResult> {
-    const response = await axios.post(`${API_BASE_URL}/queries/ai-generate`, request);
+    const response = await axios.post(
+      `${API_BASE_URL}/queries/ai-generate`,
+      request
+    );
     return response.data;
   },
 };

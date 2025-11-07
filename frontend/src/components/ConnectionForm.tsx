@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { PostgresConfig, ConnectionStatus, SavedConnection } from '../types';
 import { api } from '../services/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ConnectionFormProps {
   onConnectionSuccess: (connectionId: string, connectionName: string) => void;
@@ -108,222 +115,139 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
   };
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>Connect to PostgreSQL</h2>
+    <div className="max-w-2xl mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Connect to PostgreSQL</CardTitle>
+          <CardDescription>Enter your database connection details</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {savedConnections.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="saved-connection">Load Saved Connection</Label>
+              <Select value={selectedSavedConnection} onValueChange={handleLoadSavedConnection}>
+                <SelectTrigger id="saved-connection">
+                  <SelectValue placeholder="-- Select a saved connection --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedConnections.map((conn) => (
+                    <SelectItem key={conn.id} value={conn.id}>
+                      {conn.name} (ID: {conn.id.substring(0, 8)}...)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-      {savedConnections.length > 0 && (
-        <div style={styles.savedConnectionsSection}>
-          <label style={styles.label}>Load Saved Connection</label>
-          <select
-            value={selectedSavedConnection}
-            onChange={(e) => handleLoadSavedConnection(e.target.value)}
-            style={styles.select}
-          >
-            <option value="">-- Select a saved connection --</option>
-            {savedConnections.map((conn) => (
-              <option key={conn.id} value={conn.id}>
-                {conn.name} (ID: {conn.id.substring(0, 8)}...)
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="connection-name">Connection Name</Label>
+              <Input
+                id="connection-name"
+                type="text"
+                value={connectionName}
+                onChange={(e) => setConnectionName(e.target.value)}
+                required
+                placeholder="My Database"
+              />
+            </div>
 
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Connection Name</label>
-          <input
-            type="text"
-            value={connectionName}
-            onChange={(e) => setConnectionName(e.target.value)}
-            required
-            style={styles.input}
-            placeholder="My Database"
-          />
-        </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="host">Host</Label>
+                <Input
+                  id="host"
+                  type="text"
+                  value={formData.host}
+                  onChange={(e) => setFormData({ ...formData, host: e.target.value })}
+                  required
+                />
+              </div>
 
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Host</label>
-          <input
-            type="text"
-            value={formData.host}
-            onChange={(e) => setFormData({ ...formData, host: e.target.value })}
-            required
-            style={styles.input}
-          />
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="port">Port</Label>
+                <Input
+                  id="port"
+                  type="number"
+                  value={formData.port}
+                  onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
+                  required
+                />
+              </div>
+            </div>
 
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Port</label>
-          <input
-            type="number"
-            value={formData.port}
-            onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
-            required
-            style={styles.input}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="database">Database</Label>
+              <Input
+                id="database"
+                type="text"
+                value={formData.database}
+                onChange={(e) => setFormData({ ...formData, database: e.target.value })}
+                required
+              />
+            </div>
 
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Database</label>
-          <input
-            type="text"
-            value={formData.database}
-            onChange={(e) => setFormData({ ...formData, database: e.target.value })}
-            required
-            style={styles.input}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                required
+              />
+            </div>
 
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Username</label>
-          <input
-            type="text"
-            value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-            required
-            style={styles.input}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+              />
+            </div>
 
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Password</label>
-          <input
-            type="password"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            required
-            style={styles.input}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="schema">Schema</Label>
+              <Input
+                id="schema"
+                type="text"
+                value={formData.schema}
+                onChange={(e) => setFormData({ ...formData, schema: e.target.value })}
+              />
+            </div>
 
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Schema</label>
-          <input
-            type="text"
-            value={formData.schema}
-            onChange={(e) => setFormData({ ...formData, schema: e.target.value })}
-            style={styles.input}
-          />
-        </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="save-connection"
+                checked={saveConnection}
+                onCheckedChange={(checked) => setSaveConnection(checked as boolean)}
+              />
+              <Label htmlFor="save-connection" className="text-sm font-normal cursor-pointer">
+                Save connection details (password not saved)
+              </Label>
+            </div>
 
-        <div style={styles.checkboxGroup}>
-          <label style={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={saveConnection}
-              onChange={(e) => setSaveConnection(e.target.checked)}
-              style={styles.checkbox}
-            />
-            Save connection details (password not saved)
-          </label>
-        </div>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Connecting...' : 'Connect'}
+            </Button>
+          </form>
 
-        <button type="submit" disabled={loading} style={styles.button}>
-          {loading ? 'Connecting...' : 'Connect'}
-        </button>
-      </form>
-
-      {status && (
-        <div style={status.success ? styles.successMessage : styles.errorMessage}>
-          {status.message}
-          {status.connection_id && <div style={styles.connectionId}>ID: {status.connection_id}</div>}
-        </div>
-      )}
+          {status && (
+            <Alert variant={status.success ? 'default' : 'destructive'}>
+              <AlertDescription>
+                {status.message}
+                {status.connection_id && (
+                  <div className="mt-1 text-xs font-mono">ID: {status.connection_id}</div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    padding: '20px',
-    maxWidth: '500px',
-    margin: '0 auto',
-  },
-  title: {
-    fontSize: '24px',
-    marginBottom: '20px',
-    color: '#333',
-  },
-  savedConnectionsSection: {
-    marginBottom: '30px',
-    padding: '15px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-  },
-  select: {
-    width: '100%',
-    padding: '8px 12px',
-    fontSize: '14px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    marginTop: '5px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '15px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px',
-  },
-  checkboxGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    marginTop: '5px',
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    fontSize: '14px',
-    color: '#555',
-    cursor: 'pointer',
-  },
-  checkbox: {
-    marginRight: '8px',
-    cursor: 'pointer',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#555',
-  },
-  input: {
-    padding: '8px 12px',
-    fontSize: '14px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-  },
-  button: {
-    padding: '10px 20px',
-    fontSize: '16px',
-    fontWeight: '500',
-    color: '#fff',
-    backgroundColor: '#007bff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginTop: '10px',
-  },
-  successMessage: {
-    marginTop: '20px',
-    padding: '10px',
-    backgroundColor: '#d4edda',
-    color: '#155724',
-    borderRadius: '4px',
-  },
-  errorMessage: {
-    marginTop: '20px',
-    padding: '10px',
-    backgroundColor: '#f8d7da',
-    color: '#721c24',
-    borderRadius: '4px',
-  },
-  connectionId: {
-    fontSize: '12px',
-    marginTop: '5px',
-    fontFamily: 'monospace',
-  },
-};

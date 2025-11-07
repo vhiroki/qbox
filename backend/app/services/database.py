@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 import duckdb
+
 from app.models.schemas import (
     ConnectionConfig,
     DataSourceType,
@@ -260,6 +261,48 @@ class ConnectionManager:
     def list_saved_connections(self) -> list[dict[str, Any]]:
         """List all saved connection configurations."""
         return connection_repository.get_all()
+
+    def get_saved_connection(self, connection_id: str) -> Optional[dict[str, Any]]:
+        """Get a saved connection configuration (without sensitive data like passwords)."""
+        config = connection_repository.get(connection_id)
+        if not config:
+            return None
+
+        # Return config without sensitive data
+        safe_config = config.config.copy()
+        if "password" in safe_config:
+            safe_config["password"] = ""  # Don't expose password
+
+        return {
+            "id": connection_id,
+            "name": config.name,
+            "type": config.type.value,
+            "config": safe_config,
+        }
+
+    def update_saved_connection(
+        self, connection_id: str, config: ConnectionConfig
+    ) -> tuple[bool, str]:
+        """Update a saved connection configuration."""
+        existing = connection_repository.get(connection_id)
+        if not existing:
+            return False, "Connection not found"
+
+        # If password is empty in the update, keep the existing one
+        if "password" in config.config and not config.config["password"]:
+            if "password" in existing.config:
+                config.config["password"] = existing.config["password"]
+
+        # Save the updated config
+        connection_repository.save(connection_id, config)
+
+        # If the connection is currently active, disconnect it
+        # (it will need to be reconnected with the new config)
+        if connection_id in self.connections:
+            self.connections[connection_id].duckdb_conn = None
+            del self.connections[connection_id]
+
+        return True, "Connection updated successfully"
 
 
 # Global connection manager instance

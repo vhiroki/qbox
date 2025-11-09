@@ -116,72 +116,76 @@ The application will be available at:
 
 ## Development
 
-### Backend Structure
+### Running in Development Mode
 
-```
-backend/app/
-├── main.py                      # FastAPI application entry point
-├── api/                         # API route handlers
-│   ├── connections.py           # Connection CRUD endpoints
-│   ├── metadata.py              # Metadata collection endpoints
-│   ├── queries.py               # Query execution endpoints
-│   └── workspace.py             # Workspace management endpoints
-├── services/                    # Business logic layer
-│   ├── duckdb_manager.py        # Persistent DuckDB instance manager
-│   ├── database.py              # Database abstraction layer
-│   ├── metadata.py              # Metadata collection service
-│   ├── connection_repository.py # SQLite connection persistence
-│   └── workspace_repository.py  # SQLite workspace persistence
-├── models/
-│   └── schemas.py               # Pydantic models for API contracts
-└── config/
-    └── settings.py              # Application settings
+**VS Code (Recommended):**
+1. Start frontend: Command Palette (`Cmd+Shift+P`) → `Tasks: Run Task` → "Start Frontend Dev Server"
+2. Start backend with debugging: Press `F5` to launch "Python: FastAPI Backend"
+3. Or run both without debug: `Tasks: Run Task` → "Start Both Servers (No Debug)"
+
+**Terminal:**
+```bash
+# Terminal 1 - Backend
+cd backend
+uvicorn app.main:app --reload --port 8080
+
+# Terminal 2 - Frontend
+cd frontend
+pnpm dev
 ```
 
-### Frontend Structure
+### Adding Dependencies
 
-```
-frontend/src/
-├── App.tsx                      # Main app with sidebar navigation
-├── components/                  # React components
-│   ├── ConnectionManager.tsx    # Connection CRUD interface
-│   ├── ConnectionForm.tsx       # Connection creation form
-│   ├── WorkspaceSelector.tsx    # Left panel: table selection tree
-│   ├── WorkspaceView.tsx        # Right panel: selected tables display
-│   ├── MetadataSidebar.tsx      # Metadata tree view (legacy)
-│   └── ui/                      # shadcn/ui components
-├── services/
-│   └── api.ts                   # Backend API client
-└── types/
-    └── index.ts                 # TypeScript type definitions
+**Python packages:**
+```bash
+# Edit backend/pyproject.toml, then:
+cd backend
+uv pip install -e .
 ```
 
-### Key Concepts
-
-**Workspace**: A collection of selected tables from one or more data sources. Workspace selections persist across sessions.
-
-**Metadata**: Schema information automatically collected from data sources, including tables, columns, types, constraints, and statistics.
-
-**Connection Repository**: SQLite-based persistence layer for saving database connection configurations.
-
-**DuckDB Manager**: Manages a persistent DuckDB instance that can attach to multiple PostgreSQL databases simultaneously for cross-source queries.
-
-## Project Structure
-
+**npm packages:**
+```bash
+cd frontend
+pnpm add package-name
 ```
-qbox/
-├── backend/              # Python FastAPI backend
-├── frontend/             # React TypeScript frontend
-├── .env                  # Environment variables
-├── .gitignore
-└── README.md
+
+### Architecture
+
+**Backend (`backend/app/`):**
+- `api/` - FastAPI route handlers (thin layer)
+- `services/` - Business logic (DuckDB manager, repositories, metadata collection)
+- `models/` - Pydantic schemas
+- `config/` - Application settings
+
+**Frontend (`frontend/src/`):**
+- `components/` - React components (ConnectionManager, WorkspaceSelector, WorkspaceView)
+- `services/api.ts` - Backend API client
+- `types/` - TypeScript definitions
+
+**Key Concepts:**
+- **Workspace**: Collection of selected tables from multiple data sources (persisted in SQLite)
+- **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases
+- **Metadata**: Auto-collected schema info (tables, columns, types, constraints, stats)
+
+### Troubleshooting
+
+**Port already in use:**
+```bash
+lsof -ti:8080 | xargs kill -9  # Backend
+lsof -ti:5173 | xargs kill -9  # Frontend
+```
+
+**Module not found errors:**
+```bash
+cd backend && uv pip install -e .
+cd frontend && pnpm install
 ```
 
 ## Data Storage
 
 QBox stores data locally in `~/.qbox/`:
-- **connections.db**: SQLite database containing saved connection configurations and workspace selections
-- **qbox.duckdb**: Persistent DuckDB instance with attached data sources
+- `connections.db` - SQLite database with connection configs and workspace selections
+- `qbox.duckdb` - Persistent DuckDB instance with attached data sources
 
 ## Roadmap
 

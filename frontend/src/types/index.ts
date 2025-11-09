@@ -1,6 +1,6 @@
 export interface ConnectionConfig {
   name: string;
-  type: 'postgres' | 's3' | 'csv' | 'excel';
+  type: "postgres" | "s3" | "csv" | "excel";
   config: Record<string, any>;
 }
 
@@ -44,15 +44,38 @@ export interface ColumnInfo {
   nullable: boolean;
 }
 
+export interface ColumnMetadata {
+  name: string;
+  type: string;
+  nullable: boolean;
+  description?: string;
+  is_primary_key: boolean;
+}
+
+export interface TableMetadata {
+  name: string;
+  schema_name?: string;
+  columns: ColumnMetadata[];
+  row_count?: number;
+  description?: string;
+}
+
+export interface SchemaMetadata {
+  name: string;
+  tables: TableMetadata[];
+}
+
+export interface ConnectionMetadata {
+  connection_id: string;
+  connection_name: string;
+  source_type: string;
+  schemas: SchemaMetadata[];
+  last_updated?: string;
+}
+
 export interface QueryRequest {
   connection_id: string;
   query: string;
-}
-
-export interface AIQueryRequest {
-  connection_id: string;
-  prompt: string;
-  execute: boolean;
 }
 
 export interface QueryResult {
@@ -61,5 +84,19 @@ export interface QueryResult {
   rows?: Record<string, any>[];
   row_count?: number;
   error?: string;
-  generated_sql?: string;
+}
+
+export interface WorkspaceTableSelection {
+  connection_id: string;
+  schema_name: string;
+  table_name: string;
+}
+
+export interface WorkspaceSelections {
+  selections: WorkspaceTableSelection[];
+}
+
+export interface WorkspaceMetadataExport {
+  markdown: string;
+  filename: string;
 }

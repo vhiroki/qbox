@@ -44,6 +44,18 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Create dialog state
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createFormData, setCreateFormData] = useState<PostgresConfig>({
+    host: 'localhost',
+    port: 5432,
+    database: '',
+    username: '',
+    password: '',
+    schema: 'public',
+  });
+  const [createConnectionName, setCreateConnectionName] = useState('');
+  
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<SavedConnection | null>(null);
@@ -73,6 +85,40 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
       setSavedConnections(connections);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load connections');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setCreateConnectionName('');
+    setCreateFormData({
+      host: 'localhost',
+      port: 5432,
+      database: '',
+      username: '',
+      password: '',
+      schema: 'public',
+    });
+    setCreateDialogOpen(true);
+  };
+
+  const handleCreateSubmit = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const config: ConnectionConfig = {
+        name: createConnectionName,
+        type: 'postgres',
+        config: createFormData,
+      };
+
+      await api.createConnection(config);
+      setCreateDialogOpen(false);
+      await loadConnections();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to create connection');
     } finally {
       setLoading(false);
     }
@@ -184,10 +230,17 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
     <div className="max-w-6xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle>Connection Manager</CardTitle>
-          <CardDescription>
-            Manage your saved database connections - edit, delete, or reconnect to existing connections
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Connection Manager</CardTitle>
+              <CardDescription>
+                Manage your saved database connections - edit, delete, or reconnect to existing connections
+              </CardDescription>
+            </div>
+            <Button onClick={handleCreate} disabled={loading}>
+              Create New Connection
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {error && (
@@ -199,8 +252,11 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
           {loading && savedConnections.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Loading connections...</div>
           ) : savedConnections.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No saved connections. Create one in the Connect tab.
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">No saved connections yet</p>
+              <Button onClick={handleCreate}>
+                Create Your First Connection
+              </Button>
             </div>
           ) : (
             <Table>
@@ -236,7 +292,7 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
                           onClick={() => handleReconnect(connection)}
                           disabled={loading}
                         >
-                          Connect
+                          Add to Workspace
                         </Button>
                         <Button
                           size="sm"
@@ -351,6 +407,97 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
             </Button>
             <Button onClick={handleSaveEdit} disabled={loading}>
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Connection Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Connection</DialogTitle>
+            <DialogDescription>
+              Configure a new PostgreSQL database connection.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Connection Name</Label>
+              <Input
+                id="create-name"
+                value={createConnectionName}
+                onChange={(e) => setCreateConnectionName(e.target.value)}
+                placeholder="My Database"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-host">Host</Label>
+                <Input
+                  id="create-host"
+                  value={createFormData.host}
+                  onChange={(e) => setCreateFormData({ ...createFormData, host: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-port">Port</Label>
+                <Input
+                  id="create-port"
+                  type="number"
+                  value={createFormData.port}
+                  onChange={(e) => setCreateFormData({ ...createFormData, port: parseInt(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-database">Database</Label>
+              <Input
+                id="create-database"
+                value={createFormData.database}
+                onChange={(e) => setCreateFormData({ ...createFormData, database: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-username">Username</Label>
+              <Input
+                id="create-username"
+                value={createFormData.username}
+                onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-password">Password</Label>
+              <Input
+                id="create-password"
+                type="password"
+                value={createFormData.password}
+                onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-schema">Schema</Label>
+              <Input
+                id="create-schema"
+                value={createFormData.schema}
+                onChange={(e) => setCreateFormData({ ...createFormData, schema: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateSubmit} disabled={loading}>
+              Create Connection
             </Button>
           </DialogFooter>
         </DialogContent>

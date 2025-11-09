@@ -6,8 +6,11 @@ import type {
   SavedConnection,
   TableSchema,
   QueryRequest,
-  AIQueryRequest,
   QueryResult,
+  ConnectionMetadata,
+  WorkspaceTableSelection,
+  WorkspaceSelections,
+  WorkspaceMetadataExport,
 } from "../types";
 
 const API_BASE_URL = "/api";
@@ -78,11 +81,47 @@ export const api = {
     return response.data;
   },
 
-  async aiGenerateQuery(request: AIQueryRequest): Promise<QueryResult> {
-    const response = await axios.post(
-      `${API_BASE_URL}/queries/ai-generate`,
-      request
+  // Metadata endpoints
+  async getMetadata(connectionId: string): Promise<ConnectionMetadata> {
+    const response = await axios.get(
+      `${API_BASE_URL}/metadata/${connectionId}`
     );
+    return response.data;
+  },
+
+  async refreshMetadata(connectionId: string): Promise<ConnectionMetadata> {
+    const response = await axios.post(
+      `${API_BASE_URL}/metadata/${connectionId}/refresh`
+    );
+    return response.data;
+  },
+
+  // Workspace endpoints
+  async getWorkspaceSelections(): Promise<WorkspaceSelections> {
+    const response = await axios.get(`${API_BASE_URL}/workspace/selections`);
+    return response.data;
+  },
+
+  async addWorkspaceSelection(
+    selection: WorkspaceTableSelection
+  ): Promise<void> {
+    await axios.post(`${API_BASE_URL}/workspace/selections`, selection);
+  },
+
+  async removeWorkspaceSelection(
+    selection: WorkspaceTableSelection
+  ): Promise<void> {
+    await axios.delete(`${API_BASE_URL}/workspace/selections`, {
+      data: selection,
+    });
+  },
+
+  async clearWorkspace(): Promise<void> {
+    await axios.delete(`${API_BASE_URL}/workspace/selections/all`);
+  },
+
+  async exportWorkspaceMetadata(): Promise<WorkspaceMetadataExport> {
+    const response = await axios.get(`${API_BASE_URL}/workspace/export`);
     return response.data;
   },
 };

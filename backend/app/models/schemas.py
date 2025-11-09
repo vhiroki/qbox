@@ -48,14 +48,6 @@ class QueryRequest(BaseModel):
     query: str
 
 
-class AIQueryRequest(BaseModel):
-    """AI-powered query generation request."""
-
-    connection_id: str
-    prompt: str
-    execute: bool = False
-
-
 class QueryResult(BaseModel):
     """Query execution result."""
 
@@ -64,12 +56,69 @@ class QueryResult(BaseModel):
     rows: Optional[list[dict[str, Any]]] = None
     row_count: Optional[int] = None
     error: Optional[str] = None
-    generated_sql: Optional[str] = None
+
+
+class ColumnMetadata(BaseModel):
+    """Column metadata information."""
+
+    name: str
+    type: str
+    nullable: bool = True
+    description: Optional[str] = None
+    is_primary_key: bool = False
+
+
+class TableMetadata(BaseModel):
+    """Table metadata information."""
+
+    name: str
+    schema_name: Optional[str] = None
+    columns: list[ColumnMetadata]
+    row_count: Optional[int] = None
+    description: Optional[str] = None
+
+
+class SchemaMetadata(BaseModel):
+    """Schema metadata information."""
+
+    name: str
+    tables: list[TableMetadata]
+
+
+class ConnectionMetadata(BaseModel):
+    """Complete metadata for a connection."""
+
+    connection_id: str
+    connection_name: str
+    source_type: DataSourceType
+    schemas: list[SchemaMetadata]
+    last_updated: Optional[str] = None
 
 
 class TableSchema(BaseModel):
-    """Table schema information."""
+    """Table schema information (legacy, for backwards compatibility)."""
 
     table_name: str
     columns: list[dict[str, str]]
     row_count: Optional[int] = None
+
+
+class WorkspaceTableSelection(BaseModel):
+    """Represents a table selected in the workspace."""
+
+    connection_id: str
+    schema_name: str
+    table_name: str
+
+
+class WorkspaceSelections(BaseModel):
+    """All table selections in the workspace."""
+
+    selections: list[WorkspaceTableSelection]
+
+
+class WorkspaceMetadataExport(BaseModel):
+    """Metadata export for workspace selections."""
+
+    markdown: str
+    filename: str

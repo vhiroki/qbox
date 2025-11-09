@@ -15,16 +15,15 @@ class Settings(BaseSettings):
         env_file=str(ENV_FILE), env_file_encoding="utf-8", extra="ignore"
     )
 
-    # OpenAI Configuration
-    OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-4"
-
     # Application Configuration
     BACKEND_PORT: int = 8080
     FRONTEND_PORT: int = 5173
 
     # CORS Configuration
-    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
 
 
 @lru_cache

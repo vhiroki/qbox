@@ -101,12 +101,12 @@ class PostgresDataSource(DataSource):
 
         # Query to get tables and their columns
         query = f"""
-            SELECT 
+            SELECT
                 table_name,
                 column_name,
                 data_type,
                 is_nullable
-            FROM pg.information_schema.columns
+            FROM information_schema.columns
             WHERE table_schema = '{schema}'
             ORDER BY table_name, ordinal_position
         """
@@ -124,11 +124,11 @@ class PostgresDataSource(DataSource):
                 {
                     "name": column_name,
                     "type": data_type,
-                    "nullable": is_nullable == "YES",
+                    "nullable": "YES" if is_nullable == "YES" else "NO",
                 }
             )
 
-        # Create TableSchema objects
+        # Create TableSchema objects with fully qualified names
         schemas = []
         for table_name, columns in tables_dict.items():
             # Get row count for each table
@@ -140,7 +140,15 @@ class PostgresDataSource(DataSource):
             except Exception:
                 row_count = None
 
-            schemas.append(TableSchema(table_name=table_name, columns=columns, row_count=row_count))
+            # Use fully qualified table name (pg.schema.table)
+            full_table_name = f"pg.{schema}.{table_name}"
+            schemas.append(
+                TableSchema(
+                    table_name=full_table_name,
+                    columns=columns,
+                    row_count=row_count,
+                )
+            )
 
         return schemas
 

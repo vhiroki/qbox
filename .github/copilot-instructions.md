@@ -1,7 +1,9 @@
 # GitHub Copilot Instructions for QBox
 
 ## Project Overview
-QBox is a workspace-based data management application that helps users organize and explore data from multiple sources. Users can connect to PostgreSQL databases, select tables to build a workspace, view comprehensive metadata, and export documentation. The app runs locally with a Python FastAPI backend and React TypeScript frontend, designed to be packaged as an Electron desktop application in the future.
+QBox is a workspace-based data management application that helps users organize and explore data from multiple sources. Users can create multiple workspaces, connect to PostgreSQL databases, select tables to add to each workspace, and view comprehensive metadata. The app runs locally with a Python FastAPI backend and React TypeScript frontend, designed to be packaged as an Electron desktop application in the future.
+
+For detailed setup and usage instructions, see the [README](../README.md).
 
 ## Core Architecture Principles
 
@@ -24,7 +26,7 @@ QBox is a workspace-based data management application that helps users organize 
 - API calls should go through the `services/api.ts` client
 - Handle loading and error states gracefully
 - Design for desktop UX (keyboard shortcuts, native-feeling interactions)
-- Two-page structure: **Workspace** (main) and **Connections** (management)
+- Two-page structure: **Workspaces** (main view with workspace list and detail) and **Connections** (management)
 
 ### Electron-Ready Development
 - **Keep frontend and backend decoupled** - they should communicate only via REST API
@@ -101,13 +103,13 @@ backend/app/
 │   ├── connections.py      # Connection CRUD
 │   ├── metadata.py         # Metadata collection
 │   ├── queries.py          # Query execution
-│   └── workspace.py        # Workspace management
+│   └── workspace.py        # Workspace CRUD and table selections
 ├── services/               # Business logic (thick layer)
 │   ├── duckdb_manager.py   # Persistent DuckDB instance
 │   ├── database.py         # Database abstraction
 │   ├── metadata.py         # Metadata collection service
 │   ├── connection_repository.py  # SQLite connection persistence
-│   └── workspace_repository.py   # SQLite workspace persistence
+│   └── workspace_repository.py   # SQLite workspace and selection persistence
 ├── models/                 # Pydantic models and schemas
 ├── config/                 # Settings and configuration
 └── utils/                  # Helper functions (if needed)
@@ -118,36 +120,39 @@ backend/app/
 frontend/src/
 ├── components/             # React components
 │   ├── ConnectionManager.tsx    # Connection CRUD interface
-│   ├── ConnectionForm.tsx       # Connection creation
-│   ├── WorkspaceSelector.tsx    # Left panel: table selection tree
-│   ├── WorkspaceView.tsx        # Right panel: selected tables
-│   ├── MetadataSidebar.tsx      # Metadata tree view
+│   ├── ConnectionForm.tsx       # Connection creation/edit form
+│   ├── WorkspaceList.tsx        # Left panel: list of workspaces
+│   ├── WorkspaceDetail.tsx      # Right panel: workspace details with table cards
+│   ├── AddTablesModal.tsx       # Multi-step modal for adding tables
+│   ├── MetadataSidebar.tsx      # Metadata tree view (if used)
 │   └── ui/                      # shadcn/ui components
 ├── services/               # API client and external services
 ├── types/                  # TypeScript type definitions
 ├── hooks/                  # Custom React hooks (if needed)
 ├── utils/                  # Helper functions
 ├── lib/                    # Utility libraries (cn helper, etc.)
-└── App.tsx                 # Main app with sidebar navigation
+└── App.tsx                 # Main app with top navigation
 ```
 
 ## Workspace Architecture
 
 ### Core Concepts
 
-**Workspace**: A user's collection of selected tables from one or more data sources. Selections are persisted in SQLite and automatically restored on app startup.
+**Workspace**: A named collection of selected tables from one or more data sources. Each workspace is independent and can contain tables from multiple connections. Workspaces are persisted in SQLite and automatically restored on app startup.
 
 **Connection**: A saved database connection configuration (PostgreSQL). Stored in SQLite with credentials.
 
 **Metadata**: Schema information (tables, columns, types, constraints) automatically collected from data sources.
 
 ### Workspace Flow
-1. User creates a connection (stored in SQLite)
-2. User clicks "Add to Workspace" to load connection metadata
-3. Metadata is fetched and displayed in a tree view (Connection → Schema → Tables)
-4. User selects tables via checkboxes (persisted to SQLite)
-5. Selected tables appear as expandable cards with full metadata
-6. User can export all workspace metadata as markdown
+1. User creates a workspace (gives it a name)
+2. User creates database connections (stored in SQLite)
+3. User clicks "Add Tables" within a workspace
+4. User selects a connection, then a schema, then specific tables
+5. Selected tables are added to the workspace (persisted to SQLite)
+6. Selected tables appear as cards with full metadata in the workspace detail view
+7. User can view table details by clicking on cards
+8. User can remove tables or delete entire workspaces
 
 ### DuckDB Manager
 - Single persistent DuckDB instance at `~/.qbox/qbox.duckdb`
@@ -156,9 +161,10 @@ frontend/src/
 - Example: `pg_abc123_def456` for connection ID `abc123-def456`
 
 ### Persistence Layer
-- **connections.db**: SQLite database with two tables:
+- **connections.db**: SQLite database with three tables:
   - `connections`: Connection configurations (id, name, type, config JSON, timestamps)
-  - `workspace_selections`: Selected tables (connection_id, schema_name, table_name)
+  - `workspaces`: Workspace definitions (id, name, created_at, updated_at)
+  - `workspace_selections`: Selected tables (workspace_id, connection_id, schema_name, table_name)
 - Repository pattern: `connection_repository.py` and `workspace_repository.py`
 
 ## Data Source Guidelines
@@ -211,32 +217,39 @@ frontend/src/
 ## UI/UX Patterns
 
 ### App Structure
-- **Left Sidebar**: Navigation between Workspace and Connections pages
-- **Workspace Page**:
-  - Left panel (320px): Tree view for selecting tables (WorkspaceSelector)
-  - Right panel: Cards showing selected table metadata (WorkspaceView)
-  - Export button when tables are selected
+- **Top Navigation Bar**: Switch between Workspaces and Connections pages
+- **Workspaces Page**:
+  - Left panel (320px): List of all workspaces with create button (WorkspaceList)
+  - Right panel: Selected workspace details with table cards and Add Tables button (WorkspaceDetail)
+  - Add Tables Modal: Multi-step process (connection → schema → tables selection)
 - **Connections Page**: CRUD interface for database connections
 
 ### Component Patterns
 
-**WorkspaceSelector** (Left Panel):
-- Hierarchical tree: Connection → Schema → Tables
-- Checkboxes at table and schema level
-- Schema checkbox selects/deselects all tables
-- Collapsible sections with chevron icons
-- Color-coded icons (blue=connection, yellow=schema, green=table)
+**WorkspaceList** (Left Panel):
+- List of all workspaces ordered by newest first
+- Click to select a workspace
+- Create Workspace button at top
+- Shows workspace name and creation date
 
-**WorkspaceView** (Right Panel):
+**WorkspaceDetail** (Right Panel):
+- Header with workspace name and actions (Add Tables, Delete Workspace)
+- Table cards showing all selected tables
+- Each card displays: connection name, schema, table name, column count, row count
+- Click card to view detailed metadata in a dialog
+- X button on each card to remove from workspace
 - Empty state when no tables selected
-- Expandable cards for each selected table
-- Click card header to expand/collapse
-- Shows: connection name, schema, table name, column count, row count
-- Detailed table with columns, types, nullable, primary keys
+
+**AddTablesModal** (Multi-Step):
+- Step 1: Select a connection from saved connections
+- Step 2: Select a schema from the connection
+- Step 3: Select tables with checkboxes and search filter
+- Progress indicator showing current step
+- Back/Next/Cancel buttons for navigation
 
 **ConnectionManager**:
 - Table view of all saved connections
-- Actions: "Add to Workspace", "Edit", "Delete"
+- Actions: "Edit", "Delete" buttons
 - "Create New Connection" button in header and empty state
 - Dialog forms for create/edit
 
@@ -263,7 +276,14 @@ class ConnectionMetadata(BaseModel):
     schemas: list[SchemaMetadata]
 
 # Workspace
+class Workspace(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    updated_at: str
+
 class WorkspaceTableSelection(BaseModel):
+    workspace_id: str
     connection_id: str
     schema_name: str
     table_name: str
@@ -304,35 +324,38 @@ class WorkspaceTableSelection(BaseModel):
 ### Loading Workspace on Startup (Frontend)
 ```typescript
 useEffect(() => {
-  const loadWorkspace = async () => {
-    // 1. Get workspace selections from backend
-    const { selections } = await api.getWorkspaceSelections();
+  const loadWorkspaceData = async () => {
+    // 1. Get workspace info
+    const workspace = await api.getWorkspace(workspaceId);
     
-    // 2. Get unique connection IDs
-    const connectionIds = new Set(selections.map(s => s.connection_id));
+    // 2. Get workspace selections
+    const { selections } = await api.getWorkspaceSelections(workspaceId);
     
-    // 3. Load metadata for each connection
-    for (const id of connectionIds) {
-      const metadata = await api.getMetadata(id);
-      // Store in state
-    }
+    // 3. Display selections with their metadata
+    // Metadata is fetched on-demand when viewing table details
   };
-  loadWorkspace();
-}, []);
+  loadWorkspaceData();
+}, [workspaceId]);
 ```
 
 ### Table Selection Pattern (Frontend)
 ```typescript
-const handleTableToggle = async (connectionId: string, schemaName: string, tableName: string) => {
-  const isSelected = selectedTables.has(key);
+const handleAddTables = async () => {
+  // 1. Open multi-step modal
+  // 2. Select connection
+  const metadata = await api.getMetadata(connectionId);
   
-  if (isSelected) {
-    await api.removeWorkspaceSelection({ connection_id, schema_name, table_name });
-  } else {
-    await api.addWorkspaceSelection({ connection_id, schema_name, table_name });
+  // 3. Select schema
+  // 4. Select tables
+  
+  // 5. Add each selected table to workspace
+  for (const tableName of selectedTables) {
+    await api.addWorkspaceSelection(workspaceId, {
+      connection_id: connectionId,
+      schema_name: schemaName,
+      table_name: tableName,
+    });
   }
-  
-  // Update local state
 };
 ```
 
@@ -361,14 +384,25 @@ const fetchData = async () => {
 class WorkspaceRepository:
     """SQLite persistence for workspace selections."""
     
-    async def save(self, connection_id: str, schema_name: str, table_name: str):
+    def create_workspace(self, name: str) -> Workspace:
+        # INSERT into workspaces
+        
+    def get_all_workspaces(self) -> list[Workspace]:
+        # SELECT * from workspaces
+        
+    def delete_workspace(self, workspace_id: str) -> bool:
+        # DELETE workspace and all selections (CASCADE)
+    
+    def add_selection(self, workspace_id: str, connection_id: str, 
+                     schema_name: str, table_name: str):
         # INSERT into workspace_selections
         
-    async def remove_table(self, connection_id: str, schema_name: str, table_name: str):
+    def remove_selection(self, workspace_id: str, connection_id: str,
+                        schema_name: str, table_name: str):
         # DELETE from workspace_selections
         
-    async def get_all_selections(self) -> list[WorkspaceSelection]:
-        # SELECT * from workspace_selections
+    def get_workspace_selections(self, workspace_id: str) -> list[WorkspaceTableSelection]:
+        # SELECT * from workspace_selections WHERE workspace_id = ?
 ```
 
 ### Metadata Collection Pattern (Backend)

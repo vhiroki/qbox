@@ -8,6 +8,8 @@ import type {
   QueryRequest,
   QueryResult,
   ConnectionMetadata,
+  Workspace,
+  WorkspaceCreate,
   WorkspaceTableSelection,
   WorkspaceSelections,
   WorkspaceMetadataExport,
@@ -97,31 +99,61 @@ export const api = {
   },
 
   // Workspace endpoints
-  async getWorkspaceSelections(): Promise<WorkspaceSelections> {
-    const response = await axios.get(`${API_BASE_URL}/workspace/selections`);
+  async listWorkspaces(): Promise<Workspace[]> {
+    const response = await axios.get(`${API_BASE_URL}/workspaces/`);
+    return response.data;
+  },
+
+  async createWorkspace(data: WorkspaceCreate): Promise<Workspace> {
+    const response = await axios.post(`${API_BASE_URL}/workspaces/`, data);
+    return response.data;
+  },
+
+  async getWorkspace(workspaceId: string): Promise<Workspace> {
+    const response = await axios.get(
+      `${API_BASE_URL}/workspaces/${workspaceId}`
+    );
+    return response.data;
+  },
+
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    await axios.delete(`${API_BASE_URL}/workspaces/${workspaceId}`);
+  },
+
+  async getWorkspaceSelections(
+    workspaceId: string
+  ): Promise<WorkspaceSelections> {
+    const response = await axios.get(
+      `${API_BASE_URL}/workspaces/${workspaceId}/selections`
+    );
     return response.data;
   },
 
   async addWorkspaceSelection(
-    selection: WorkspaceTableSelection
+    workspaceId: string,
+    selection: Omit<WorkspaceTableSelection, "workspace_id">
   ): Promise<void> {
-    await axios.post(`${API_BASE_URL}/workspace/selections`, selection);
+    await axios.post(
+      `${API_BASE_URL}/workspaces/${workspaceId}/selections`,
+      selection
+    );
   },
 
   async removeWorkspaceSelection(
-    selection: WorkspaceTableSelection
+    workspaceId: string,
+    selection: Omit<WorkspaceTableSelection, "workspace_id">
   ): Promise<void> {
-    await axios.delete(`${API_BASE_URL}/workspace/selections`, {
+    await axios.delete(`${API_BASE_URL}/workspaces/${workspaceId}/selections`, {
       data: selection,
     });
   },
 
-  async clearWorkspace(): Promise<void> {
-    await axios.delete(`${API_BASE_URL}/workspace/selections/all`);
-  },
-
-  async exportWorkspaceMetadata(): Promise<WorkspaceMetadataExport> {
-    const response = await axios.get(`${API_BASE_URL}/workspace/export`);
+  async exportWorkspaceMetadata(
+    workspaceId: string
+  ): Promise<WorkspaceMetadataExport> {
+    const response = await axios.get(
+      `${API_BASE_URL}/workspaces/${workspaceId}/export`
+    );
     return response.data;
   },
 };

@@ -1,15 +1,14 @@
 # QBox
 
-QBox is a local data workspace application that helps you manage and explore data from multiple sources. Build your workspace by selecting tables from different PostgreSQL databases, view their metadata, and export documentation for AI-powered analysis.
+QBox is a local data workspace application that helps you manage and explore data from multiple sources. Create workspaces, connect to PostgreSQL databases, select tables to organize your data, and view comprehensive metadata.
 
 ## Features
 
-- 📊 **Workspace-Based Data Management**: Select and organize tables from multiple data sources in one workspace
+- � **Multi-Workspace Management**: Create and manage multiple workspaces for different projects
 - 🐘 **PostgreSQL Support**: Connect to multiple PostgreSQL databases simultaneously
 - 🦆 **DuckDB Query Engine**: Fast, embedded analytical database for cross-source queries
 - 🗂️ **Metadata Management**: Automatic schema discovery and metadata collection
-- 📥 **Metadata Export**: Export workspace metadata as markdown for AI model consumption
-- � **Persistent Workspaces**: Your table selections are saved and restored across sessions
+- � **Persistent Workspaces**: Your workspaces and table selections are saved and restored across sessions
 - 🌐 **Modern Web Interface**: Clean, dark-themed UI built with React and TypeScript
 - 🔌 **Extensible Architecture**: Ready for future data sources (S3, CSV, Excel)
 
@@ -79,9 +78,16 @@ The application will be available at:
 
 ## How to Use
 
-### 1. Create a Connection
+### 1. Create a Workspace
 
-1. Navigate to the **Connections** page using the sidebar
+1. On the **Workspaces** page (default view), click **Create Workspace**
+2. Enter a name for your workspace (e.g., "Analytics Project")
+3. Click **Create**
+4. Your new workspace appears in the left panel
+
+### 2. Create a Connection
+
+1. Navigate to the **Connections** page using the top navigation
 2. Click **Create New Connection**
 3. Fill in your PostgreSQL connection details:
    - Connection Name (e.g., "Production DB")
@@ -90,29 +96,33 @@ The application will be available at:
    - Schema (default: "public")
 4. Click **Create Connection**
 
-### 2. Add Connection to Workspace
+### 3. Add Tables to a Workspace
 
-1. In the Connections list, click **Add to Workspace** for your connection
-2. The app will load the connection's metadata and switch to the Workspace page
-
-### 3. Select Tables
-
-1. In the Workspace page, you'll see your connections in the left panel
-2. Expand connections → schemas → tables
-3. Check individual tables or entire schemas to add them to your workspace
-4. Selected tables appear as expandable cards in the main area
+1. Go back to the **Workspaces** page and select your workspace
+2. Click **Add Tables** in the workspace detail area
+3. Select a connection from the list
+4. Choose a schema from the connection
+5. Select the tables you want to add (use checkboxes)
+6. Click **Add Selected Tables**
 
 ### 4. View Table Metadata
 
-1. Click on any table card to expand it
-2. View columns, data types, nullable fields, and primary keys
-3. See row counts and table descriptions when available
+1. In the workspace detail area, you'll see all tables you've added
+2. Each table is shown as a card with:
+   - Connection name and schema
+   - Table name
+   - Column count and row count
+3. Click on a table card to view detailed metadata:
+   - Column names and data types
+   - Nullable fields
+   - Primary keys
+   - Row count
 
-### 5. Export Metadata
+### 5. Manage Workspaces
 
-1. Click the **Export Metadata** button at the top of the workspace
-2. A markdown file will download with all metadata from your selected tables
-3. Use this file as context for AI models or documentation
+- **Switch Workspaces**: Click on any workspace in the left panel
+- **Delete Tables**: Click the X button on a table card to remove it from the workspace
+- **Delete Workspace**: Click the trash icon in the workspace header (removes workspace and all selections)
 
 ## Development
 
@@ -152,20 +162,25 @@ pnpm add package-name
 ### Architecture
 
 **Backend (`backend/app/`):**
-- `api/` - FastAPI route handlers (thin layer)
+- `api/` - FastAPI route handlers (connections, workspace, metadata, queries)
 - `services/` - Business logic (DuckDB manager, repositories, metadata collection)
 - `models/` - Pydantic schemas
 - `config/` - Application settings
 
 **Frontend (`frontend/src/`):**
-- `components/` - React components (ConnectionManager, WorkspaceSelector, WorkspaceView)
+- `components/` - React components
+  - `WorkspaceList.tsx` - Left panel: list of all workspaces
+  - `WorkspaceDetail.tsx` - Right panel: workspace details and table cards
+  - `AddTablesModal.tsx` - Multi-step modal for adding tables
+  - `ConnectionManager.tsx` - Connection CRUD interface
 - `services/api.ts` - Backend API client
 - `types/` - TypeScript definitions
 
 **Key Concepts:**
-- **Workspace**: Collection of selected tables from multiple data sources (persisted in SQLite)
+- **Workspace**: Named collection of selected tables (can include tables from multiple connections)
+- **Connection**: Saved database configuration (PostgreSQL)
 - **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases
-- **Metadata**: Auto-collected schema info (tables, columns, types, constraints, stats)
+- **Metadata**: Auto-collected schema info (tables, columns, types, constraints, row counts)
 
 ### Troubleshooting
 
@@ -184,20 +199,22 @@ cd frontend && pnpm install
 ## Data Storage
 
 QBox stores data locally in `~/.qbox/`:
-- `connections.db` - SQLite database with connection configs and workspace selections
+- `connections.db` - SQLite database with connection configs, workspaces, and workspace table selections
 - `qbox.duckdb` - Persistent DuckDB instance with attached data sources
 
 ## Roadmap
 
 **Completed:**
 - ✅ PostgreSQL connection management
-- ✅ Multi-connection workspace support
+- ✅ Multi-workspace support (create, list, delete)
+- ✅ Add tables to workspaces from any connection
 - ✅ Automatic metadata discovery
-- ✅ Workspace persistence
-- ✅ Metadata export
+- ✅ Workspace and table selection persistence
+- ✅ View detailed table metadata
 
 **Planned:**
 - [ ] Query execution interface
+- [ ] Metadata export (markdown format)
 - [ ] CSV file support
 - [ ] Excel file support
 - [ ] S3 bucket support

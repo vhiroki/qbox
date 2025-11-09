@@ -63,7 +63,7 @@ export default function WorkspaceView({
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <div className="text-center">
-          <p className="text-lg mb-2">No tables selected</p>
+          <p className="text-lg mb-2">No tables connected</p>
           <p className="text-sm">Select tables from the left panel to view their metadata</p>
         </div>
       </div>
@@ -75,7 +75,7 @@ export default function WorkspaceView({
       {/* Header with Export Button */}
       <div className="p-4 border-b flex items-center justify-between">
         <div>
-          <h3 className="font-semibold">Selected Tables ({selectedMetadata.length})</h3>
+          <h3 className="font-semibold">Connected Tables ({selectedMetadata.length})</h3>
           <p className="text-sm text-muted-foreground">
             Click on a table to expand and view its metadata
           </p>

@@ -45,7 +45,7 @@ app.include_router(
 )
 app.include_router(queries.router, prefix="/api/queries", tags=["queries"])
 app.include_router(metadata.router, prefix="/api")
-app.include_router(workspace.router, prefix="/api")
+app.include_router(workspace.router, prefix="/api")  # /api/workspaces
 
 
 @app.get("/")

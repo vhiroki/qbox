@@ -86,13 +86,26 @@ export interface QueryResult {
   error?: string;
 }
 
+export interface Workspace {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceCreate {
+  name: string;
+}
+
 export interface WorkspaceTableSelection {
+  workspace_id: string;
   connection_id: string;
   schema_name: string;
   table_name: string;
 }
 
 export interface WorkspaceSelections {
+  workspace_id: string;
   selections: WorkspaceTableSelection[];
 }
 

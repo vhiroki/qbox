@@ -33,13 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-interface ConnectionManagerProps {
-  onConnect?: (connectionId: string, connectionName: string) => void;
-  onDisconnect?: (connectionId: string) => void;
-  currentConnectionId?: string | null;
-}
-
-export default function ConnectionManager({ onConnect, onDisconnect, currentConnectionId }: ConnectionManagerProps) {
+export default function ConnectionManager() {
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -184,39 +178,14 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
       setLoading(true);
       setError(null);
       
-      // Check if we're deleting the currently active connection
-      const isDeletingActiveConnection = currentConnectionId === deletingConnection.id;
-      
       // Delete both active and saved connection
       await api.deleteConnection(deletingConnection.id, true);
-      
-      // If we deleted the active connection, notify parent to clear it
-      if (isDeletingActiveConnection && onDisconnect) {
-        onDisconnect(deletingConnection.id);
-      }
       
       setDeleteDialogOpen(false);
       setDeletingConnection(null);
       await loadConnections();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete connection');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReconnect = async (connection: SavedConnection) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await api.reconnectConnection(connection.id);
-      
-      if (result.success && result.connection_id && onConnect) {
-        onConnect(result.connection_id, connection.name);
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to reconnect. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -286,14 +255,6 @@ export default function ConnectionManager({ onConnect, onDisconnect, currentConn
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleReconnect(connection)}
-                          disabled={loading}
-                        >
-                          Add to Workspace
-                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

@@ -147,3 +147,136 @@ class WorkspaceMetadataExport(BaseModel):
 
     markdown: str
     filename: str
+
+
+# Query Models (replaces Workspace concept)
+
+
+class Query(BaseModel):
+    """A query containing SQL text and selected tables."""
+
+    id: str
+    name: str
+    sql_text: str
+    created_at: str
+    updated_at: str
+
+
+class QueryCreate(BaseModel):
+    """Request to create a new query."""
+
+    name: str
+    sql_text: str = ""
+
+
+class QueryTableSelectionRequest(BaseModel):
+    """Request to add/remove a table from query."""
+
+    connection_id: str
+    schema_name: str
+    table_name: str
+
+
+class QueryTableSelection(BaseModel):
+    """Represents a table selected in a query."""
+
+    query_id: str
+    connection_id: str
+    schema_name: str
+    table_name: str
+
+
+class QuerySelections(BaseModel):
+    """All table selections in a query."""
+
+    query_id: str
+    selections: list[QueryTableSelection]
+
+
+class ChatMessage(BaseModel):
+    """A chat message in query conversation."""
+
+    id: int
+    query_id: str
+    role: str  # 'user' or 'assistant'
+    message: str
+    created_at: str
+
+
+class ChatRequest(BaseModel):
+    """Request to send a chat message."""
+
+    message: str
+
+
+class ChatResponse(BaseModel):
+    """Response from chat interaction."""
+
+    message: ChatMessage
+    updated_sql: str
+
+
+class QueryUpdateRequest(BaseModel):
+    """Request to update query SQL."""
+
+    sql_text: str
+
+
+# AI Query Models
+
+
+class AIQueryRequest(BaseModel):
+    """Request to generate SQL from natural language."""
+
+    prompt: str
+    additional_instructions: Optional[str] = None
+
+
+class AIQueryResponse(BaseModel):
+    """Response with generated SQL and explanation."""
+
+    query_id: str
+    generated_sql: str
+    explanation: Optional[str] = None
+
+
+class QueryExecutionRequest(BaseModel):
+    """Request to execute a SQL query."""
+
+    sql: str
+    save_to_history: bool = True
+    query_id: Optional[str] = None  # Reference to AI-generated query
+
+
+class QueryExecutionResult(BaseModel):
+    """Result of query execution."""
+
+    success: bool
+    columns: Optional[list[str]] = None
+    rows: Optional[list[dict[str, Any]]] = None
+    row_count: Optional[int] = None
+    execution_time_ms: Optional[int] = None
+    error: Optional[str] = None
+
+
+class QueryHistoryItem(BaseModel):
+    """A query history item."""
+
+    id: str
+    workspace_id: str
+    prompt: str
+    generated_sql: str
+    executed_sql: Optional[str] = None
+    explanation: Optional[str] = None
+    row_count: Optional[int] = None
+    execution_time_ms: Optional[int] = None
+    error: Optional[str] = None
+    created_at: str
+
+
+class QueryHistoryList(BaseModel):
+    """List of query history items."""
+
+    workspace_id: str
+    queries: list[QueryHistoryItem]
+    total: int

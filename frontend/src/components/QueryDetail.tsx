@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Database, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Database, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -27,118 +27,137 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { api } from '../services/api';
-import QueryInterface from './QueryInterface';
-import type { Workspace, WorkspaceTableSelection, TableMetadata } from '../types';
+} from "@/components/ui/table";
+import { api } from "../services/api";
+import ChatInterface from "./ChatInterface";
+import type {
+  Query,
+  QueryTableSelection,
+  TableMetadata,
+} from "../types";
 
-interface WorkspaceDetailProps {
-  workspaceId: string;
-  onWorkspaceDeleted: () => void;
+interface QueryDetailProps {
+  queryId: string;
+  onQueryDeleted: () => void;
   onAddTables: () => void;
 }
 
-export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAddTables }: WorkspaceDetailProps) {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [selections, setSelections] = useState<WorkspaceTableSelection[]>([]);
+export default function QueryDetail({
+  queryId,
+  onQueryDeleted,
+  onAddTables,
+}: QueryDetailProps) {
+  const [query, setQuery] = useState<Query | null>(null);
+  const [selections, setSelections] = useState<QueryTableSelection[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
+
   // Table details dialog
-  const [selectedTable, setSelectedTable] = useState<{ 
-    selection: WorkspaceTableSelection; 
+  const [selectedTable, setSelectedTable] = useState<{
+    selection: QueryTableSelection;
     metadata: TableMetadata | null;
   } | null>(null);
   const [tableDetailsOpen, setTableDetailsOpen] = useState(false);
   const [loadingTableDetails, setLoadingTableDetails] = useState(false);
 
   useEffect(() => {
-    loadWorkspaceData();
-  }, [workspaceId]);
+    loadQueryData();
+  }, [queryId]);
 
-  const loadWorkspaceData = async () => {
+  const loadQueryData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const [workspaceData, selectionsData] = await Promise.all([
-        api.getWorkspace(workspaceId),
-        api.getWorkspaceSelections(workspaceId),
+
+      const [queryData, selectionsData] = await Promise.all([
+        api.getQuery(queryId),
+        api.getQuerySelections(queryId),
       ]);
-      
-      setWorkspace(workspaceData);
+
+      setQuery(queryData);
       setSelections(selectionsData.selections);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load workspace');
+      setError(err.response?.data?.detail || "Failed to load query");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRemoveTable = async (selection: WorkspaceTableSelection) => {
+  const handleRemoveTable = async (selection: QueryTableSelection) => {
     try {
-      await api.removeWorkspaceSelection(workspaceId, {
+      await api.removeQuerySelection(queryId, {
         connection_id: selection.connection_id,
         schema_name: selection.schema_name,
         table_name: selection.table_name,
       });
-      
-      setSelections(prev => prev.filter(s => 
-        !(s.connection_id === selection.connection_id && 
-          s.schema_name === selection.schema_name && 
-          s.table_name === selection.table_name)
-      ));
+
+      setSelections((prev) =>
+        prev.filter(
+          (s) =>
+            !(
+              s.connection_id === selection.connection_id &&
+              s.schema_name === selection.schema_name &&
+              s.table_name === selection.table_name
+            )
+        )
+      );
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to remove table');
+      setError(err.response?.data?.detail || "Failed to remove table");
     }
   };
 
-  const handleTableClick = async (selection: WorkspaceTableSelection) => {
+  const handleTableClick = async (selection: QueryTableSelection) => {
     try {
       setLoadingTableDetails(true);
       setTableDetailsOpen(true);
       setSelectedTable({ selection, metadata: null });
-      
+
       // Fetch metadata for the connection
       const metadata = await api.getMetadata(selection.connection_id);
-      
+
       // Find the specific table
-      const schema = metadata.schemas.find(s => s.name === selection.schema_name);
-      const table = schema?.tables.find(t => t.name === selection.table_name);
-      
+      const schema = metadata.schemas.find(
+        (s) => s.name === selection.schema_name
+      );
+      const table = schema?.tables.find((t) => t.name === selection.table_name);
+
       setSelectedTable({ selection, metadata: table || null });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load table details');
+      setError(err.response?.data?.detail || "Failed to load table details");
     } finally {
       setLoadingTableDetails(false);
     }
   };
 
-  const handleDeleteWorkspace = async () => {
+  const handleDeleteQuery = async () => {
     try {
       setLoading(true);
-      await api.deleteWorkspace(workspaceId);
+      await api.deleteQuery(queryId);
       setDeleteDialogOpen(false);
-      onWorkspaceDeleted();
+      onQueryDeleted();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete workspace');
+      setError(err.response?.data?.detail || "Failed to delete query");
       setLoading(false);
     }
   };
 
-  if (loading && !workspace) {
+  const handleSQLUpdate = (updatedQuery: Query) => {
+    setQuery(updatedQuery);
+  };
+
+  if (loading && !query) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-muted-foreground">Loading workspace...</div>
+        <div className="text-muted-foreground">Loading query...</div>
       </div>
     );
   }
 
-  if (!workspace) {
+  if (!query) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-muted-foreground">Workspace not found</div>
+        <div className="text-muted-foreground">Query not found</div>
       </div>
     );
   }
@@ -149,9 +168,10 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
       <div className="border-b bg-muted/10 p-6">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold">{workspace.name}</h2>
+            <h2 className="text-2xl font-bold">{query.name}</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {selections.length} {selections.length === 1 ? 'table' : 'tables'} connected
+              {selections.length}{" "}
+              {selections.length === 1 ? "table" : "tables"} connected
             </p>
           </div>
           <div className="flex gap-2">
@@ -159,7 +179,10 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
               <Plus className="h-4 w-4 mr-2" />
               Add Tables
             </Button>
-            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
@@ -174,25 +197,27 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <Tabs defaultValue="query" className="h-full flex flex-col">
+      <div className="flex-1 overflow-hidden p-6">
+        <Tabs defaultValue="chat" className="h-full flex flex-col">
           <TabsList className="w-full justify-start mb-4">
-            <TabsTrigger value="query">AI Query</TabsTrigger>
+            <TabsTrigger value="chat">Chat & SQL</TabsTrigger>
             <TabsTrigger value="tables">
               Connected Tables ({selections.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="query" className="flex-1">
-            <QueryInterface workspaceId={workspaceId} />
+          <TabsContent value="chat" className="flex-1 overflow-hidden">
+            <ChatInterface query={query} onSQLUpdate={handleSQLUpdate} />
           </TabsContent>
 
-          <TabsContent value="tables" className="flex-1">
+          <TabsContent value="tables" className="flex-1 overflow-y-auto">
             {selections.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Database className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No tables connected yet</p>
-                <p className="text-xs mt-1">Click "Add Tables" to get started</p>
+                <p className="text-xs mt-1">
+                  Click "Add Tables" to get started
+                </p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -233,15 +258,15 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Workspace</AlertDialogTitle>
+            <AlertDialogTitle>Delete Query</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{workspace.name}"? This will remove all table selections
-              and cannot be undone.
+              Are you sure you want to delete "{query.name}"? This will remove
+              all table selections and chat history. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteWorkspace} disabled={loading}>
+            <AlertDialogAction onClick={handleDeleteQuery} disabled={loading}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -253,7 +278,8 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
         <DialogContent className="max-w-6xl min-w-[800px] w-[90vw] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedTable?.selection.schema_name}.{selectedTable?.selection.table_name}
+              {selectedTable?.selection.schema_name}.
+              {selectedTable?.selection.table_name}
             </DialogTitle>
             <DialogDescription>
               Table column definitions and metadata
@@ -278,20 +304,38 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
                 <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[35%] break-words whitespace-normal">Column Name</TableHead>
-                      <TableHead className="w-[35%] break-words whitespace-normal">Type</TableHead>
-                      <TableHead className="w-[15%] break-words whitespace-normal">Nullable</TableHead>
-                      <TableHead className="w-[15%] break-words whitespace-normal">Primary Key</TableHead>
+                      <TableHead className="w-[35%] break-words whitespace-normal">
+                        Column Name
+                      </TableHead>
+                      <TableHead className="w-[35%] break-words whitespace-normal">
+                        Type
+                      </TableHead>
+                      <TableHead className="w-[15%] break-words whitespace-normal">
+                        Nullable
+                      </TableHead>
+                      <TableHead className="w-[15%] break-words whitespace-normal">
+                        Primary Key
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {selectedTable.metadata.columns.map((column) => (
                       <TableRow key={column.name}>
-                        <TableCell className="font-medium break-words whitespace-normal">{column.name}</TableCell>
-                        <TableCell className="font-mono text-xs break-all whitespace-normal">{column.type}</TableCell>
+                        <TableCell className="font-medium break-words whitespace-normal">
+                          {column.name}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs break-all whitespace-normal">
+                          {column.type}
+                        </TableCell>
                         <TableCell>
-                          <span className={column.nullable ? 'text-muted-foreground' : 'text-yellow-600'}>
-                            {column.nullable ? 'Yes' : 'No'}
+                          <span
+                            className={
+                              column.nullable
+                                ? "text-muted-foreground"
+                                : "text-yellow-600"
+                            }
+                          >
+                            {column.nullable ? "Yes" : "No"}
                           </span>
                         </TableCell>
                         <TableCell>

@@ -1,7 +1,7 @@
 # GitHub Copilot Instructions for QBox
 
 ## Project Overview
-QBox is a workspace-based data management application that helps users organize and explore data from multiple sources. Users can create multiple workspaces, connect to PostgreSQL databases, select tables to add to each workspace, and view comprehensive metadata. The app runs locally with a Python FastAPI backend and React TypeScript frontend, designed to be packaged as an Electron desktop application in the future.
+QBox is a query-based data management application that helps users build and manage SQL queries across multiple sources. Users can create queries, connect to PostgreSQL databases, select tables to add to each query, use AI-powered chat to interactively build SQL, and view comprehensive metadata. The app runs locally with a Python FastAPI backend and React TypeScript frontend, designed to be packaged as an Electron desktop application in the future.
 
 For detailed setup and usage instructions, see the [README](../README.md).
 
@@ -10,12 +10,13 @@ For detailed setup and usage instructions, see the [README](../README.md).
 ### Backend (Python + FastAPI)
 - Use FastAPI for all API endpoints
 - DuckDB is the query engine - maintain a persistent instance that can attach multiple data sources
-- SQLite for persistence: connection configurations and workspace selections stored in `~/.qbox/connections.db`
+- SQLite for persistence: connection configurations, queries, query table selections, and chat history stored in `~/.qbox/connections.db`
 - Keep the backend as a standalone service that communicates via REST API
 - All business logic should be in the `services/` directory
 - Use Pydantic models for data validation and serialization
-- Repository pattern for data persistence (connection_repository, workspace_repository)
+- Repository pattern for data persistence (connection_repository, query_repository)
 - Environment variables for configuration (use `pydantic-settings`)
+- AI integration via OpenAI for interactive SQL editing
 
 ### Frontend (React + TypeScript)
 - Use functional components with hooks (no class components)
@@ -26,7 +27,7 @@ For detailed setup and usage instructions, see the [README](../README.md).
 - API calls should go through the `services/api.ts` client
 - Handle loading and error states gracefully
 - Design for desktop UX (keyboard shortcuts, native-feeling interactions)
-- Two-page structure: **Workspaces** (main view with workspace list and detail) and **Connections** (management)
+- Two-page structure: **Queries** (main view with query list and detail) and **Connections** (management)
 
 ### Electron-Ready Development
 - **Keep frontend and backend decoupled** - they should communicate only via REST API
@@ -102,14 +103,15 @@ backend/app/
 ├── api/                    # Route handlers (thin layer)
 │   ├── connections.py      # Connection CRUD
 │   ├── metadata.py         # Metadata collection
-│   ├── queries.py          # Query execution
-│   └── workspace.py        # Workspace CRUD and table selections
+│   ├── queries.py          # Query CRUD and chat interaction
+│   └── query.py            # Query execution (deprecated, use queries.py)
 ├── services/               # Business logic (thick layer)
 │   ├── duckdb_manager.py   # Persistent DuckDB instance
 │   ├── database.py         # Database abstraction
 │   ├── metadata.py         # Metadata collection service
+│   ├── ai_service.py       # AI integration for SQL editing
 │   ├── connection_repository.py  # SQLite connection persistence
-│   └── workspace_repository.py   # SQLite workspace and selection persistence
+│   └── query_repository.py       # SQLite query and chat history persistence
 ├── models/                 # Pydantic models and schemas
 ├── config/                 # Settings and configuration
 └── utils/                  # Helper functions (if needed)
@@ -121,8 +123,9 @@ frontend/src/
 ├── components/             # React components
 │   ├── ConnectionManager.tsx    # Connection CRUD interface
 │   ├── ConnectionForm.tsx       # Connection creation/edit form
-│   ├── WorkspaceList.tsx        # Left panel: list of workspaces
-│   ├── WorkspaceDetail.tsx      # Right panel: workspace details with table cards
+│   ├── QueryList.tsx            # Left panel: list of queries
+│   ├── QueryDetail.tsx          # Right panel: query details with chat and table cards
+│   ├── ChatInterface.tsx        # AI chat for interactive SQL editing
 │   ├── AddTablesModal.tsx       # Multi-step modal for adding tables
 │   ├── MetadataSidebar.tsx      # Metadata tree view (if used)
 │   └── ui/                      # shadcn/ui components
@@ -134,25 +137,28 @@ frontend/src/
 └── App.tsx                 # Main app with top navigation
 ```
 
-## Workspace Architecture
+## Query Architecture
 
 ### Core Concepts
 
-**Workspace**: A named collection of selected tables from one or more data sources. Each workspace is independent and can contain tables from multiple connections. Workspaces are persisted in SQLite and automatically restored on app startup.
+**Query**: A named SQL query with connected tables from one or more data sources. Each query is independent and can contain tables from multiple connections. Queries are persisted in SQLite with SQL text, chat history, and table selections automatically restored on app startup.
 
 **Connection**: A saved database connection configuration (PostgreSQL). Stored in SQLite with credentials.
 
 **Metadata**: Schema information (tables, columns, types, constraints) automatically collected from data sources.
 
-### Workspace Flow
-1. User creates a workspace (gives it a name)
+**Chat History**: Conversational messages between user and AI for iterative SQL editing. Stored per query.
+
+### Query Flow
+1. User creates a query (gives it a name)
 2. User creates database connections (stored in SQLite)
-3. User clicks "Add Tables" within a workspace
+3. User clicks "Add Tables" within a query
 4. User selects a connection, then a schema, then specific tables
-5. Selected tables are added to the workspace (persisted to SQLite)
-6. Selected tables appear as cards with full metadata in the workspace detail view
-7. User can view table details by clicking on cards
-8. User can remove tables or delete entire workspaces
+5. Selected tables are added to the query (persisted to SQLite)
+6. Selected tables appear as cards with full metadata in the query detail view
+7. User can chat with AI to build/edit SQL interactively
+8. User can view table details by clicking on cards
+9. User can remove tables or delete entire queries
 
 ### DuckDB Manager
 - Single persistent DuckDB instance at `~/.qbox/qbox.duckdb`
@@ -161,11 +167,12 @@ frontend/src/
 - Example: `pg_abc123_def456` for connection ID `abc123-def456`
 
 ### Persistence Layer
-- **connections.db**: SQLite database with three tables:
+- **connections.db**: SQLite database with four tables:
   - `connections`: Connection configurations (id, name, type, config JSON, timestamps)
-  - `workspaces`: Workspace definitions (id, name, created_at, updated_at)
-  - `workspace_selections`: Selected tables (workspace_id, connection_id, schema_name, table_name)
-- Repository pattern: `connection_repository.py` and `workspace_repository.py`
+  - `queries`: Query definitions (id, name, sql_text, created_at, updated_at)
+  - `query_selections`: Selected tables (query_id, connection_id, schema_name, table_name)
+  - `query_chat_history`: Chat messages (id, query_id, role, message, created_at)
+- Repository pattern: `connection_repository.py` and `query_repository.py`
 
 ## Data Source Guidelines
 
@@ -217,28 +224,39 @@ frontend/src/
 ## UI/UX Patterns
 
 ### App Structure
-- **Top Navigation Bar**: Switch between Workspaces and Connections pages
-- **Workspaces Page**:
-  - Left panel (320px): List of all workspaces with create button (WorkspaceList)
-  - Right panel: Selected workspace details with table cards and Add Tables button (WorkspaceDetail)
+- **Top Navigation Bar**: Switch between Queries and Connections pages
+- **Queries Page**:
+  - Left panel (320px): List of all queries with create button (QueryList)
+  - Right panel: Selected query details with chat interface and table cards (QueryDetail)
   - Add Tables Modal: Multi-step process (connection → schema → tables selection)
+  - Chat & SQL Tab: Interactive SQL editing with AI assistant
 - **Connections Page**: CRUD interface for database connections
 
 ### Component Patterns
 
-**WorkspaceList** (Left Panel):
-- List of all workspaces ordered by newest first
-- Click to select a workspace
-- Create Workspace button at top
-- Shows workspace name and creation date
+**QueryList** (Left Panel):
+- List of all queries ordered by newest first
+- Click to select a query
+- Create Query button at top
+- Shows query name and last updated date
 
-**WorkspaceDetail** (Right Panel):
-- Header with workspace name and actions (Add Tables, Delete Workspace)
-- Table cards showing all selected tables
+**QueryDetail** (Right Panel):
+- Header with query name and actions (Add Tables, Delete Query)
+- Two tabs: "Chat & SQL" and "Connected Tables"
+- Chat & SQL tab: ChatInterface component with SQL editor and chat history
+- Connected Tables tab: Table cards showing all selected tables
 - Each card displays: connection name, schema, table name, column count, row count
 - Click card to view detailed metadata in a dialog
-- X button on each card to remove from workspace
+- X button on each card to remove from query
 - Empty state when no tables selected
+
+**ChatInterface** (Chat & SQL Tab):
+- SQL editor (editable textarea) showing current SQL
+- Chat message history with user/assistant bubbles
+- Input field and send button for new messages
+- AI iteratively refines SQL based on conversation context
+- Save SQL button when manually edited
+- Clear chat history button
 
 **AddTablesModal** (Multi-Step):
 - Step 1: Select a connection from saved connections
@@ -275,18 +293,34 @@ class ConnectionMetadata(BaseModel):
     source_type: str
     schemas: list[SchemaMetadata]
 
-# Workspace
-class Workspace(BaseModel):
+# Query
+class Query(BaseModel):
     id: str
     name: str
+    sql_text: str
     created_at: str
     updated_at: str
 
-class WorkspaceTableSelection(BaseModel):
-    workspace_id: str
+class QueryTableSelection(BaseModel):
+    query_id: str
     connection_id: str
     schema_name: str
     table_name: str
+
+# Chat
+class ChatMessage(BaseModel):
+    id: int
+    query_id: str
+    role: Literal["user", "assistant"]
+    message: str
+    created_at: str
+
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    message: ChatMessage
+    updated_sql: str
 ```
 
 ## Testing Approach
@@ -321,21 +355,24 @@ class WorkspaceTableSelection(BaseModel):
 
 ## Common Patterns
 
-### Loading Workspace on Startup (Frontend)
+### Loading Query on Startup (Frontend)
 ```typescript
 useEffect(() => {
-  const loadWorkspaceData = async () => {
-    // 1. Get workspace info
-    const workspace = await api.getWorkspace(workspaceId);
+  const loadQueryData = async () => {
+    // 1. Get query info
+    const query = await api.getQuery(queryId);
     
-    // 2. Get workspace selections
-    const { selections } = await api.getWorkspaceSelections(workspaceId);
+    // 2. Get query selections
+    const { selections } = await api.getQuerySelections(queryId);
     
-    // 3. Display selections with their metadata
+    // 3. Get chat history
+    const chatHistory = await api.getChatHistory(queryId);
+    
+    // 4. Display selections with their metadata
     // Metadata is fetched on-demand when viewing table details
   };
-  loadWorkspaceData();
-}, [workspaceId]);
+  loadQueryData();
+}, [queryId]);
 ```
 
 ### Table Selection Pattern (Frontend)
@@ -348,14 +385,32 @@ const handleAddTables = async () => {
   // 3. Select schema
   // 4. Select tables
   
-  // 5. Add each selected table to workspace
+  // 5. Add each selected table to query
   for (const tableName of selectedTables) {
-    await api.addWorkspaceSelection(workspaceId, {
+    await api.addQuerySelection(queryId, {
       connection_id: connectionId,
       schema_name: schemaName,
       table_name: tableName,
     });
   }
+};
+```
+
+### Chat Interaction Pattern (Frontend)
+```typescript
+const handleSendMessage = async () => {
+  const response = await api.chatWithAI(queryId, {
+    message: userMessage,
+  });
+  
+  // Add chat message to history
+  setChatHistory(prev => [...prev, response.message]);
+  
+  // Update SQL text
+  setSqlText(response.updated_sql);
+  
+  // Update parent component
+  onSQLUpdate({ ...query, sql_text: response.updated_sql });
 };
 ```
 
@@ -381,28 +436,34 @@ const fetchData = async () => {
 
 ### Service Layer Pattern (Backend)
 ```python
-class WorkspaceRepository:
-    """SQLite persistence for workspace selections."""
+class QueryRepository:
+    """SQLite persistence for queries and selections."""
     
-    def create_workspace(self, name: str) -> Workspace:
-        # INSERT into workspaces
+    def create_query(self, name: str, sql_text: str = "") -> Query:
+        # INSERT into queries
         
-    def get_all_workspaces(self) -> list[Workspace]:
-        # SELECT * from workspaces
+    def get_all_queries(self) -> list[Query]:
+        # SELECT * from queries
         
-    def delete_workspace(self, workspace_id: str) -> bool:
-        # DELETE workspace and all selections (CASCADE)
+    def delete_query(self, query_id: str) -> bool:
+        # DELETE query and all selections + chat history (CASCADE)
     
-    def add_selection(self, workspace_id: str, connection_id: str, 
+    def add_table_selection(self, query_id: str, connection_id: str, 
                      schema_name: str, table_name: str):
-        # INSERT into workspace_selections
+        # INSERT into query_selections
         
-    def remove_selection(self, workspace_id: str, connection_id: str,
+    def remove_table_selection(self, query_id: str, connection_id: str,
                         schema_name: str, table_name: str):
-        # DELETE from workspace_selections
+        # DELETE from query_selections
         
-    def get_workspace_selections(self, workspace_id: str) -> list[WorkspaceTableSelection]:
-        # SELECT * from workspace_selections WHERE workspace_id = ?
+    def get_query_selections(self, query_id: str) -> list[QueryTableSelection]:
+        # SELECT * from query_selections WHERE query_id = ?
+    
+    def add_chat_message(self, query_id: str, role: str, message: str) -> ChatMessage:
+        # INSERT into query_chat_history
+    
+    def get_chat_history(self, query_id: str) -> list[ChatMessage]:
+        # SELECT * from query_chat_history WHERE query_id = ? ORDER BY created_at
 ```
 
 ### Metadata Collection Pattern (Backend)
@@ -472,7 +533,7 @@ Example: `feat: add schema-level checkbox selection to workspace`
 
 ## Priority Order for Development
 
-1. **Core Functionality**: Database connections, workspace management, metadata collection
+1. **Core Functionality**: Database connections, query management, metadata collection, AI chat integration
 2. **User Experience**: Loading states, error handling, responsive design
 3. **Extensibility**: Easy to add new data sources
 4. **Testing**: Ensure reliability
@@ -489,4 +550,4 @@ Example: `feat: add schema-level checkbox selection to workspace`
 - Performance matters (working with potentially large datasets)
 - User experience should feel native and fast
 - Dark theme only - no light mode or theme switching
-- Workspace is the main concept - everything revolves around table selection and metadata viewing
+- Query is the main concept - everything revolves around interactive SQL editing with AI assistance and table metadata viewing

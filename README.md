@@ -1,14 +1,15 @@
 # QBox
 
-QBox is a local data workspace application that helps you manage and explore data from multiple sources. Create workspaces, connect to PostgreSQL databases, select tables to organize your data, and view comprehensive metadata.
+QBox is a local data query application that helps you build and manage SQL queries across multiple data sources. Create queries, connect to PostgreSQL databases, select tables to work with, and use AI-powered chat to interactively build your SQL.
 
 ## Features
 
-- � **Multi-Workspace Management**: Create and manage multiple workspaces for different projects
+- 💬 **AI-Powered Query Building**: Chat with AI to iteratively build and refine SQL queries
+- 📊 **Query Management**: Create and manage multiple queries for different analysis tasks
 - 🐘 **PostgreSQL Support**: Connect to multiple PostgreSQL databases simultaneously
 - 🦆 **DuckDB Query Engine**: Fast, embedded analytical database for cross-source queries
 - 🗂️ **Metadata Management**: Automatic schema discovery and metadata collection
-- � **Persistent Workspaces**: Your workspaces and table selections are saved and restored across sessions
+- 💾 **Persistent Queries**: Your queries, table selections, and chat history are saved across sessions
 - 🌐 **Modern Web Interface**: Clean, dark-themed UI built with React and TypeScript
 - 🔌 **Extensible Architecture**: Ready for future data sources (S3, CSV, Excel)
 
@@ -78,12 +79,12 @@ The application will be available at:
 
 ## How to Use
 
-### 1. Create a Workspace
+### 1. Create a Query
 
-1. On the **Workspaces** page (default view), click **Create Workspace**
-2. Enter a name for your workspace (e.g., "Analytics Project")
+1. On the **Queries** page (default view), click **Create Query**
+2. Enter a name for your query (e.g., "Sales Analysis")
 3. Click **Create**
-4. Your new workspace appears in the left panel
+4. Your new query appears in the left panel
 
 ### 2. Create a Connection
 
@@ -96,33 +97,40 @@ The application will be available at:
    - Schema (default: "public")
 4. Click **Create Connection**
 
-### 3. Add Tables to a Workspace
+### 3. Add Tables to a Query
 
-1. Go back to the **Workspaces** page and select your workspace
-2. Click **Add Tables** in the workspace detail area
+1. Go back to the **Queries** page and select your query
+2. Click **Add Tables** in the query detail area
 3. Select a connection from the list
 4. Choose a schema from the connection
 5. Select the tables you want to add (use checkboxes)
 6. Click **Add Selected Tables**
 
-### 4. View Table Metadata
+### 4. Build SQL with AI Chat
 
-1. In the workspace detail area, you'll see all tables you've added
-2. Each table is shown as a card with:
-   - Connection name and schema
-   - Table name
-   - Column count and row count
-3. Click on a table card to view detailed metadata:
+1. In the query detail area, you'll see the "Chat & SQL" tab
+2. The SQL editor shows your current query (initially empty)
+3. Type a message to the AI like "Write a SELECT query to get all active users"
+4. The AI will generate SQL and update the editor
+5. Continue chatting to refine: "Add a WHERE clause for created_at > '2024-01-01'"
+6. Each message iteratively improves the SQL based on your connected tables
+
+### 5. View Table Metadata
+
+1. Switch to the "Connected Tables" tab
+2. Click on any table card to view detailed metadata:
    - Column names and data types
    - Nullable fields
    - Primary keys
    - Row count
 
-### 5. Manage Workspaces
+### 6. Manage Queries
 
-- **Switch Workspaces**: Click on any workspace in the left panel
-- **Delete Tables**: Click the X button on a table card to remove it from the workspace
-- **Delete Workspace**: Click the trash icon in the workspace header (removes workspace and all selections)
+- **Switch Queries**: Click on any query in the left panel
+- **Edit SQL Directly**: You can manually edit the SQL in the editor
+- **Clear Chat**: Remove chat history while keeping the SQL
+- **Delete Tables**: Click the X button on a table card to remove it from the query
+- **Delete Query**: Click the trash icon in the query header (removes query, selections, and chat history)
 
 ## Development
 
@@ -162,23 +170,25 @@ pnpm add package-name
 ### Architecture
 
 **Backend (`backend/app/`):**
-- `api/` - FastAPI route handlers (connections, workspace, metadata, queries)
-- `services/` - Business logic (DuckDB manager, repositories, metadata collection)
+- `api/` - FastAPI route handlers (connections, queries, metadata)
+- `services/` - Business logic (DuckDB manager, repositories, metadata collection, AI service)
 - `models/` - Pydantic schemas
 - `config/` - Application settings
 
 **Frontend (`frontend/src/`):**
 - `components/` - React components
-  - `WorkspaceList.tsx` - Left panel: list of all workspaces
-  - `WorkspaceDetail.tsx` - Right panel: workspace details and table cards
+  - `QueryList.tsx` - Left panel: list of all queries
+  - `QueryDetail.tsx` - Right panel: query details with chat interface and table cards
+  - `ChatInterface.tsx` - AI chat for interactive SQL editing
   - `AddTablesModal.tsx` - Multi-step modal for adding tables
   - `ConnectionManager.tsx` - Connection CRUD interface
 - `services/api.ts` - Backend API client
 - `types/` - TypeScript definitions
 
 **Key Concepts:**
-- **Workspace**: Named collection of selected tables (can include tables from multiple connections)
+- **Query**: A named SQL query with connected tables (can include tables from multiple connections)
 - **Connection**: Saved database configuration (PostgreSQL)
+- **Chat History**: Conversational context for iterative SQL editing with AI
 - **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases
 - **Metadata**: Auto-collected schema info (tables, columns, types, constraints, row counts)
 
@@ -199,27 +209,28 @@ cd frontend && pnpm install
 ## Data Storage
 
 QBox stores data locally in `~/.qbox/`:
-- `connections.db` - SQLite database with connection configs, workspaces, and workspace table selections
+- `connections.db` - SQLite database with connection configs, queries, query table selections, and chat history
 - `qbox.duckdb` - Persistent DuckDB instance with attached data sources
 
 ## Roadmap
 
 **Completed:**
 - ✅ PostgreSQL connection management
-- ✅ Multi-workspace support (create, list, delete)
-- ✅ Add tables to workspaces from any connection
+- ✅ Query management (create, list, delete)
+- ✅ Add tables to queries from any connection
+- ✅ AI-powered chat interface for interactive SQL editing
+- ✅ Chat history persistence per query
 - ✅ Automatic metadata discovery
-- ✅ Workspace and table selection persistence
+- ✅ Query and table selection persistence
 - ✅ View detailed table metadata
 
 **Planned:**
 - [ ] Query execution interface
+- [ ] Query result visualization
 - [ ] Metadata export (markdown format)
 - [ ] CSV file support
 - [ ] Excel file support
 - [ ] S3 bucket support
-- [ ] AI-powered SQL generation
-- [ ] Query history
 - [ ] Result export and visualization
 - [ ] Electron desktop application packaging
 

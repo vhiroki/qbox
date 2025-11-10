@@ -25,6 +25,10 @@ class Settings(BaseSettings):
         "http://localhost:3000",
     ]
 
+    # AI Provider Configuration
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o"  # Default model for SQL generation
+
 
 @lru_cache
 def get_settings() -> Settings:

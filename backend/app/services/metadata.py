@@ -218,3 +218,205 @@ def get_metadata_service() -> MetadataService:
     if _metadata_service is None:
         _metadata_service = MetadataService()
     return _metadata_service
+
+
+async def get_workspace_metadata(workspace_id: str) -> list[dict[str, Any]]:
+    """
+    Get metadata for all tables in a workspace.
+
+    Returns a list of dictionaries containing table metadata with:
+    - connection_id
+    - connection_name
+    - schema_name
+    - table_name
+    - columns (list of column metadata)
+    - row_count
+    """
+    from collections import defaultdict
+
+    from app.services.connection_repository import connection_repository
+    from app.services.workspace_repository import workspace_repository
+
+    metadata_service = get_metadata_service()
+    duckdb_manager = get_duckdb_manager()
+
+    # Get all selections for this workspace
+    selections = workspace_repository.get_workspace_selections(workspace_id)
+
+    if not selections:
+        return []
+
+    workspace_metadata = []
+
+    # Group selections by connection
+    selections_by_connection = defaultdict(list)
+    for selection in selections:
+        selections_by_connection[selection.connection_id].append(selection)
+
+    # For each connection, get table metadata
+    for connection_id, conn_selections in selections_by_connection.items():
+        # Get connection config
+        connection_config = connection_repository.get(connection_id)
+        if not connection_config:
+            logger.warning(f"Connection {connection_id} not found, skipping selections")
+            continue
+
+        # Get connection name from repository
+        all_connections = connection_repository.get_all()
+        connection_name = next(
+            (c["name"] for c in all_connections if c["id"] == connection_id),
+            "Unknown",
+        )
+
+        # Get DuckDB alias for this connection
+        alias = f"pg_{connection_id.replace('-', '_')}"
+
+        # For each table selection in this connection
+        for selection in conn_selections:
+            schema_name = selection.schema_name
+            table_name = selection.table_name
+
+            try:
+                # Get columns for this table
+                columns = await metadata_service._get_postgres_columns(
+                    alias, schema_name, table_name
+                )
+
+                # Get row count
+                conn = duckdb_manager.connect()
+                try:
+                    count_query = f"SELECT COUNT(*) FROM {alias}." f"{schema_name}.{table_name}"
+                    count_result = conn.execute(count_query)
+                    row_count = count_result.fetchone()[0]
+                except Exception as e:
+                    logger.warning(
+                        f"Could not get row count for " f"{schema_name}.{table_name}: {e}"
+                    )
+                    row_count = None
+
+                workspace_metadata.append(
+                    {
+                        "connection_id": connection_id,
+                        "connection_name": connection_name,
+                        "schema_name": schema_name,
+                        "table_name": table_name,
+                        "columns": [
+                            {
+                                "name": col.name,
+                                "type": col.type,
+                                "nullable": col.nullable,
+                                "is_primary_key": col.is_primary_key,
+                            }
+                            for col in columns
+                        ],
+                        "row_count": row_count,
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to get metadata for " f"{schema_name}.{table_name}: {e}")
+                # Continue with other tables
+                continue
+
+    return workspace_metadata
+
+
+async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
+    """
+    Get metadata for all tables in a query (same as workspace but for queries).
+
+    Returns a list of dictionaries containing table metadata with:
+    - connection_id
+    - connection_name
+    - schema_name
+    - table_name
+    - columns (list of column metadata)
+    - row_count
+    """
+    from collections import defaultdict
+
+    from app.services.connection_repository import connection_repository
+    from app.services.query_repository import query_repository
+
+    metadata_service = get_metadata_service()
+    duckdb_manager = get_duckdb_manager()
+
+    # Get all selections for this query
+    selections = query_repository.get_query_selections(query_id)
+
+    if not selections:
+        return []
+
+    query_metadata = []
+
+    # Group selections by connection
+    selections_by_connection = defaultdict(list)
+    for selection in selections:
+        selections_by_connection[selection.connection_id].append(selection)
+
+    # For each connection, get table metadata
+    for connection_id, conn_selections in selections_by_connection.items():
+        # Get connection config
+        connection_config = connection_repository.get(connection_id)
+        if not connection_config:
+            logger.warning(f"Connection {connection_id} not found, skipping selections")
+            continue
+
+        # Get connection name from repository
+        all_connections = connection_repository.get_all()
+        connection_name = next(
+            (c["name"] for c in all_connections if c["id"] == connection_id),
+            "Unknown",
+        )
+
+        # Get DuckDB alias for this connection
+        alias = f"pg_{connection_id.replace('-', '_')}"
+
+        # For each table selection in this connection
+        for selection in conn_selections:
+            schema_name = selection.schema_name
+            table_name = selection.table_name
+
+            try:
+                # Get columns for this table
+                columns = await metadata_service._get_postgres_columns(
+                    alias, schema_name, table_name
+                )
+
+                # Get row count
+                conn = duckdb_manager.connect()
+                try:
+                    count_query = f"SELECT COUNT(*) FROM {alias}." f"{schema_name}.{table_name}"
+                    count_result = conn.execute(count_query)
+                    row_count = count_result.fetchone()[0]
+                except Exception as e:
+                    logger.warning(
+                        f"Could not get row count for " f"{schema_name}.{table_name}: {e}"
+                    )
+                    row_count = None
+
+                query_metadata.append(
+                    {
+                        "connection_id": connection_id,
+                        "connection_name": connection_name,
+                        "schema_name": schema_name,
+                        "table_name": table_name,
+                        "columns": [
+                            {
+                                "name": col.name,
+                                "type": col.type,
+                                "nullable": col.nullable,
+                                "is_primary_key": col.is_primary_key,
+                            }
+                            for col in columns
+                        ],
+                        "row_count": row_count,
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to get metadata for " f"{schema_name}.{table_name}: {e}")
+                # Continue with other tables
+                continue
+
+    return query_metadata

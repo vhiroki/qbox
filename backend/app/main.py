@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import connections, metadata, queries, workspace
+from app.api import connections, metadata, query
 from app.config.settings import get_settings
 
 
@@ -43,9 +43,8 @@ app.include_router(
     prefix="/api/connections",
     tags=["connections"],
 )
-app.include_router(queries.router, prefix="/api/queries", tags=["queries"])
+app.include_router(query.router, prefix="/api", tags=["queries"])
 app.include_router(metadata.router, prefix="/api")
-app.include_router(workspace.router, prefix="/api")  # /api/workspaces
 
 
 @app.get("/")

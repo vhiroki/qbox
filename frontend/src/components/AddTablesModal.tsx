@@ -18,13 +18,13 @@ import type { SavedConnection, ConnectionMetadata, SchemaMetadata } from '../typ
 interface AddTablesModalProps {
   open: boolean;
   onClose: () => void;
-  workspaceId: string;
+  workspaceId: string; // Keep this name for backward compatibility with App.tsx
   onTablesAdded: () => void;
 }
 
 type Step = 'connection' | 'schema' | 'tables';
 
-export default function AddTablesModal({ open, onClose, workspaceId, onTablesAdded }: AddTablesModalProps) {
+export default function AddTablesModal({ open, onClose, workspaceId: queryId, onTablesAdded }: AddTablesModalProps) {
   const [step, setStep] = useState<Step>('connection');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,9 +126,9 @@ export default function AddTablesModal({ open, onClose, workspaceId, onTablesAdd
       setLoading(true);
       setError(null);
 
-      // Add each selected table to the workspace
+      // Add each selected table to the query
       for (const tableName of selectedTables) {
-        await api.addWorkspaceSelection(workspaceId, {
+        await api.addQuerySelection(queryId, {
           connection_id: selectedConnection.id,
           schema_name: selectedSchema.name,
           table_name: tableName,
@@ -186,9 +186,9 @@ export default function AddTablesModal({ open, onClose, workspaceId, onTablesAdd
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Add Tables to Workspace</DialogTitle>
+          <DialogTitle>Add Tables to Query</DialogTitle>
           <DialogDescription>
-            Select a connection, schema, and tables to add to your workspace.
+            Select a connection, schema, and tables to add to your query.
           </DialogDescription>
         </DialogHeader>
 

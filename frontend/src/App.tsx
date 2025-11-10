@@ -1,33 +1,33 @@
 import { useState } from 'react';
-import { Database, FolderKanban } from 'lucide-react';
+import { Database, FileCode } from 'lucide-react';
 import ConnectionManager from './components/ConnectionManager';
-import WorkspaceList from './components/WorkspaceList';
-import WorkspaceDetail from './components/WorkspaceDetail';
+import QueryList from './components/QueryList';
+import QueryDetail from './components/QueryDetail';
 import AddTablesModal from './components/AddTablesModal';
 
-type Page = 'workspaces' | 'connections';
+type Page = 'queries' | 'connections';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('workspaces');
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<Page>('queries');
+  const [selectedQueryId, setSelectedQueryId] = useState<string | null>(null);
   const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
-  const [workspaceListRefresh, setWorkspaceListRefresh] = useState(0);
+  const [queryListRefresh, setQueryListRefresh] = useState(0);
 
-  const handleSelectWorkspace = (workspaceId: string) => {
-    setSelectedWorkspaceId(workspaceId);
+  const handleSelectQuery = (queryId: string) => {
+    setSelectedQueryId(queryId);
   };
 
-  const handleWorkspaceDeleted = () => {
-    setSelectedWorkspaceId(null);
-    setWorkspaceListRefresh(prev => prev + 1); // Trigger workspace list refresh
+  const handleQueryDeleted = () => {
+    setSelectedQueryId(null);
+    setQueryListRefresh(prev => prev + 1);
   };
 
   const handleTablesAdded = () => {
-    // Trigger refresh by resetting and reselecting the workspace
-    if (selectedWorkspaceId) {
-      const id = selectedWorkspaceId;
-      setSelectedWorkspaceId(null);
-      setTimeout(() => setSelectedWorkspaceId(id), 0);
+    // Trigger refresh by resetting and reselecting the query
+    if (selectedQueryId) {
+      const id = selectedQueryId;
+      setSelectedQueryId(null);
+      setTimeout(() => setSelectedQueryId(id), 0);
     }
   };
 
@@ -44,15 +44,15 @@ function App() {
             
             <nav className="flex gap-2">
               <button
-                onClick={() => setCurrentPage('workspaces')}
+                onClick={() => setCurrentPage('queries')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'workspaces'
+                  currentPage === 'queries'
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-accent text-foreground'
                 }`}
               >
-                <FolderKanban className="h-4 w-4" />
-                <span className="font-medium">Workspaces</span>
+                <FileCode className="h-4 w-4" />
+                <span className="font-medium">Queries</span>
               </button>
 
               <button
@@ -73,31 +73,31 @@ function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {currentPage === 'workspaces' && (
+        {currentPage === 'queries' && (
           <div className="flex-1 flex">
-            {/* Left Panel: Workspace List */}
+            {/* Left Panel: Query List */}
             <div className="w-80 border-r flex flex-col">
-              <WorkspaceList
-                selectedWorkspaceId={selectedWorkspaceId}
-                onSelectWorkspace={handleSelectWorkspace}
-                refreshTrigger={workspaceListRefresh}
+              <QueryList
+                selectedQueryId={selectedQueryId}
+                onSelectQuery={handleSelectQuery}
+                refreshTrigger={queryListRefresh}
               />
             </div>
 
-            {/* Right Panel: Workspace Detail */}
+            {/* Right Panel: Query Detail */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {selectedWorkspaceId ? (
-                <WorkspaceDetail
-                  workspaceId={selectedWorkspaceId}
-                  onWorkspaceDeleted={handleWorkspaceDeleted}
+              {selectedQueryId ? (
+                <QueryDetail
+                  queryId={selectedQueryId}
+                  onQueryDeleted={handleQueryDeleted}
                   onAddTables={() => setAddTablesModalOpen(true)}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
-                    <FolderKanban className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">Select a workspace</h3>
-                    <p className="text-sm">Choose a workspace from the list or create a new one</p>
+                    <FileCode className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">Select a query</h3>
+                    <p className="text-sm">Choose a query from the list or create a new one</p>
                   </div>
                 </div>
               )}
@@ -115,11 +115,11 @@ function App() {
       </main>
 
       {/* Add Tables Modal */}
-      {selectedWorkspaceId && (
+      {selectedQueryId && (
         <AddTablesModal
           open={addTablesModalOpen}
           onClose={() => setAddTablesModalOpen(false)}
-          workspaceId={selectedWorkspaceId}
+          workspaceId={selectedQueryId}
           onTablesAdded={handleTablesAdded}
         />
       )}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, FileCode } from "lucide-react";
+import { Plus, FileCode, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +19,16 @@ interface QueryListProps {
   selectedQueryId: string | null;
   onSelectQuery: (queryId: string) => void;
   refreshTrigger?: number;
+  currentPage?: 'queries' | 'connections';
+  onPageChange?: (page: 'queries' | 'connections') => void;
 }
 
 export default function QueryList({
   selectedQueryId,
   onSelectQuery,
   refreshTrigger,
+  currentPage = 'queries',
+  onPageChange,
 }: QueryListProps) {
   const [queries, setQueries] = useState<Query[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,15 +93,31 @@ export default function QueryList({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b">
+      {/* Header Section */}
+      <div className="p-4 border-b space-y-3">
+        <div>
+          <h1 className="text-2xl font-bold">QBox</h1>
+          <p className="text-xs text-muted-foreground">Data Query Application</p>
+        </div>
+        
+        {/* Navigation Button */}
+        <Button
+          variant={currentPage === 'connections' ? 'default' : 'outline'}
+          onClick={() => onPageChange?.('connections')}
+          className="w-full"
+        >
+          <Database className="h-4 w-4 mr-2" />
+          Connections
+        </Button>
+
+        {/* Create Query Button */}
         <Button onClick={handleCreate} disabled={loading} className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           Create Query
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {loading && queries.length === 0 && (
+      <div className="flex-1 overflow-y-auto">{loading && queries.length === 0 && (
           <div className="p-4 text-center text-muted-foreground">
             Loading queries...
           </div>

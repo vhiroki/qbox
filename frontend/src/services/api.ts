@@ -247,6 +247,14 @@ export const api = {
     return response.data;
   },
 
+  async updateQueryName(queryId: string, name: string): Promise<Query> {
+    const response = await axios.patch(
+      `${API_BASE_URL}/queries/${queryId}/name`,
+      { name }
+    );
+    return response.data;
+  },
+
   async deleteQuery(queryId: string): Promise<void> {
     await axios.delete(`${API_BASE_URL}/queries/${queryId}`);
   },

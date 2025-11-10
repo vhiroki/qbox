@@ -9,6 +9,7 @@ from app.models.schemas import (
     ChatResponse,
     Query,
     QueryCreate,
+    QueryNameUpdateRequest,
     QuerySelections,
     QueryTableSelectionRequest,
     QueryUpdateRequest,
@@ -61,6 +62,22 @@ async def update_query_sql(query_id: str, request: QueryUpdateRequest):
         raise HTTPException(status_code=500, detail="Failed to update query")
 
     return {"success": True, "sql_text": request.sql_text}
+
+
+@router.patch("/{query_id}/name")
+async def update_query_name(query_id: str, request: QueryNameUpdateRequest):
+    """Update the name of a query."""
+    query = query_repository.get_query(query_id)
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    success = query_repository.update_query_name(query_id, request.name)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update query")
+
+    # Return updated query
+    updated_query = query_repository.get_query(query_id)
+    return updated_query
 
 
 @router.delete("/{query_id}")

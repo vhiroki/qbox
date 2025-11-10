@@ -146,7 +146,7 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="border-b bg-muted/10 p-6">
+      <div className="border-b bg-muted/10 p-4">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-2xl font-bold">{workspace.name}</h2>
@@ -174,7 +174,7 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4">
         <Tabs defaultValue="query" className="h-full flex flex-col">
           <TabsList className="w-full justify-start mb-4">
             <TabsTrigger value="query">AI Query</TabsTrigger>
@@ -274,7 +274,7 @@ export default function WorkspaceDetail({ workspaceId, onWorkspaceDeleted, onAdd
                 </div>
               )}
 
-              <div className="overflow-x-auto -mx-6 px-6">
+              <div className="overflow-x-auto -mx-6 px-4">
                 <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>

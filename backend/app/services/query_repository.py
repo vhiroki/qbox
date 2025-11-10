@@ -207,6 +207,22 @@ class QueryRepository:
             conn.commit()
             return cursor.rowcount > 0
 
+    def update_query_name(self, query_id: str, name: str) -> bool:
+        """Update the name of a query."""
+        now = datetime.now().isoformat()
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                UPDATE queries
+                SET name = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (name, now, query_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
     def delete_query(self, query_id: str) -> bool:
         """Delete a query and all its selections and chat history (CASCADE)."""
         with sqlite3.connect(self.db_path) as conn:

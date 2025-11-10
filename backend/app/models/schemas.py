@@ -222,6 +222,12 @@ class QueryUpdateRequest(BaseModel):
     sql_text: str
 
 
+class QueryNameUpdateRequest(BaseModel):
+    """Request to update query name."""
+
+    name: str
+
+
 # AI Query Models
 
 

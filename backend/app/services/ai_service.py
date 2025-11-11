@@ -205,9 +205,17 @@ INSTRUCTIONS:
 6. Optimize for readability and performance
 7. Return ONLY the SQL query and a brief explanation
 
-RESPONSE FORMAT:
-Provide your response in the following format:
+CRITICAL CONSTRAINTS:
+- You MUST ONLY generate SELECT statements for querying data
+- DO NOT generate DELETE, UPDATE, INSERT, CREATE, DROP, ALTER, TRUNCATE, or any other data modification or DDL statements
+- You MUST ONLY use tables and columns that are explicitly listed in the DATABASE SCHEMA above
+- DO NOT assume, guess, or hallucinate table names or column names that are not provided
+- If the user requests something that requires tables or columns not in the DATABASE SCHEMA, you MUST inform them that you cannot generate the SQL because the required data is not available in the current schema context
+- If you are uncertain about whether a table or column exists, assume it does NOT exist unless explicitly shown above
+- If the user asks for data modification operations (DELETE, UPDATE, INSERT, etc.), inform them that you can only generate read-only SELECT queries
 
+RESPONSE FORMAT:
+If you CAN generate the SQL with the available schema:
 SQL:
 ```sql
 <your SQL query here>
@@ -215,6 +223,10 @@ SQL:
 
 EXPLANATION:
 <brief explanation of what the query does>
+
+If you CANNOT generate the SQL due to missing tables/columns or unsupported operations:
+EXPLANATION:
+I cannot generate the SQL you requested because [explain what tables/columns are missing or why the operation is not supported]. Please add the necessary tables to your query first, or rephrase your request as a SELECT query.
 """
 
         if additional_instructions:
@@ -245,9 +257,17 @@ INSTRUCTIONS:
 6. Preserve the user's manual edits unless they ask you to change them
 7. Return the COMPLETE updated SQL query, not just the changes
 
-RESPONSE FORMAT:
-Provide your response in the following format:
+CRITICAL CONSTRAINTS:
+- You MUST ONLY generate SELECT statements for querying data
+- DO NOT generate DELETE, UPDATE, INSERT, CREATE, DROP, ALTER, TRUNCATE, or any other data modification or DDL statements
+- You MUST ONLY use tables and columns that are explicitly listed in the DATABASE SCHEMA above
+- DO NOT assume, guess, or hallucinate table names or column names that are not provided
+- If the user requests something that requires tables or columns not in the DATABASE SCHEMA, you MUST inform them that you cannot generate the SQL because the required data is not available in the current schema context
+- If you are uncertain about whether a table or column exists, assume it does NOT exist unless explicitly shown above
+- If the user asks for data modification operations (DELETE, UPDATE, INSERT, etc.), inform them that you can only generate read-only SELECT queries
 
+RESPONSE FORMAT:
+If you CAN generate the SQL with the available schema:
 SQL:
 ```sql
 <complete updated SQL query here>
@@ -255,6 +275,10 @@ SQL:
 
 EXPLANATION:
 <brief explanation of what you changed or added>
+
+If you CANNOT generate the SQL due to missing tables/columns or unsupported operations:
+EXPLANATION:
+I cannot generate the SQL you requested because [explain what tables/columns are missing or why the operation is not supported]. Please add the necessary tables to your query first, or rephrase your request as a SELECT query.
 """
 
     def _parse_response(self, content: str) -> tuple[str, str]:
@@ -278,18 +302,24 @@ EXPLANATION:
             explanation = content[exp_start:].strip()
 
         # Fallback: if no structured format, try to extract any SQL-like content
-        if not sql:
-            # Look for SELECT statements
+        # But only if there's no EXPLANATION block (which means it's a refusal/error response)
+        if not sql and "EXPLANATION:" not in content and "Explanation:" not in content:
+            # Look for SELECT statements at the beginning of lines (not in prose)
             if "SELECT" in content.upper():
                 lines = content.split("\n")
                 sql_lines = []
                 in_sql = False
                 for line in lines:
-                    if "SELECT" in line.upper() or in_sql:
+                    stripped = line.strip()
+                    # Only start SQL extraction if SELECT is at the beginning of the line
+                    if stripped.upper().startswith("SELECT") or (in_sql and stripped):
                         in_sql = True
                         sql_lines.append(line)
                         if ";" in line:
                             break
+                    elif in_sql:
+                        # Stop if we hit an empty line after starting SQL
+                        break
                 sql = "\n".join(sql_lines).strip()
 
         return sql, explanation

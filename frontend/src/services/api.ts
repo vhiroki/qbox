@@ -16,6 +16,8 @@ import type {
   ChatRequest,
   ChatResponse,
   QueryUpdateRequest,
+  QueryExecuteRequest,
+  QueryExecuteResult,
 } from "../types";
 
 const API_BASE_URL = "/api";
@@ -185,6 +187,28 @@ export const api = {
 
   async clearChatHistory(queryId: string): Promise<void> {
     await axios.delete(`${API_BASE_URL}/queries/${queryId}/chat`);
+  },
+
+  // Query Execution endpoints
+  async executeQuery(
+    queryId: string,
+    request: QueryExecuteRequest
+  ): Promise<QueryExecuteResult> {
+    const response = await axios.post(
+      `${API_BASE_URL}/queries/${queryId}/execute`,
+      request
+    );
+    return response.data;
+  },
+
+  async exportQueryToCSV(queryId: string): Promise<Blob> {
+    const response = await axios.get(
+      `${API_BASE_URL}/queries/${queryId}/export`,
+      {
+        responseType: "blob",
+      }
+    );
+    return response.data;
   },
 
   // Settings endpoints

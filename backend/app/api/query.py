@@ -1,20 +1,29 @@
 """API endpoints for query operations."""
 
+import csv
+import io
 import logging
+import time
+from math import ceil
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.models.schemas import (
     ChatRequest,
     ChatResponse,
     Query,
     QueryCreate,
+    QueryExecuteRequest,
+    QueryExecuteResult,
     QueryNameUpdateRequest,
     QuerySelections,
     QueryTableSelectionRequest,
     QueryUpdateRequest,
 )
 from app.services.ai_service import get_ai_service
+from app.services.connection_repository import connection_repository
+from app.services.duckdb_manager import get_duckdb_manager
 from app.services.metadata import get_query_metadata
 from app.services.query_repository import query_repository
 
@@ -149,6 +158,170 @@ async def remove_query_selection(query_id: str, selection: QueryTableSelectionRe
     except Exception as e:
         logger.error(f"Failed to remove table selection: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to remove table: {str(e)}")
+
+
+# Query Execution endpoints
+
+
+@router.post("/{query_id}/execute", response_model=QueryExecuteResult)
+async def execute_query(query_id: str, request: QueryExecuteRequest):
+    """Execute a query and return paginated results."""
+    start_time = time.time()
+
+    # Verify query exists
+    query = query_repository.get_query(query_id)
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    if not query.sql_text or query.sql_text.strip() == "":
+        raise HTTPException(status_code=400, detail="Query SQL is empty")
+
+    # Get query selections to attach necessary connections
+    selections = query_repository.get_query_selections(query_id)
+    if not selections:
+        raise HTTPException(
+            status_code=400,
+            detail="No tables selected. Add tables before executing query.",
+        )
+
+    try:
+        # Get DuckDB manager
+        duckdb = get_duckdb_manager()
+
+        # Attach all required connections
+        attached_connections = set()
+        for selection in selections:
+            if selection.connection_id not in attached_connections:
+                # Get connection config
+                conn_config = connection_repository.get(selection.connection_id)
+                if not conn_config:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Connection {selection.connection_id} not found",
+                    )
+
+                # Attach to DuckDB
+                from app.models.schemas import PostgresConnectionConfig
+
+                pg_config = PostgresConnectionConfig(**conn_config.config)
+                duckdb.attach_postgres(selection.connection_id, pg_config)
+                attached_connections.add(selection.connection_id)
+
+        # Execute query with pagination
+        # Strip trailing semicolons from query
+        clean_sql = query.sql_text.strip().rstrip(";")
+        
+        # First, get total count
+        count_query = f"SELECT COUNT(*) as total FROM ({clean_sql}) as subquery"
+        _, count_result = duckdb.execute_query(count_query)
+        total_rows = count_result[0]["total"] if count_result else 0
+
+        # Calculate pagination
+        total_pages = ceil(total_rows / request.page_size)
+        offset = (request.page - 1) * request.page_size
+
+        # Execute paginated query
+        paginated_query = f"""
+            {clean_sql}
+            LIMIT {request.page_size}
+            OFFSET {offset}
+        """
+
+        columns, rows = duckdb.execute_query(paginated_query)
+
+        execution_time = (time.time() - start_time) * 1000  # Convert to ms
+
+        return QueryExecuteResult(
+            success=True,
+            columns=columns,
+            rows=rows,
+            total_rows=total_rows,
+            page=request.page,
+            page_size=request.page_size,
+            total_pages=total_pages,
+            execution_time_ms=execution_time,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to execute query {query_id}: {e}")
+        execution_time = (time.time() - start_time) * 1000
+        return QueryExecuteResult(
+            success=False,
+            page=request.page,
+            page_size=request.page_size,
+            execution_time_ms=execution_time,
+            error=str(e),
+        )
+
+
+@router.get("/{query_id}/export")
+async def export_query_to_csv(query_id: str):
+    """Export full query results to CSV."""
+    # Verify query exists
+    query = query_repository.get_query(query_id)
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    if not query.sql_text or query.sql_text.strip() == "":
+        raise HTTPException(status_code=400, detail="Query SQL is empty")
+
+    # Get query selections to attach necessary connections
+    selections = query_repository.get_query_selections(query_id)
+    if not selections:
+        raise HTTPException(
+            status_code=400,
+            detail="No tables selected. Add tables before executing query.",
+        )
+
+    try:
+        # Get DuckDB manager
+        duckdb = get_duckdb_manager()
+
+        # Attach all required connections
+        attached_connections = set()
+        for selection in selections:
+            if selection.connection_id not in attached_connections:
+                # Get connection config
+                conn_config = connection_repository.get(selection.connection_id)
+                if not conn_config:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Connection {selection.connection_id} not found",
+                    )
+
+                # Attach to DuckDB
+                from app.models.schemas import PostgresConnectionConfig
+
+                pg_config = PostgresConnectionConfig(**conn_config.config)
+                duckdb.attach_postgres(selection.connection_id, pg_config)
+                attached_connections.add(selection.connection_id)
+
+        # Execute full query (no pagination)
+        # Strip trailing semicolons from query
+        clean_sql = query.sql_text.strip().rstrip(";")
+        columns, rows = duckdb.execute_query(clean_sql)
+
+        # Generate CSV in memory
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=columns)
+        writer.writeheader()
+        writer.writerows(rows)
+
+        # Prepare response
+        output.seek(0)
+        filename = f"{query.name.replace(' ', '_')}.csv"
+
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to export query {query_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to export query: {str(e)}"
+        )
 
 
 # Chat interaction endpoints

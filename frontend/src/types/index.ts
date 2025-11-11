@@ -182,3 +182,22 @@ export interface QueryHistoryList {
   queries: QueryHistoryItem[];
   total: number;
 }
+
+// Query Running Types
+
+export interface QueryExecuteRequest {
+  page?: number;
+  page_size?: number;
+}
+
+export interface QueryExecuteResult {
+  success: boolean;
+  columns?: string[];
+  rows?: Record<string, any>[];
+  total_rows?: number;
+  page: number;
+  page_size: number;
+  total_pages?: number;
+  execution_time_ms?: number;
+  error?: string;
+}

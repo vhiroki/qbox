@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { api } from '../services/api';
-import type { Query, QueryTableSelection, ChatMessage } from '../types';
+import type { Query, QueryTableSelection, ChatMessage, QueryExecuteResult } from '../types';
+
+interface QueryExecutionState {
+  result: QueryExecuteResult | null;
+  error: string | null;
+  currentPage: number;
+  pageSize: number;
+}
 
 interface QueryState {
   // Data
@@ -9,6 +16,7 @@ interface QueryState {
   selectedQueryId: string | null;
   querySelections: Map<string, QueryTableSelection[]>; // queryId -> selections
   queryChatHistory: Map<string, ChatMessage[]>; // queryId -> messages
+  queryResults: Map<string, QueryExecutionState>; // queryId -> execution state
 
   // Loading & Error states
   isLoading: boolean;
@@ -33,6 +41,12 @@ interface QueryState {
   retryChatMessage: (queryId: string, tempMessageId: string) => Promise<{ updatedSQL: string }>;
   clearChatHistory: (queryId: string) => Promise<void>;
 
+  // Query Execution Results
+  getQueryExecutionState: (queryId: string) => QueryExecutionState | undefined;
+  setQueryResult: (queryId: string, result: QueryExecuteResult | null, error: string | null) => void;
+  setQueryPagination: (queryId: string, page: number, pageSize: number) => void;
+  clearQueryResult: (queryId: string) => void;
+
   // Utility
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -47,6 +61,7 @@ export const useQueryStore = create<QueryState>()(
       selectedQueryId: null,
       querySelections: new Map(),
       queryChatHistory: new Map(),
+      queryResults: new Map(),
       isLoading: false,
       error: null,
 
@@ -134,17 +149,19 @@ export const useQueryStore = create<QueryState>()(
         set({ isLoading: true, error: null });
         try {
           await api.deleteQuery(queryId);
-          const { querySelections, queryChatHistory } = get();
+          const { querySelections, queryChatHistory, queryResults } = get();
 
           // Clean up related data
           querySelections.delete(queryId);
           queryChatHistory.delete(queryId);
+          queryResults.delete(queryId);
 
           set((state) => ({
             queries: state.queries.filter((q) => q.id !== queryId),
             selectedQueryId: state.selectedQueryId === queryId ? null : state.selectedQueryId,
             querySelections: new Map(querySelections),
             queryChatHistory: new Map(queryChatHistory),
+            queryResults: new Map(queryResults),
             isLoading: false,
           }));
         } catch (error: any) {
@@ -376,6 +393,56 @@ export const useQueryStore = create<QueryState>()(
           set({ error: error.response?.data?.detail || 'Failed to clear chat history' });
           throw error;
         }
+      },
+
+      // Query Execution Results Management
+      getQueryExecutionState: (queryId) => {
+        const { queryResults } = get();
+        return queryResults.get(queryId);
+      },
+
+      setQueryResult: (queryId, result, error) => {
+        const { queryResults } = get();
+        const currentState = queryResults.get(queryId) || {
+          result: null,
+          error: null,
+          currentPage: 1,
+          pageSize: 100,
+        };
+
+        queryResults.set(queryId, {
+          ...currentState,
+          result,
+          error,
+          currentPage: result?.page || currentState.currentPage,
+          pageSize: result?.page_size || currentState.pageSize,
+        });
+
+        set({ queryResults: new Map(queryResults) });
+      },
+
+      setQueryPagination: (queryId, page, pageSize) => {
+        const { queryResults } = get();
+        const currentState = queryResults.get(queryId) || {
+          result: null,
+          error: null,
+          currentPage: 1,
+          pageSize: 100,
+        };
+
+        queryResults.set(queryId, {
+          ...currentState,
+          currentPage: page,
+          pageSize,
+        });
+
+        set({ queryResults: new Map(queryResults) });
+      },
+
+      clearQueryResult: (queryId) => {
+        const { queryResults } = get();
+        queryResults.delete(queryId);
+        set({ queryResults: new Map(queryResults) });
       },
 
       // Utility methods

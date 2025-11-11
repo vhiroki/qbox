@@ -240,3 +240,27 @@ class QueryHistoryList(BaseModel):
     query_id: str
     queries: list[QueryHistoryItem]
     total: int
+
+
+# Query Execution Models for Query Running
+
+
+class QueryExecuteRequest(BaseModel):
+    """Request to execute a query with pagination."""
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=100, ge=1, le=1000)
+
+
+class QueryExecuteResult(BaseModel):
+    """Result of query execution with pagination."""
+
+    success: bool
+    columns: Optional[list[str]] = None
+    rows: Optional[list[dict[str, Any]]] = None
+    total_rows: Optional[int] = None
+    page: int
+    page_size: int
+    total_pages: Optional[int] = None
+    execution_time_ms: Optional[float] = None
+    error: Optional[str] = None

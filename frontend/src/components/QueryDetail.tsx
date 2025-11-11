@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Database, X, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { Plus, Trash2, Database, X, ChevronDown, ChevronRight, Pencil, Play } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -45,11 +45,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQueryStore, useConnectionStore } from "../stores";
+import { api } from "../services/api";
 import ChatInterface from "./ChatInterface";
 import AddTablesModal from "./AddTablesModal";
+import QueryResults from "./QueryResults";
 import type {
   TableMetadata,
   QueryTableSelection,
+  QueryExecuteResult,
 } from "../types";
 
 interface QueryDetailProps {
@@ -76,6 +79,11 @@ export default function QueryDetail({
 
   const loadMetadata = useConnectionStore((state) => state.loadMetadata);
   const connectionMetadata = useConnectionStore((state) => state.connectionMetadata);
+  
+  // Query execution state from store
+  const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
+  const setQueryResult = useQueryStore((state) => state.setQueryResult);
+  const setQueryPagination = useQueryStore((state) => state.setQueryPagination);
 
   // Local UI state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -86,6 +94,16 @@ export default function QueryDetail({
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [tableMetadataCache, setTableMetadataCache] = useState<Map<string, TableMetadata>>(new Map());
   const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Get cached query execution state
+  const executionState = getQueryExecutionState(queryId) || {
+    result: null,
+    error: null,
+    currentPage: 1,
+    pageSize: 100,
+  };
 
   // Derived state
   const query = queries.find((q) => q.id === queryId);
@@ -189,6 +207,103 @@ export default function QueryDetail({
     }
   };
 
+  const handleExecuteQuery = async () => {
+    if (!query || !sqlText.trim()) {
+      setQueryResult(queryId, null, "Query SQL is empty");
+      return;
+    }
+
+    setIsExecuting(true);
+
+    try {
+      const result = await api.executeQuery(queryId, {
+        page: executionState.currentPage,
+        page_size: executionState.pageSize,
+      });
+      
+      if (result.success) {
+        setQueryResult(queryId, result, null);
+      } else {
+        setQueryResult(queryId, result, result.error || "Failed to execute query");
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "Failed to execute query";
+      setQueryResult(queryId, null, errorMsg);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handlePageChange = async (newPage: number) => {
+    setQueryPagination(queryId, newPage, executionState.pageSize);
+    setIsExecuting(true);
+
+    try {
+      const result = await api.executeQuery(queryId, {
+        page: newPage,
+        page_size: executionState.pageSize,
+      });
+      
+      if (result.success) {
+        setQueryResult(queryId, result, null);
+      } else {
+        setQueryResult(queryId, result, result.error || "Failed to execute query");
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "Failed to execute query";
+      setQueryResult(queryId, null, errorMsg);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handlePageSizeChange = async (newPageSize: number) => {
+    setQueryPagination(queryId, 1, newPageSize); // Reset to first page
+    setIsExecuting(true);
+
+    try {
+      const result = await api.executeQuery(queryId, {
+        page: 1,
+        page_size: newPageSize,
+      });
+      
+      if (result.success) {
+        setQueryResult(queryId, result, null);
+      } else {
+        setQueryResult(queryId, result, result.error || "Failed to execute query");
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "Failed to execute query";
+      setQueryResult(queryId, null, errorMsg);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleExportToCSV = async () => {
+    if (!query) return;
+
+    setIsExporting(true);
+    try {
+      const blob = await api.exportQueryToCSV(queryId);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${query.name.replace(/\s+/g, "_")}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "Failed to export query";
+      setQueryResult(queryId, executionState.result, errorMsg);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isQueryLoading && !query) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -267,37 +382,68 @@ export default function QueryDetail({
 
                 {/* SQL Query Tab */}
                 <TabsContent value="sql" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
-                  <div className="h-full flex flex-col">
-                    <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                      {sqlEdited && (
-                        <Button onClick={handleSaveSQL} size="sm" variant="outline" className="ml-auto">
-                          Save SQL
-                        </Button>
-                      )}
-                    </div>
-                    <div className="flex-1 border rounded-md overflow-hidden">
-                      <Editor
-                        defaultLanguage="sql"
-                        value={sqlText}
-                        onChange={handleSQLChange}
-                        theme="vs-dark"
-                        options={{
-                          minimap: { enabled: false },
-                          fontSize: 14,
-                          lineNumbers: "on",
-                          scrollBeyondLastLine: false,
-                          automaticLayout: true,
-                          tabSize: 2,
-                          wordWrap: "on",
-                        }}
-                      />
-                    </div>
-                    {sqlEdited && (
-                      <p className="text-xs text-muted-foreground mt-2 flex-shrink-0">
-                        SQL has been modified. Click "Save SQL" to persist changes.
-                      </p>
-                    )}
-                  </div>
+                  <ResizablePanelGroup direction="vertical" className="h-full">
+                    {/* SQL Editor Panel */}
+                    <ResizablePanel defaultSize={50} minSize={30}>
+                      <div className="h-full flex flex-col">
+                        <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                          <Button
+                            onClick={handleExecuteQuery}
+                            size="sm"
+                            disabled={isExecuting || !sqlText.trim()}
+                          >
+                            <Play className="h-3 w-3 mr-2" />
+                            Run Query
+                          </Button>
+                          {sqlEdited && (
+                            <Button onClick={handleSaveSQL} size="sm" variant="outline">
+                              Save SQL
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex-1 border rounded-md overflow-hidden">
+                          <Editor
+                            defaultLanguage="sql"
+                            value={sqlText}
+                            onChange={handleSQLChange}
+                            theme="vs-dark"
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              lineNumbers: "on",
+                              scrollBeyondLastLine: false,
+                              automaticLayout: true,
+                              tabSize: 2,
+                              wordWrap: "on",
+                            }}
+                          />
+                        </div>
+                        {sqlEdited && (
+                          <p className="text-xs text-muted-foreground mt-2 flex-shrink-0">
+                            SQL has been modified. Click "Save SQL" to persist changes.
+                          </p>
+                        )}
+                      </div>
+                    </ResizablePanel>
+
+                    <ResizableHandle withHandle />
+
+                    {/* Query Results Panel */}
+                    <ResizablePanel defaultSize={50} minSize={20}>
+                      <div className="h-full pt-2">
+                        <QueryResults
+                          queryId={queryId}
+                          result={executionState.result}
+                          isLoading={isExecuting}
+                          error={executionState.error}
+                          onPageChange={handlePageChange}
+                          onPageSizeChange={handlePageSizeChange}
+                          onExport={handleExportToCSV}
+                          isExporting={isExporting}
+                        />
+                      </div>
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
                 </TabsContent>
 
                 {/* Connected Tables Tab */}

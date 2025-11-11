@@ -114,11 +114,13 @@ export interface QuerySelections {
 }
 
 export interface ChatMessage {
-  id: number;
+  id: number | string; // number for persisted, string for temporary
   query_id: string;
   role: "user" | "assistant";
   message: string;
   created_at: string;
+  is_pending?: boolean; // true while waiting for backend
+  has_error?: boolean; // true if failed to send
 }
 
 export interface ChatRequest {

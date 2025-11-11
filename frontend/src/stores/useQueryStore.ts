@@ -30,6 +30,7 @@ interface QueryState {
   // Chat
   loadChatHistory: (queryId: string) => Promise<void>;
   sendChatMessage: (queryId: string, message: string) => Promise<{ updatedSQL: string }>;
+  retryChatMessage: (queryId: string, tempMessageId: string) => Promise<{ updatedSQL: string }>;
   clearChatHistory: (queryId: string) => Promise<void>;
 
   // Utility
@@ -233,14 +234,39 @@ export const useQueryStore = create<QueryState>()(
 
       // Send chat message
       sendChatMessage: async (queryId, message) => {
-        set({ isLoading: true, error: null });
+        const tempId = `temp-${Date.now()}`;
+        
+        // Optimistically add user message immediately
+        const { queryChatHistory } = get();
+        const currentHistory = queryChatHistory.get(queryId) || [];
+        const tempUserMessage: ChatMessage = {
+          id: tempId,
+          query_id: queryId,
+          role: 'user',
+          message,
+          created_at: new Date().toISOString(),
+          is_pending: true,
+        };
+        
+        queryChatHistory.set(queryId, [...currentHistory, tempUserMessage]);
+        set({ 
+          queryChatHistory: new Map(queryChatHistory),
+          isLoading: true, 
+          error: null 
+        });
+
         try {
           const response = await api.chatWithAI(queryId, { message });
 
-          // Update chat history
-          const { queryChatHistory } = get();
-          const currentHistory = queryChatHistory.get(queryId) || [];
-          queryChatHistory.set(queryId, [...currentHistory, response.message]);
+          // Mark user message as sent (no longer pending) and add assistant response
+          const updatedHistory = queryChatHistory.get(queryId) || [];
+          const finalHistory = updatedHistory.map(m => 
+            m.id === tempId 
+              ? { ...m, is_pending: false }
+              : m
+          );
+          // Add assistant message
+          queryChatHistory.set(queryId, [...finalHistory, response.message]);
 
           // Update query SQL
           const updatedQuery = await api.getQuery(queryId);
@@ -253,7 +279,82 @@ export const useQueryStore = create<QueryState>()(
 
           return { updatedSQL: response.updated_sql };
         } catch (error: any) {
+          // Mark the temporary message as failed
+          const failedHistory = queryChatHistory.get(queryId) || [];
+          const markedHistory = failedHistory.map(m => 
+            m.id === tempId 
+              ? { ...m, is_pending: false, has_error: true }
+              : m
+          );
+          queryChatHistory.set(queryId, markedHistory);
+          
           set({
+            queryChatHistory: new Map(queryChatHistory),
+            error: error.response?.data?.detail || 'Failed to send message',
+            isLoading: false
+          });
+          throw error;
+        }
+      },
+
+      // Retry a failed chat message
+      retryChatMessage: async (queryId, tempMessageId) => {
+        const { queryChatHistory } = get();
+        const currentHistory = queryChatHistory.get(queryId) || [];
+        const failedMessage = currentHistory.find(m => m.id === tempMessageId);
+        
+        if (!failedMessage) {
+          throw new Error('Message not found');
+        }
+
+        // Mark as pending again
+        const updatedHistory = currentHistory.map(m =>
+          m.id === tempMessageId
+            ? { ...m, is_pending: true, has_error: false }
+            : m
+        );
+        queryChatHistory.set(queryId, updatedHistory);
+        set({ 
+          queryChatHistory: new Map(queryChatHistory),
+          isLoading: true,
+          error: null 
+        });
+
+        try {
+          const response = await api.chatWithAI(queryId, { message: failedMessage.message });
+
+          // Mark user message as sent and add assistant response
+          const retryHistory = queryChatHistory.get(queryId) || [];
+          const finalHistory = retryHistory.map(m =>
+            m.id === tempMessageId
+              ? { ...m, is_pending: false, has_error: false }
+              : m
+          );
+          // Add assistant message
+          queryChatHistory.set(queryId, [...finalHistory, response.message]);
+
+          // Update query SQL
+          const updatedQuery = await api.getQuery(queryId);
+
+          set((state) => ({
+            queries: state.queries.map((q) => (q.id === queryId ? updatedQuery : q)),
+            queryChatHistory: new Map(queryChatHistory),
+            isLoading: false,
+          }));
+
+          return { updatedSQL: response.updated_sql };
+        } catch (error: any) {
+          // Mark as failed again
+          const failedAgainHistory = queryChatHistory.get(queryId) || [];
+          const markedHistory = failedAgainHistory.map(m =>
+            m.id === tempMessageId
+              ? { ...m, is_pending: false, has_error: true }
+              : m
+          );
+          queryChatHistory.set(queryId, markedHistory);
+
+          set({
+            queryChatHistory: new Map(queryChatHistory),
             error: error.response?.data?.detail || 'Failed to send message',
             isLoading: false
           });

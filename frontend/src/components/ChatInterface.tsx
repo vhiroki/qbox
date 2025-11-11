@@ -4,7 +4,7 @@ import { useQueryStore } from "../stores";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { ScrollArea } from "./ui/scroll-area";
-import { AlertCircle, Loader2, Send } from "lucide-react";
+import { AlertCircle, Loader2, Send, RotateCcw } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
 interface ChatInterfaceProps {
@@ -18,6 +18,7 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   // Zustand store
   const sendChatMessage = useQueryStore((state) => state.sendChatMessage);
+  const retryChatMessage = useQueryStore((state) => state.retryChatMessage);
   const loadChatHistory = useQueryStore((state) => state.loadChatHistory);
   const clearChatHistory = useQueryStore((state) => state.clearChatHistory);
   const queryChatHistory = useQueryStore((state) => state.queryChatHistory);
@@ -55,9 +56,22 @@ export default function ChatInterface({
         onSQLChange(response.updatedSQL);
       }
     } catch (err: any) {
-      // Restore the message in the input
-      setUserMessage(messageText);
+      // Don't restore message - retry button will be shown in chat history
       setError(storeError || "Failed to process message. Please try again.");
+    }
+  };
+
+  const handleRetry = async (messageId: string) => {
+    setError(null);
+    try {
+      const response = await retryChatMessage(query.id, messageId);
+
+      // Notify parent of SQL change if callback provided
+      if (onSQLChange) {
+        onSQLChange(response.updatedSQL);
+      }
+    } catch (err: any) {
+      setError(storeError || "Failed to retry message. Please try again.");
     }
   };
 
@@ -102,15 +116,37 @@ export default function ChatInterface({
                   }`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
+                  className={`max-w-[80%] rounded-lg p-3 ${
+                    msg.role === "user"
+                      ? msg.has_error
+                        ? "bg-destructive/20 border border-destructive"
+                        : "bg-primary text-primary-foreground"
                       : "bg-muted"
-                    }`}
+                  }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                  <p className="text-xs opacity-70 mt-1">
-                    {new Date(msg.created_at).toLocaleTimeString()}
-                  </p>
+                  <div className="flex items-center justify-between mt-1 gap-2">
+                    <p className="text-xs opacity-70">
+                      {new Date(msg.created_at).toLocaleTimeString()}
+                    </p>
+                    {msg.is_pending && (
+                      <div className="flex items-center gap-1 text-xs opacity-70">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Sending...</span>
+                      </div>
+                    )}
+                    {msg.has_error && (
+                      <Button
+                        onClick={() => handleRetry(String(msg.id))}
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Retry
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

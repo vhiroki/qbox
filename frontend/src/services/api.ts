@@ -186,4 +186,9 @@ export const api = {
   async clearChatHistory(queryId: string): Promise<void> {
     await axios.delete(`${API_BASE_URL}/queries/${queryId}/chat`);
   },
+
+  // Settings endpoints
+  async clearAllData(): Promise<void> {
+    await axios.post(`${API_BASE_URL}/settings/clear-all-data`);
+  },
 };

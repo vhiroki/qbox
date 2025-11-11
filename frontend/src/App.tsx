@@ -59,13 +59,22 @@ function AppContent() {
     setQueryListKey(prev => prev + 1);
   };
 
+  const handleDataCleared = () => {
+    // Force QueryList to reload by changing its key
+    setQueryListKey(prev => prev + 1);
+  };
+
   return (
     <div className="h-screen flex bg-background text-foreground dark">
       {/* Permanent Left Sidebar - Query List */}
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={15} minSize={10} maxSize={60}>
           <div className="h-full border-r flex flex-col">
-            <QueryList key={queryListKey} currentPage={currentPage} />
+            <QueryList 
+              key={queryListKey} 
+              currentPage={currentPage} 
+              onDataCleared={handleDataCleared}
+            />
           </div>
         </ResizablePanel>
 

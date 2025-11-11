@@ -13,15 +13,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import SettingsModal from "./SettingsModal";
 import { api } from "../services/api";
 import type { Query } from "../types";
 
 interface QueryListProps {
   currentPage?: 'queries' | 'connections';
+  onDataCleared?: () => void;
 }
 
 export default function QueryList({
   currentPage = 'queries',
+  onDataCleared,
 }: QueryListProps) {
   const navigate = useNavigate();
   const { queryId: selectedQueryId } = useParams<{ queryId: string }>();
@@ -84,6 +87,17 @@ export default function QueryList({
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
+  };
+
+  const handleDataCleared = async () => {
+    // Navigate to home
+    navigate('/');
+    // Reload queries
+    await loadQueries();
+    // Notify parent if callback provided
+    if (onDataCleared) {
+      onDataCleared();
+    }
   };
 
   return (
@@ -154,6 +168,11 @@ export default function QueryList({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Settings Button at Bottom */}
+      <div className="p-4 border-t">
+        <SettingsModal onDataCleared={handleDataCleared} />
       </div>
 
       {/* Create Dialog */}

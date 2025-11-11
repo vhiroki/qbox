@@ -11,6 +11,7 @@ interface ConnectionFormFieldsProps {
   onFormDataChange: (data: Partial<PostgresConfig>) => void;
   showPasswordPlaceholder?: boolean;
   nameRequired?: boolean;
+  aliasReadOnly?: boolean;
 }
 
 export default function ConnectionFormFields({
@@ -22,6 +23,7 @@ export default function ConnectionFormFields({
   onFormDataChange,
   showPasswordPlaceholder = false,
   nameRequired = false,
+  aliasReadOnly = false,
 }: ConnectionFormFieldsProps) {
   return (
     <>
@@ -39,7 +41,7 @@ export default function ConnectionFormFields({
 
       <div className="space-y-2">
         <Label htmlFor="connection-alias">
-          Database Alias (Optional)
+          Database Alias {!aliasReadOnly && '(Optional)'}
           <span className="ml-2 text-xs text-muted-foreground font-normal">
             Used in SQL queries (e.g., <code className="text-xs">pg_production</code>)
           </span>
@@ -52,10 +54,18 @@ export default function ConnectionFormFields({
           placeholder="production"
           pattern="[a-zA-Z][a-zA-Z0-9_]{2,49}"
           title="3-50 characters, start with letter, only alphanumeric and underscores"
+          readOnly={aliasReadOnly}
+          disabled={aliasReadOnly}
+          className={aliasReadOnly ? 'bg-muted cursor-not-allowed' : ''}
         />
-        {!showPasswordPlaceholder && (
+        {!showPasswordPlaceholder && !aliasReadOnly && (
           <p className="text-xs text-muted-foreground">
             Leave empty to auto-generate from connection name
+          </p>
+        )}
+        {aliasReadOnly && (
+          <p className="text-xs text-muted-foreground">
+            Alias cannot be changed after creation to prevent breaking existing queries
           </p>
         )}
       </div>

@@ -111,10 +111,11 @@ export default function ConnectionManager() {
   const handleEdit = async (connection: SavedConnection) => {
     try {
       const fullConfig = await api.getSavedConnection(connection.id);
-
+      
       setEditingConnection(connection);
       setEditConnectionName(fullConfig.name);
-      setEditConnectionAlias(fullConfig.alias || '');
+      // Show the alias field (custom or auto-generated indicator)
+      setEditConnectionAlias(fullConfig.alias || '(auto-generated)');
       setEditFormData({
         host: fullConfig.config.host || 'localhost',
         port: fullConfig.config.port || 5432,
@@ -288,6 +289,7 @@ export default function ConnectionManager() {
               onAliasChange={setEditConnectionAlias}
               onFormDataChange={(updates) => setEditFormData({ ...editFormData, ...updates })}
               showPasswordPlaceholder={true}
+              aliasReadOnly={true}
             />
           </div>
 

@@ -59,6 +59,9 @@ class ConnectionRepository:
 
     def save(self, connection_id: str, config: ConnectionConfig) -> None:
         """Save or update a connection configuration."""
+        # Check if this is an update (connection already exists)
+        existing = self.get(connection_id)
+        
         # Validate alias uniqueness if provided
         if config.alias:
             if not self._is_alias_valid(config.alias):
@@ -69,26 +72,44 @@ class ConnectionRepository:
             if not self._is_alias_unique(config.alias, connection_id):
                 raise ValueError(f"Alias '{config.alias}' is already in use by another connection.")
         
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO connections (id, name, type, config, alias, updated_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(id) DO UPDATE SET
-                    name = excluded.name,
-                    type = excluded.type,
-                    config = excluded.config,
-                    alias = excluded.alias,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (
-                    connection_id,
-                    config.name,
-                    config.type.value,
-                    json.dumps(config.config),
-                    config.alias,
-                ),
+        # Prevent alias changes on existing connections
+        if existing and existing.alias and existing.alias != config.alias:
+            raise ValueError(
+                "Cannot change alias after connection creation. "
+                "This would break existing queries that reference the connection."
             )
+        
+        with sqlite3.connect(self.db_path) as conn:
+            if existing:
+                # Update existing connection - preserve alias
+                conn.execute(
+                    """
+                    UPDATE connections 
+                    SET name = ?, type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (
+                        config.name,
+                        config.type.value,
+                        json.dumps(config.config),
+                        connection_id,
+                    ),
+                )
+            else:
+                # Insert new connection - allow alias
+                conn.execute(
+                    """
+                    INSERT INTO connections (id, name, type, config, alias, updated_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (
+                        connection_id,
+                        config.name,
+                        config.type.value,
+                        json.dumps(config.config),
+                        config.alias,
+                    ),
+                )
             conn.commit()
 
     def get(self, connection_id: str) -> Optional[ConnectionConfig]:

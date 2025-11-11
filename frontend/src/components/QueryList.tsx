@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, FileCode, Database } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,20 +17,14 @@ import { api } from "../services/api";
 import type { Query } from "../types";
 
 interface QueryListProps {
-  selectedQueryId: string | null;
-  onSelectQuery: (queryId: string) => void;
-  refreshTrigger?: number;
   currentPage?: 'queries' | 'connections';
-  onPageChange?: (page: 'queries' | 'connections') => void;
 }
 
 export default function QueryList({
-  selectedQueryId,
-  onSelectQuery,
-  refreshTrigger,
   currentPage = 'queries',
-  onPageChange,
 }: QueryListProps) {
+  const navigate = useNavigate();
+  const { queryId: selectedQueryId } = useParams<{ queryId: string }>();
   const [queries, setQueries] = useState<Query[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +34,7 @@ export default function QueryList({
 
   useEffect(() => {
     loadQueries();
-  }, [refreshTrigger]);
+  }, []);
 
   const loadQueries = async () => {
     try {
@@ -72,7 +67,7 @@ export default function QueryList({
       setCreateDialogOpen(false);
       setQueryName("");
       await loadQueries();
-      onSelectQuery(newQuery.id);
+      navigate(`/query/${newQuery.id}`);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to create query");
     } finally {
@@ -103,7 +98,7 @@ export default function QueryList({
         {/* Navigation Button */}
         <Button
           variant={currentPage === 'connections' ? 'default' : 'outline'}
-          onClick={() => onPageChange?.('connections')}
+          onClick={() => navigate('/connections')}
           className="w-full"
         >
           <Database className="h-4 w-4 mr-2" />
@@ -145,7 +140,7 @@ export default function QueryList({
           {queries.map((query) => (
             <button
               key={query.id}
-              onClick={() => onSelectQuery(query.id)}
+              onClick={() => navigate(`/query/${query.id}`)}
               className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
                 selectedQueryId === query.id
                   ? "bg-primary text-primary-foreground"

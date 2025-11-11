@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "../services/api";
 import ChatInterface from "./ChatInterface";
+import AddTablesModal from "./AddTablesModal";
 import type {
   Query,
   QueryTableSelection,
@@ -55,15 +56,11 @@ import type {
 interface QueryDetailProps {
   queryId: string;
   onQueryDeleted: () => void;
-  onAddTables: () => void;
-  onQueryUpdated?: () => void;
 }
 
 export default function QueryDetail({
   queryId,
   onQueryDeleted,
-  onAddTables,
-  onQueryUpdated,
 }: QueryDetailProps) {
   const [query, setQuery] = useState<Query | null>(null);
   const [selections, setSelections] = useState<QueryTableSelection[]>([]);
@@ -77,6 +74,7 @@ export default function QueryDetail({
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [tableMetadataCache, setTableMetadataCache] = useState<Map<string, TableMetadata>>(new Map());
   const [connectionNames, setConnectionNames] = useState<Map<string, string>>(new Map());
+  const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
 
   useEffect(() => {
     loadQueryData();
@@ -169,10 +167,6 @@ export default function QueryDetail({
       setRenameDialogOpen(false);
       setNewQueryName("");
       setError(null);
-      // Notify parent to refresh the query list
-      if (onQueryUpdated) {
-        onQueryUpdated();
-      }
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to rename query");
     } finally {
@@ -350,7 +344,7 @@ export default function QueryDetail({
                       <h3 className="text-sm font-medium text-muted-foreground">
                         {selections.length} {selections.length === 1 ? "table" : "tables"} connected
                       </h3>
-                      <Button onClick={onAddTables} size="sm">
+                      <Button onClick={() => setAddTablesModalOpen(true)} size="sm">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Tables
                       </Button>
@@ -556,6 +550,17 @@ export default function QueryDetail({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Tables Modal */}
+      <AddTablesModal
+        open={addTablesModalOpen}
+        onClose={() => setAddTablesModalOpen(false)}
+        workspaceId={queryId}
+        onTablesAdded={() => {
+          // Reload query data to reflect new table selections
+          loadQueryData();
+        }}
+      />
     </div>
   );
 }

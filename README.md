@@ -98,39 +98,41 @@ The application will be available at:
    - Schema (default: "public")
 4. Click **Create Connection**
 
-### 3. Add Tables to a Query
+### 3. Select Tables for Your Query
 
 1. Go back to the **Queries** page and select your query
-2. Click **Add Tables** in the query detail area
-3. Select a connection from the list
-4. Choose a schema from the connection
-5. Select the tables you want to add (use checkboxes)
-6. Click **Add Selected Tables**
+2. Switch to the **Tables** tab
+3. Browse the tree view showing all your connections → schemas → tables
+4. Check/uncheck tables to add or remove them from your query (saves automatically)
+5. Use the **filter** to search for specific tables by name
+6. Toggle **"Show Only Selected"** to focus on your chosen tables
+7. Click the **refresh button** to update connection metadata
 
 ### 4. Build SQL with AI Chat
 
-1. In the query detail area, you'll see the "Chat & SQL" tab
+1. In the query detail area, switch to the **SQL Query** tab
 2. The SQL editor shows your current query (initially empty)
 3. Type a message to the AI like "Write a SELECT query to get all active users"
 4. The AI will generate SQL and update the editor
 5. Continue chatting to refine: "Add a WHERE clause for created_at > '2024-01-01'"
-6. Each message iteratively improves the SQL based on your Tables
+6. Each message iteratively improves the SQL based on your selected tables
 
 ### 5. View Table Metadata
 
-1. Switch to the "Tables" tab
-2. Click on any table card to view detailed metadata:
+1. In the **Tables** tab, expand any table in the tree view
+2. Click the arrow next to a table to see:
    - Column names and data types
    - Nullable fields
-   - Primary keys
-   - Row count
+   - Primary keys (if available)
+   - Row counts displayed inline
 
 ### 6. Manage Queries
 
 - **Switch Queries**: Click on any query in the left panel
 - **Edit SQL Directly**: You can manually edit the SQL in the editor
+- **Run Queries**: Execute SQL and view paginated results
+- **Export Results**: Download query results as CSV
 - **Clear Chat**: Remove chat history while keeping the SQL
-- **Delete Tables**: Click the X button on a table card to remove it from the query
 - **Delete Query**: Click the trash icon in the query header (removes query, selections, and chat history)
 
 ## Development
@@ -179,23 +181,24 @@ pnpm add package-name
 **Frontend (`frontend/src/`):**
 - `components/` - React components
   - `QueryList.tsx` - Left panel: list of all queries
-  - `QueryDetail.tsx` - Right panel: query details with chat interface and table cards
+  - `QueryDetail.tsx` - Right panel: query details with tabs (SQL Query and Tables)
   - `ChatInterface.tsx` - AI chat for interactive SQL editing
-  - `AddTablesModal.tsx` - Multi-step modal for adding tables
+  - `DataSourcesTreeView.tsx` - Tree view with checkboxes for real-time table selection
   - `ConnectionManager.tsx` - Connection CRUD interface
 - `stores/` - Zustand state management stores
   - `useQueryStore.ts` - Query state and operations
-  - `useConnectionStore.ts` - Connection state and metadata cache
+  - `useConnectionStore.ts` - Connection state and metadata cache (5-minute TTL)
   - `useUIStore.ts` - UI state (modals, toasts, loading)
 - `services/api.ts` - Backend API client
 - `types/` - TypeScript definitions
 
 **Key Concepts:**
-- **Query**: A named SQL query with Tables (can include tables from multiple connections)
+- **Query**: A named SQL query with selected tables (can include tables from multiple connections)
 - **Connection**: Saved database configuration (PostgreSQL)
+- **Data Sources**: Extensible concept supporting different source types (currently 'connection', planned: 'file', 's3')
 - **Chat History**: Conversational context for iterative SQL editing with AI
-- **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases
-- **Metadata**: Auto-collected schema info (tables, columns, types, constraints, row counts)
+- **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases using system functions
+- **Metadata**: Auto-collected schema info (tables, columns, types, row counts) with 5-minute cache
 - **State Management**: Zustand stores provide centralized state with automatic reactivity and Redux DevTools integration
 
 ### Troubleshooting
@@ -215,29 +218,35 @@ cd frontend && pnpm install
 ## Data Storage
 
 QBox stores data locally in `~/.qbox/`:
-- `connections.db` - SQLite database with connection configs, queries, query table selections, and chat history
+- `connections.db` - SQLite database with:
+  - Connection configurations (id, name, type, config, alias)
+  - Queries (id, name, sql_text, timestamps)
+  - Query selections (query_id, connection_id, schema_name, table_name, source_type)
+  - Chat history (query_id, role, message)
+  - SQL history (query_id, sql_text, timestamps)
 - `qbox.duckdb` - Persistent DuckDB instance with attached data sources
 
 ## Roadmap
 
 **Completed:**
 - ✅ PostgreSQL connection management
-- ✅ Query management (create, list, delete)
-- ✅ Add tables to queries from any connection
+- ✅ Query management (create, list, delete, rename)
+- ✅ Tree view interface for browsing and selecting tables
+- ✅ Real-time table selection with checkboxes
+- ✅ Table filtering and "show selected only" toggle
 - ✅ AI-powered chat interface for interactive SQL editing
 - ✅ Chat history persistence per query
-- ✅ Automatic metadata discovery
-- ✅ Query and table selection persistence
-- ✅ View detailed table metadata
+- ✅ SQL version history (last 50 versions per query)
+- ✅ Automatic metadata discovery with caching (5-minute TTL)
+- ✅ Query execution with pagination
+- ✅ CSV export of query results
+- ✅ View detailed table metadata (columns, types, row counts)
 
 **Planned:**
-- [ ] Query execution interface
-- [ ] Query result visualization
-- [ ] Metadata export (markdown format)
-- [ ] CSV file support
-- [ ] Excel file support
-- [ ] S3 bucket support
-- [ ] Result export and visualization
+- [ ] Advanced query result visualization
+- [ ] CSV file data source support
+- [ ] Excel file data source support
+- [ ] S3 bucket data source support
 - [ ] Electron desktop application packaging
 
 ## License

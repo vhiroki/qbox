@@ -89,13 +89,13 @@ QBox is a query-based data management application for building and managing SQL 
 ### Query Flow
 1. User creates query (names it)
 2. User creates database connections
-3. User clicks "Add Tables" in query
-4. User selects connection → schema → tables
-5. Tables added to query (persisted)
-6. Tables appear as cards with metadata
+3. User opens "Tables" tab in query
+4. User browses tree view of all connections → schemas → tables
+5. User checks/unchecks tables to add/remove from query (real-time saving)
+6. User can filter tables by name or show only selected tables
 7. User chats with AI to build/edit SQL
-8. User views table details by clicking cards
-9. User can remove tables or delete queries
+8. User can expand tables to view column metadata
+9. User can refresh connection metadata or delete queries
 
 ### DuckDB Manager
 - Single persistent instance at `~/.qbox/qbox.duckdb`
@@ -105,10 +105,12 @@ QBox is a query-based data management application for building and managing SQL 
 
 ### Persistence (connections.db)
 Tables:
-- `connections`: Connection configs (id, name, type, config JSON, timestamps)
+- `connections`: Connection configs (id, name, type, config JSON, alias, timestamps)
 - `queries`: Query definitions (id, name, sql_text, created_at, updated_at)
-- `query_selections`: Selected tables (query_id, connection_id, schema_name, table_name)
+- `query_selections`: Selected tables (query_id, connection_id, schema_name, table_name, source_type)
 - `query_chat_history`: Chat messages (id, query_id, role, message, created_at)
+
+**Data Sources**: The `source_type` field in `query_selections` supports extensibility for future data sources (currently 'connection' for database connections, with 'file' and 's3' planned).
 
 ## UI/UX Structure
 
@@ -116,9 +118,9 @@ Tables:
 
 **Queries Page**:
 - Left panel (320px): Query list with create button (QueryList)
-- Right panel: Query details with chat and table cards (QueryDetail)
-- Add Tables Modal: Multi-step (connection → schema → tables)
-- Chat & SQL Tab: Interactive SQL editing with AI
+- Right panel: Query details with tabs (QueryDetail)
+- SQL Query Tab: Editor with AI chat, execution, and results
+- Tables Tab: Tree view of all data sources with checkboxes for selection
 
 **Connections Page**: CRUD interface for connections
 
@@ -126,11 +128,16 @@ Tables:
 
 **QueryList**: Query list ordered newest first, click to select
 
-**QueryDetail**: Header with actions, tabs for "Chat & SQL" and "Tables"
+**QueryDetail**: Header with actions, tabs for "SQL Query" and "Tables"
 
 **ChatInterface**: SQL editor, chat history, message input, AI refinement
 
-**AddTablesModal**: 3-step selection (connection → schema → tables) with progress indicator
+**DataSourcesTreeView**: Tree view with checkboxes for real-time table selection, includes:
+- Refresh button for metadata updates
+- Filter input for searching tables by name
+- Toggle to show all tables or only selected ones
+- Auto-expands connections with selected tables
+- Cached metadata with 5-minute TTL
 
 **ConnectionManager**: Table view with create/edit/delete actions
 
@@ -143,7 +150,8 @@ Tables:
 - Sanitize file paths
 
 ### Performance
-- Cache schema information
+- Cache schema information (5-minute TTL in Zustand store)
+- Metadata queries use DuckDB system functions (duckdb_schemas, duckdb_tables, duckdb_columns)
 - Use connection pooling if needed
 - Limit query result sizes
 - Debounce user input in search/filter fields

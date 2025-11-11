@@ -16,6 +16,8 @@ import type {
   QueryUpdateRequest,
   QueryExecuteRequest,
   QueryExecuteResult,
+  SQLHistoryList,
+  SQLHistoryRestoreRequest,
 } from "../types";
 
 const API_BASE_URL = "/api";
@@ -200,6 +202,25 @@ export const api = {
       {
         responseType: "blob",
       }
+    );
+    return response.data;
+  },
+
+  // SQL History endpoints
+  async getSQLHistory(queryId: string): Promise<SQLHistoryList> {
+    const response = await axios.get(
+      `${API_BASE_URL}/queries/${queryId}/sql-history`
+    );
+    return response.data;
+  },
+
+  async restoreSQLFromHistory(
+    queryId: string,
+    request: SQLHistoryRestoreRequest
+  ): Promise<Query> {
+    const response = await axios.post(
+      `${API_BASE_URL}/queries/${queryId}/sql-history/restore`,
+      request
     );
     return response.data;
   },

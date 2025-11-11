@@ -266,3 +266,28 @@ class QueryExecuteResult(BaseModel):
     total_pages: Optional[int] = None
     execution_time_ms: Optional[float] = None
     error: Optional[str] = None
+
+
+# SQL History Models
+
+
+class SQLHistoryItem(BaseModel):
+    """A SQL history version."""
+
+    id: int
+    query_id: str
+    sql_text: str
+    created_at: str
+
+
+class SQLHistoryList(BaseModel):
+    """List of SQL history versions."""
+
+    query_id: str
+    versions: list[SQLHistoryItem]
+
+
+class SQLHistoryRestoreRequest(BaseModel):
+    """Request to restore a SQL version from history."""
+
+    history_id: int

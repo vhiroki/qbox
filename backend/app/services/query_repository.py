@@ -4,7 +4,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from app.models.schemas import ChatMessage, Query, QueryTableSelection
 
@@ -85,6 +85,26 @@ class QueryRepository:
                 """
                 CREATE INDEX IF NOT EXISTS idx_query_chat_history
                 ON query_chat_history(query_id, created_at)
+            """
+            )
+
+            # Query SQL history table (new)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS query_sql_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query_id TEXT NOT NULL,
+                    sql_text TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
+                )
+            """
+            )
+
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_query_sql_history
+                ON query_sql_history(query_id, created_at DESC)
             """
             )
 
@@ -197,11 +217,24 @@ class QueryRepository:
                 for row in rows
             ]
 
-    def update_query_sql(self, query_id: str, sql_text: str) -> bool:
-        """Update the SQL text of a query."""
+    def update_query_sql(self, query_id: str, sql_text: str, save_to_history: bool = True) -> bool:
+        """Update the SQL text of a query and optionally save to history."""
         now = datetime.now().isoformat()
 
         with self._get_connection() as conn:
+            # Get current SQL to check if it's different
+            cursor = conn.execute(
+                "SELECT sql_text FROM queries WHERE id = ?",
+                (query_id,)
+            )
+            row = cursor.fetchone()
+            current_sql = row[0] if row else ""
+
+            # Only save to history if SQL has actually changed
+            if save_to_history and current_sql != sql_text:
+                self._save_sql_to_history(conn, query_id, sql_text, now)
+
+            # Update the query
             cursor = conn.execute(
                 """
                 UPDATE queries
@@ -423,6 +456,103 @@ class QueryRepository:
                 (query_id,),
             )
             conn.commit()
+
+    # SQL history operations
+
+    def _save_sql_to_history(
+        self, conn: sqlite3.Connection, query_id: str, sql_text: str, timestamp: str
+    ) -> None:
+        """Save SQL to history and maintain maximum of 50 versions."""
+        # Add new version
+        conn.execute(
+            """
+            INSERT INTO query_sql_history (query_id, sql_text, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (query_id, sql_text, timestamp),
+        )
+
+        # Count total versions for this query
+        cursor = conn.execute(
+            """
+            SELECT COUNT(*) FROM query_sql_history WHERE query_id = ?
+            """,
+            (query_id,),
+        )
+        count = cursor.fetchone()[0]
+
+        # If we exceed 50 versions, delete the oldest ones
+        if count > 50:
+            conn.execute(
+                """
+                DELETE FROM query_sql_history
+                WHERE id IN (
+                    SELECT id FROM query_sql_history
+                    WHERE query_id = ?
+                    ORDER BY created_at ASC
+                    LIMIT ?
+                )
+                """,
+                (query_id, count - 50),
+            )
+
+    def get_sql_history(self, query_id: str) -> list[dict[str, Any]]:
+        """Get SQL history for a query, ordered by most recent first."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT id, query_id, sql_text, created_at
+                FROM query_sql_history
+                WHERE query_id = ?
+                ORDER BY created_at DESC
+                """,
+                (query_id,),
+            )
+            rows = cursor.fetchall()
+
+            return [
+                {
+                    "id": row["id"],
+                    "query_id": row["query_id"],
+                    "sql_text": row["sql_text"],
+                    "created_at": row["created_at"],
+                }
+                for row in rows
+            ]
+
+    def restore_sql_from_history(self, query_id: str, history_id: int) -> Optional[str]:
+        """Restore SQL from a history entry. Returns the restored SQL text."""
+        with self._get_connection() as conn:
+            # Get the SQL from history
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT sql_text FROM query_sql_history
+                WHERE id = ? AND query_id = ?
+                """,
+                (history_id, query_id),
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            sql_text = row["sql_text"]
+
+            # Update the query with this SQL (without saving to history to avoid duplication)
+            now = datetime.now().isoformat()
+            conn.execute(
+                """
+                UPDATE queries
+                SET sql_text = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (sql_text, now, query_id),
+            )
+            conn.commit()
+
+            return sql_text
 
 
 # Global query repository instance

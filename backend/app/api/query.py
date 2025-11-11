@@ -20,6 +20,9 @@ from app.models.schemas import (
     QuerySelections,
     QueryTableSelectionRequest,
     QueryUpdateRequest,
+    SQLHistoryItem,
+    SQLHistoryList,
+    SQLHistoryRestoreRequest,
 )
 from app.services.ai_service import get_ai_service
 from app.services.connection_repository import connection_repository
@@ -443,3 +446,49 @@ async def clear_chat_history(query_id: str):
 
     query_repository.clear_chat_history(query_id)
     return {"success": True, "message": "Chat history cleared"}
+
+
+# SQL History endpoints
+
+
+@router.get("/{query_id}/sql-history", response_model=SQLHistoryList)
+async def get_sql_history(query_id: str):
+    """Get SQL history for a query."""
+    query = query_repository.get_query(query_id)
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    history = query_repository.get_sql_history(query_id)
+    versions = [
+        SQLHistoryItem(
+            id=h["id"],
+            query_id=h["query_id"],
+            sql_text=h["sql_text"],
+            created_at=h["created_at"],
+        )
+        for h in history
+    ]
+    return SQLHistoryList(query_id=query_id, versions=versions)
+
+
+@router.post("/{query_id}/sql-history/restore", response_model=Query)
+async def restore_sql_from_history(query_id: str, request: SQLHistoryRestoreRequest):
+    """Restore SQL from a history version."""
+    query = query_repository.get_query(query_id)
+    if not query:
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    try:
+        restored_sql = query_repository.restore_sql_from_history(query_id, request.history_id)
+        if restored_sql is None:
+            raise HTTPException(status_code=404, detail="History version not found")
+
+        # Return the updated query
+        updated_query = query_repository.get_query(query_id)
+        return updated_query
+
+    except Exception as e:
+        logger.error(f"Failed to restore SQL from history: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to restore SQL: {str(e)}"
+        )

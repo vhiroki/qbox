@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Database, X, ChevronDown, ChevronRight, Pencil, Play } from "lucide-react";
+import { Plus, Trash2, Database, X, ChevronDown, ChevronRight, Pencil, Play, History } from "lucide-react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -49,6 +49,7 @@ import { api } from "../services/api";
 import ChatInterface from "./ChatInterface";
 import AddTablesModal from "./AddTablesModal";
 import QueryResults from "./QueryResults";
+import SQLHistoryModal from "./SQLHistoryModal";
 import type {
   TableMetadata,
   QueryTableSelection,
@@ -92,6 +93,7 @@ export default function QueryDetail({
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [tableMetadataCache, setTableMetadataCache] = useState<Map<string, TableMetadata>>(new Map());
   const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
+  const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -454,6 +456,15 @@ export default function QueryDetail({
                           <span className="text-xs text-muted-foreground">
                             {window.navigator.platform.match("Mac") ? "⌘" : "Ctrl"}+Enter
                           </span>
+                          <div className="flex-1" />
+                          <Button
+                            onClick={() => setSqlHistoryModalOpen(true)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <History className="h-3 w-3 mr-2" />
+                            History
+                          </Button>
                         </div>
                         <div className="flex-1 border rounded-md overflow-hidden">
                           <Editor
@@ -715,6 +726,16 @@ export default function QueryDetail({
         onTablesAdded={() => {
           // Reload query selections to reflect new table selections
           loadQuerySelections(queryId);
+        }}
+      />
+
+      {/* SQL History Modal */}
+      <SQLHistoryModal
+        queryId={queryId}
+        isOpen={sqlHistoryModalOpen}
+        onClose={() => setSqlHistoryModalOpen(false)}
+        onRestore={(restoredSQL) => {
+          setSqlText(restoredSQL);
         }}
       />
     </div>

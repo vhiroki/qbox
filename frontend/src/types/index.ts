@@ -204,3 +204,21 @@ export interface QueryExecuteResult {
   execution_time_ms?: number;
   error?: string;
 }
+
+// SQL History Types
+
+export interface SQLHistoryItem {
+  id: number;
+  query_id: string;
+  sql_text: string;
+  created_at: string;
+}
+
+export interface SQLHistoryList {
+  query_id: string;
+  versions: SQLHistoryItem[];
+}
+
+export interface SQLHistoryRestoreRequest {
+  history_id: number;
+}

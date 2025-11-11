@@ -222,3 +222,21 @@ export interface SQLHistoryList {
 export interface SQLHistoryRestoreRequest {
   history_id: number;
 }
+
+// Settings Types
+
+export interface AISettings {
+  openai_api_key?: string | null;
+  anthropic_api_key?: string | null;
+  gemini_api_key?: string | null;
+  ai_model: string;
+  ai_temperature: number;
+}
+
+export interface AISettingsUpdate {
+  openai_api_key?: string | null;
+  anthropic_api_key?: string | null;
+  gemini_api_key?: string | null;
+  ai_model?: string;
+  ai_temperature?: number;
+}

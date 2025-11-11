@@ -18,6 +18,8 @@ import type {
   QueryExecuteResult,
   SQLHistoryList,
   SQLHistoryRestoreRequest,
+  AISettings,
+  AISettingsUpdate,
 } from "../types";
 
 const API_BASE_URL = "/api";
@@ -226,6 +228,16 @@ export const api = {
   },
 
   // Settings endpoints
+  async getAISettings(): Promise<AISettings> {
+    const response = await axios.get(`${API_BASE_URL}/settings/ai`);
+    return response.data;
+  },
+
+  async updateAISettings(settings: AISettingsUpdate): Promise<AISettings> {
+    const response = await axios.put(`${API_BASE_URL}/settings/ai`, settings);
+    return response.data;
+  },
+
   async clearAllData(): Promise<void> {
     await axios.post(`${API_BASE_URL}/settings/clear-all-data`);
   },

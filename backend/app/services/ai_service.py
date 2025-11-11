@@ -1,6 +1,7 @@
 """AI service for SQL query generation using LiteLLM."""
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -8,6 +9,7 @@ import litellm
 from litellm import acompletion
 
 from app.config.settings import get_settings
+from app.services.settings_repository import settings_repository
 
 logger = logging.getLogger(__name__)
 
@@ -326,9 +328,25 @@ EXPLANATION:
 
 def get_ai_service() -> AIService:
     """Get AI service instance with configured model."""
-    settings = get_settings()
-
-    model = settings.AI_MODEL
+    # Get settings from database first, then fall back to config/env
+    db_settings = settings_repository.get_ai_settings()
+    config_settings = get_settings()
+    
+    # Use database settings if available, otherwise fall back to config/env
+    openai_key = db_settings.get("openai_api_key") or config_settings.OPENAI_API_KEY
+    anthropic_key = db_settings.get("anthropic_api_key") or config_settings.ANTHROPIC_API_KEY
+    gemini_key = db_settings.get("gemini_api_key") or config_settings.GEMINI_API_KEY
+    model = db_settings.get("ai_model") or config_settings.AI_MODEL
+    temperature_str = db_settings.get("ai_temperature")
+    temperature = float(temperature_str) if temperature_str else config_settings.AI_TEMPERATURE
+    
+    # Set API keys in environment for LiteLLM to use
+    if openai_key:
+        os.environ["OPENAI_API_KEY"] = openai_key
+    if anthropic_key:
+        os.environ["ANTHROPIC_API_KEY"] = anthropic_key
+    if gemini_key:
+        os.environ["GEMINI_API_KEY"] = gemini_key
     
     # Validate that appropriate API key is set for the model
     # Models can be prefixed with provider (e.g., "openai/gpt-4o") or not (e.g., "gpt-4o")
@@ -336,22 +354,22 @@ def get_ai_service() -> AIService:
     
     # OpenAI models
     if any(prefix in model_lower for prefix in ["openai/", "gpt-", "o1-", "o3-"]):
-        if not settings.OPENAI_API_KEY:
+        if not openai_key:
             raise RuntimeError(
-                "OPENAI_API_KEY not configured. Please set it in your .env file."
+                "OPENAI_API_KEY not configured. Please set it in Settings."
             )
     # Anthropic models
     elif any(prefix in model_lower for prefix in ["anthropic/", "claude-"]):
-        if not settings.ANTHROPIC_API_KEY:
+        if not anthropic_key:
             raise RuntimeError(
-                "ANTHROPIC_API_KEY not configured. Please set it in your .env file."
+                "ANTHROPIC_API_KEY not configured. Please set it in Settings."
             )
     # Google models (Gemini or Vertex AI)
     elif any(prefix in model_lower for prefix in ["gemini/", "gemini-", "vertex_ai/"]):
-        if not settings.GEMINI_API_KEY:
+        if not gemini_key:
             raise RuntimeError(
-                "GEMINI_API_KEY not configured. Please set it in your .env file."
+                "GEMINI_API_KEY not configured. Please set it in Settings."
             )
     # Local models (Ollama, etc.) don't need API keys
 
-    return AIService(model=model, temperature=settings.AI_TEMPERATURE)
+    return AIService(model=model, temperature=temperature)

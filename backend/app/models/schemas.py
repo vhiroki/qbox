@@ -291,3 +291,26 @@ class SQLHistoryRestoreRequest(BaseModel):
     """Request to restore a SQL version from history."""
 
     history_id: int
+
+
+# Settings Models
+
+
+class AISettings(BaseModel):
+    """AI configuration settings."""
+
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    ai_model: str = "gpt-4o"
+    ai_temperature: float = 0.1
+
+
+class AISettingsUpdate(BaseModel):
+    """Request to update AI settings (all fields optional)."""
+
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    ai_model: Optional[str] = None
+    ai_temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)

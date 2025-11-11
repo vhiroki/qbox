@@ -173,7 +173,8 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
     if not query:
         raise HTTPException(status_code=404, detail="Query not found")
 
-    if not query.sql_text or query.sql_text.strip() == "":
+    # Use SQL from request payload (current editor content)
+    if not request.sql_text or request.sql_text.strip() == "":
         raise HTTPException(status_code=400, detail="Query SQL is empty")
 
     # Get query selections to attach necessary connections
@@ -209,7 +210,7 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
 
         # Execute query with pagination
         # Strip trailing semicolons from query
-        clean_sql = query.sql_text.strip().rstrip(";")
+        clean_sql = request.sql_text.strip().rstrip(";")
         
         # First, get total count
         count_query = f"SELECT COUNT(*) as total FROM ({clean_sql}) as subquery"
@@ -254,15 +255,16 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
         )
 
 
-@router.get("/{query_id}/export")
-async def export_query_to_csv(query_id: str):
+@router.post("/{query_id}/export")
+async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
     """Export full query results to CSV."""
     # Verify query exists
     query = query_repository.get_query(query_id)
     if not query:
         raise HTTPException(status_code=404, detail="Query not found")
 
-    if not query.sql_text or query.sql_text.strip() == "":
+    # Use SQL from request payload (current editor content)
+    if not request.sql_text or request.sql_text.strip() == "":
         raise HTTPException(status_code=400, detail="Query SQL is empty")
 
     # Get query selections to attach necessary connections
@@ -298,7 +300,7 @@ async def export_query_to_csv(query_id: str):
 
         # Execute full query (no pagination)
         # Strip trailing semicolons from query
-        clean_sql = query.sql_text.strip().rstrip(";")
+        clean_sql = request.sql_text.strip().rstrip(";")
         columns, rows = duckdb.execute_query(clean_sql)
 
         # Generate CSV in memory

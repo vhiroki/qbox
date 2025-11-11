@@ -250,6 +250,7 @@ class QueryExecuteRequest(BaseModel):
 
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=100, ge=1, le=1000)
+    sql_text: str  # Execute this SQL from the current editor
 
 
 class QueryExecuteResult(BaseModel):

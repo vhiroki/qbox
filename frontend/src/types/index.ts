@@ -188,6 +188,7 @@ export interface QueryHistoryList {
 export interface QueryExecuteRequest {
   page?: number;
   page_size?: number;
+  sql_text: string; // Execute this SQL from the current editor
 }
 
 export interface QueryExecuteResult {

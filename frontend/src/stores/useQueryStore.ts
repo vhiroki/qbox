@@ -8,6 +8,7 @@ interface QueryExecutionState {
   error: string | null;
   currentPage: number;
   pageSize: number;
+  executedSqlText: string | null; // The SQL that generated the current results
 }
 
 interface QueryState {
@@ -43,7 +44,7 @@ interface QueryState {
 
   // Query Execution Results
   getQueryExecutionState: (queryId: string) => QueryExecutionState | undefined;
-  setQueryResult: (queryId: string, result: QueryExecuteResult | null, error: string | null) => void;
+  setQueryResult: (queryId: string, result: QueryExecuteResult | null, error: string | null, executedSqlText?: string) => void;
   setQueryPagination: (queryId: string, page: number, pageSize: number) => void;
   clearQueryResult: (queryId: string) => void;
 
@@ -252,7 +253,7 @@ export const useQueryStore = create<QueryState>()(
       // Send chat message
       sendChatMessage: async (queryId, message) => {
         const tempId = `temp-${Date.now()}`;
-        
+
         // Optimistically add user message immediately
         const { queryChatHistory } = get();
         const currentHistory = queryChatHistory.get(queryId) || [];
@@ -264,12 +265,12 @@ export const useQueryStore = create<QueryState>()(
           created_at: new Date().toISOString(),
           is_pending: true,
         };
-        
+
         queryChatHistory.set(queryId, [...currentHistory, tempUserMessage]);
-        set({ 
+        set({
           queryChatHistory: new Map(queryChatHistory),
-          isLoading: true, 
-          error: null 
+          isLoading: true,
+          error: null
         });
 
         try {
@@ -277,8 +278,8 @@ export const useQueryStore = create<QueryState>()(
 
           // Mark user message as sent (no longer pending) and add assistant response
           const updatedHistory = queryChatHistory.get(queryId) || [];
-          const finalHistory = updatedHistory.map(m => 
-            m.id === tempId 
+          const finalHistory = updatedHistory.map(m =>
+            m.id === tempId
               ? { ...m, is_pending: false }
               : m
           );
@@ -298,13 +299,13 @@ export const useQueryStore = create<QueryState>()(
         } catch (error: any) {
           // Mark the temporary message as failed
           const failedHistory = queryChatHistory.get(queryId) || [];
-          const markedHistory = failedHistory.map(m => 
-            m.id === tempId 
+          const markedHistory = failedHistory.map(m =>
+            m.id === tempId
               ? { ...m, is_pending: false, has_error: true }
               : m
           );
           queryChatHistory.set(queryId, markedHistory);
-          
+
           set({
             queryChatHistory: new Map(queryChatHistory),
             error: error.response?.data?.detail || 'Failed to send message',
@@ -319,7 +320,7 @@ export const useQueryStore = create<QueryState>()(
         const { queryChatHistory } = get();
         const currentHistory = queryChatHistory.get(queryId) || [];
         const failedMessage = currentHistory.find(m => m.id === tempMessageId);
-        
+
         if (!failedMessage) {
           throw new Error('Message not found');
         }
@@ -331,10 +332,10 @@ export const useQueryStore = create<QueryState>()(
             : m
         );
         queryChatHistory.set(queryId, updatedHistory);
-        set({ 
+        set({
           queryChatHistory: new Map(queryChatHistory),
           isLoading: true,
-          error: null 
+          error: null
         });
 
         try {
@@ -401,13 +402,14 @@ export const useQueryStore = create<QueryState>()(
         return queryResults.get(queryId);
       },
 
-      setQueryResult: (queryId, result, error) => {
+      setQueryResult: (queryId, result, error, executedSqlText) => {
         const { queryResults } = get();
         const currentState = queryResults.get(queryId) || {
           result: null,
           error: null,
           currentPage: 1,
           pageSize: 100,
+          executedSqlText: null,
         };
 
         queryResults.set(queryId, {
@@ -416,6 +418,7 @@ export const useQueryStore = create<QueryState>()(
           error,
           currentPage: result?.page || currentState.currentPage,
           pageSize: result?.page_size || currentState.pageSize,
+          executedSqlText: executedSqlText !== undefined ? executedSqlText : currentState.executedSqlText,
         });
 
         set({ queryResults: new Map(queryResults) });
@@ -428,6 +431,7 @@ export const useQueryStore = create<QueryState>()(
           error: null,
           currentPage: 1,
           pageSize: 100,
+          executedSqlText: null,
         };
 
         queryResults.set(queryId, {

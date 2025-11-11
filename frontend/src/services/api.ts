@@ -190,9 +190,13 @@ export const api = {
     return response.data;
   },
 
-  async exportQueryToCSV(queryId: string): Promise<Blob> {
-    const response = await axios.get(
+  async exportQueryToCSV(
+    queryId: string,
+    request: QueryExecuteRequest
+  ): Promise<Blob> {
+    const response = await axios.post(
       `${API_BASE_URL}/queries/${queryId}/export`,
+      request,
       {
         responseType: "blob",
       }

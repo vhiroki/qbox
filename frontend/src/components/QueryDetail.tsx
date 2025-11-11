@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Database, X, ChevronDown, ChevronRight, Pencil, Play } from "lucide-react";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,7 +52,6 @@ import QueryResults from "./QueryResults";
 import type {
   TableMetadata,
   QueryTableSelection,
-  QueryExecuteResult,
 } from "../types";
 
 interface QueryDetailProps {
@@ -79,7 +78,7 @@ export default function QueryDetail({
 
   const loadMetadata = useConnectionStore((state) => state.loadMetadata);
   const connectionMetadata = useConnectionStore((state) => state.connectionMetadata);
-  
+
   // Query execution state from store
   const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
   const setQueryResult = useQueryStore((state) => state.setQueryResult);
@@ -96,6 +95,21 @@ export default function QueryDetail({
   const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Monaco Editor ref for keyboard shortcuts
+  const editorRef = useRef<any>(null);
+  const isExecutingRef = useRef(isExecuting);
+  const sqlTextRef = useRef(sqlText);
+  const handleExecuteQueryRef = useRef<(() => void) | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isExecutingRef.current = isExecuting;
+  }, [isExecuting]);
+
+  useEffect(() => {
+    sqlTextRef.current = sqlText;
+  }, [sqlText]);
 
   // Get cached query execution state
   const executionState = getQueryExecutionState(queryId) || {
@@ -208,7 +222,7 @@ export default function QueryDetail({
   };
 
   const handleExecuteQuery = async () => {
-    if (!query || !sqlText.trim()) {
+    if (!query || !sqlTextRef.current.trim()) {
       setQueryResult(queryId, null, "Query SQL is empty");
       return;
     }
@@ -220,7 +234,7 @@ export default function QueryDetail({
         page: executionState.currentPage,
         page_size: executionState.pageSize,
       });
-      
+
       if (result.success) {
         setQueryResult(queryId, result, null);
       } else {
@@ -234,6 +248,11 @@ export default function QueryDetail({
     }
   };
 
+  // Store the latest handleExecuteQuery in ref for keyboard shortcut
+  useEffect(() => {
+    handleExecuteQueryRef.current = handleExecuteQuery;
+  });
+
   const handlePageChange = async (newPage: number) => {
     setQueryPagination(queryId, newPage, executionState.pageSize);
     setIsExecuting(true);
@@ -243,7 +262,7 @@ export default function QueryDetail({
         page: newPage,
         page_size: executionState.pageSize,
       });
-      
+
       if (result.success) {
         setQueryResult(queryId, result, null);
       } else {
@@ -266,7 +285,7 @@ export default function QueryDetail({
         page: 1,
         page_size: newPageSize,
       });
-      
+
       if (result.success) {
         setQueryResult(queryId, result, null);
       } else {
@@ -286,7 +305,7 @@ export default function QueryDetail({
     setIsExporting(true);
     try {
       const blob = await api.exportQueryToCSV(queryId);
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -302,6 +321,27 @@ export default function QueryDetail({
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+
+    // Add keyboard shortcut: Cmd/Ctrl + Enter to run query
+    editor.addAction({
+      id: "execute-query",
+      label: "Run Query",
+      keybindings: [
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      ],
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.5,
+      run: () => {
+        // Use refs to get current values and function instead of captured closure values
+        if (!isExecutingRef.current && sqlTextRef.current.trim() && handleExecuteQueryRef.current) {
+          handleExecuteQueryRef.current();
+        }
+      },
+    });
   };
 
   if (isQueryLoading && !query) {
@@ -387,14 +427,19 @@ export default function QueryDetail({
                     <ResizablePanel defaultSize={50} minSize={30}>
                       <div className="h-full flex flex-col">
                         <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                          <Button
-                            onClick={handleExecuteQuery}
-                            size="sm"
-                            disabled={isExecuting || !sqlText.trim()}
-                          >
-                            <Play className="h-3 w-3 mr-2" />
-                            Run Query
-                          </Button>
+                          <div className="flex items-center gap-3">
+                            <Button
+                              onClick={handleExecuteQuery}
+                              size="sm"
+                              disabled={isExecuting || !sqlText.trim()}
+                            >
+                              <Play className="h-3 w-3 mr-2" />
+                              Run Query
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                              {window.navigator.platform.match("Mac") ? "⌘" : "Ctrl"}+Enter
+                            </span>
+                          </div>
                           {sqlEdited && (
                             <Button onClick={handleSaveSQL} size="sm" variant="outline">
                               Save SQL
@@ -406,6 +451,7 @@ export default function QueryDetail({
                             defaultLanguage="sql"
                             value={sqlText}
                             onChange={handleSQLChange}
+                            onMount={handleEditorDidMount}
                             theme="vs-dark"
                             options={{
                               minimap: { enabled: false },
@@ -432,7 +478,6 @@ export default function QueryDetail({
                     <ResizablePanel defaultSize={50} minSize={20}>
                       <div className="h-full pt-2">
                         <QueryResults
-                          queryId={queryId}
                           result={executionState.result}
                           isLoading={isExecuting}
                           error={executionState.error}

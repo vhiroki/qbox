@@ -12,7 +12,6 @@ import {
 import type { QueryExecuteResult } from "../types";
 
 interface QueryResultsProps {
-  queryId: string;
   result: QueryExecuteResult | null;
   isLoading: boolean;
   error: string | null;
@@ -23,7 +22,6 @@ interface QueryResultsProps {
 }
 
 export default function QueryResults({
-  queryId,
   result,
   isLoading,
   error,

@@ -5,8 +5,6 @@ import type {
   Connection,
   SavedConnection,
   TableSchema,
-  QueryRequest,
-  QueryResult,
   ConnectionMetadata,
   Query,
   QueryCreate,
@@ -77,15 +75,6 @@ export const api = {
       `${API_BASE_URL}/connections/${connectionId}/schema`
     );
     return response.data.schema;
-  },
-
-  // Query endpoints
-  async executeQuery(request: QueryRequest): Promise<QueryResult> {
-    const response = await axios.post(
-      `${API_BASE_URL}/queries/execute`,
-      request
-    );
-    return response.data;
   },
 
   // Metadata endpoints

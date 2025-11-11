@@ -312,7 +312,7 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
                                 <div className="font-medium">{table.name}</div>
                                 <div className="text-xs text-muted-foreground">
                                   {table.columns.length} columns
-                                  {table.row_count !== undefined && ` • ${table.row_count.toLocaleString()} rows`}
+                                  {table.row_count != null && ` • ${table.row_count.toLocaleString()} rows`}
                                 </div>
                               </div>
                             </div>

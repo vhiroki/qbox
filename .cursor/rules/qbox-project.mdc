@@ -1,0 +1,197 @@
+---
+description: QBox project architecture, coding standards, and best practices
+globs: ["**/*.py", "**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# QBox Project Context
+
+## Project Overview
+QBox is a query-based data management application for building and managing SQL queries across multiple sources. Users can create queries, connect to PostgreSQL databases, select tables, use AI-powered chat to build SQL interactively, and view comprehensive metadata. The app runs locally with Python FastAPI backend and React TypeScript frontend, designed for future Electron packaging.
+
+## Core Architecture
+
+### Backend (Python + FastAPI)
+- FastAPI for all API endpoints
+- DuckDB as persistent query engine at `~/.qbox/qbox.duckdb` (attaches multiple data sources)
+- SQLite for persistence at `~/.qbox/connections.db` (connections, queries, selections, chat history)
+- Business logic in `services/` directory
+- Repository pattern: `connection_repository.py`, `query_repository.py`
+- Pydantic models for validation and serialization
+- OpenAI integration for interactive SQL editing
+
+### Frontend (React + TypeScript)
+- Functional components with hooks only (no classes)
+- TypeScript strict mode
+- TailwindCSS + shadcn/ui components
+- Dark theme only (no toggle)
+- API calls through `services/api.ts`
+- Desktop UX focus (keyboard shortcuts, native interactions)
+- Two-page structure: Queries (main view) and Connections (management)
+
+### Electron-Ready Design
+- Backend and frontend communicate only via REST API
+- Use localhost URLs (avoid hardcoded IPs)
+- Cross-platform file paths
+- Avoid browser-specific APIs
+- State in backend where possible
+- Backend runs as child process in Electron
+
+## Technology Stack
+
+**Backend**: Python 3.13+, FastAPI, DuckDB, SQLite, uvicorn, uv
+**Frontend**: React 18, TypeScript 5+, Vite, TailwindCSS, shadcn/ui, Axios, pnpm
+
+## Code Style
+
+### Python
+- Follow PEP 8 (Black + Ruff)
+- Type hints for all functions
+- Async/await for I/O
+- Dataclasses or Pydantic models
+- Small, single-purpose functions
+- Descriptive variable names
+- Docstrings for public functions
+
+### TypeScript/React
+- Functional components with explicit types
+- No `any` type (use proper types or `unknown`)
+- Async/await for API calls
+- Try/catch with user-friendly error messages
+- Export types separately
+
+## Project Structure
+
+**Backend**:
+- `api/`: Route handlers (thin layer - HTTP only)
+- `services/`: Business logic (thick layer - core functionality)
+- `models/`: Pydantic schemas
+- `config/`: Settings and configuration
+
+**Frontend**:
+- `components/`: React components (small and focused)
+  - `ui/`: shadcn/ui base components
+- `services/`: API client
+- `types/`: TypeScript definitions
+- `hooks/`: Custom React hooks
+- `utils/`: Helper functions
+
+## Query Architecture
+
+**Query**: Named SQL query with connected tables from one/multiple sources. Persisted in SQLite with SQL text, chat history, and table selections.
+
+**Connection**: Saved database connection (PostgreSQL). Stored in SQLite with credentials.
+
+**Metadata**: Schema information (tables, columns, types, constraints) from data sources.
+
+**Chat History**: User-AI conversation for iterative SQL editing, stored per query.
+
+### Query Flow
+1. User creates query (names it)
+2. User creates database connections
+3. User clicks "Add Tables" in query
+4. User selects connection → schema → tables
+5. Tables added to query (persisted)
+6. Tables appear as cards with metadata
+7. User chats with AI to build/edit SQL
+8. User views table details by clicking cards
+9. User can remove tables or delete queries
+
+### DuckDB Manager
+- Single persistent instance at `~/.qbox/qbox.duckdb`
+- Connections attached with aliases: `pg_{connection_id_with_underscores}`
+- Must use `pg_` prefix and underscores (not hyphens)
+- Example: `pg_abc123_def456` for connection ID `abc123-def456`
+
+### Persistence (connections.db)
+Tables:
+- `connections`: Connection configs (id, name, type, config JSON, timestamps)
+- `queries`: Query definitions (id, name, sql_text, created_at, updated_at)
+- `query_selections`: Selected tables (query_id, connection_id, schema_name, table_name)
+- `query_chat_history`: Chat messages (id, query_id, role, message, created_at)
+
+## UI/UX Structure
+
+**Top Navigation**: Switch between Queries and Connections pages
+
+**Queries Page**:
+- Left panel (320px): Query list with create button (QueryList)
+- Right panel: Query details with chat and table cards (QueryDetail)
+- Add Tables Modal: Multi-step (connection → schema → tables)
+- Chat & SQL Tab: Interactive SQL editing with AI
+
+**Connections Page**: CRUD interface for connections
+
+### Key Components
+
+**QueryList**: Query list ordered newest first, click to select
+
+**QueryDetail**: Header with actions, tabs for "Chat & SQL" and "Connected Tables"
+
+**ChatInterface**: SQL editor, chat history, message input, AI refinement
+
+**AddTablesModal**: 3-step selection (connection → schema → tables) with progress indicator
+
+**ConnectionManager**: Table view with create/edit/delete actions
+
+## Best Practices
+
+### Security
+- Never log sensitive data (passwords, API keys)
+- Use environment variables for secrets
+- Validate all user input
+- Sanitize file paths
+
+### Performance
+- Cache schema information
+- Use connection pooling if needed
+- Limit query result sizes
+- Debounce user input in search/filter fields
+
+### API Patterns
+- Proper HTTP methods (GET, POST, DELETE)
+- Consistent response formats
+- Correct HTTP status codes
+- Pydantic models for request/response validation
+
+### Data Flow
+1. User interacts with UI
+2. Component calls API service
+3. API client makes HTTP request
+4. Backend API delegates to service layer
+5. Service performs logic and DB operations
+6. Response returns with proper typing
+7. UI updates and re-renders
+
+### Error Handling
+- Try/catch around all async operations
+- User-friendly error messages
+- Loading states during operations
+- Validate input with Pydantic (backend)
+- Appropriate HTTP status codes
+- Log technical details server-side
+
+## Prefer
+
+✅ Async/await over callbacks
+✅ Type hints and interfaces
+✅ Repository pattern
+✅ Small, focused functions
+✅ Explicit error handling
+✅ RESTful API design
+✅ Functional React components with hooks
+✅ TailwindCSS utilities over custom CSS
+✅ shadcn/ui components
+
+## Avoid
+
+❌ Global state (use React state or backend persistence)
+❌ Blocking I/O operations
+❌ Hardcoded values
+❌ Complex class hierarchies
+❌ Browser-specific code (won't work in Electron)
+❌ Direct DOM manipulation
+❌ Synchronous database operations
+❌ Storing credentials in code
+❌ Dark/light theme toggles (dark theme only)
+❌ Custom CSS when TailwindCSS utilities exist

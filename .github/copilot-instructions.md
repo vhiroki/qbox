@@ -65,15 +65,7 @@ For detailed setup and usage instructions, see the [README](../README.md).
 - Use dataclasses or Pydantic models for structured data
 - Keep functions small and single-purpose
 - Use descriptive variable names
-
-Example:
-```python
-async def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any]]]:
-    """Execute a SQL query and return columns and rows."""
-    if not self.duckdb_conn:
-        raise RuntimeError("Not connected to database")
-    # Implementation...
-```
+- Include docstrings for public functions
 
 ### TypeScript/React
 - Use functional components with TypeScript interfaces
@@ -83,59 +75,23 @@ async def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any
 - Handle errors with try/catch and user-friendly messages
 - Export types separately from components
 
-Example:
-```typescript
-interface QueryResultProps {
-  result: QueryResult | null;
-  loading: boolean;
-}
-
-export default function QueryResult({ result, loading }: QueryResultProps) {
-  // Implementation...
-}
-```
-
 ## Project Structure Rules
 
-### Backend Directory Structure
-```
-backend/app/
-├── api/                    # Route handlers (thin layer)
-│   ├── connections.py      # Connection CRUD
-│   ├── metadata.py         # Metadata collection
-│   ├── queries.py          # Query CRUD and chat interaction
-│   └── query.py            # Query execution (deprecated, use queries.py)
-├── services/               # Business logic (thick layer)
-│   ├── duckdb_manager.py   # Persistent DuckDB instance
-│   ├── database.py         # Database abstraction
-│   ├── metadata.py         # Metadata collection service
-│   ├── ai_service.py       # AI integration for SQL editing
-│   ├── connection_repository.py  # SQLite connection persistence
-│   └── query_repository.py       # SQLite query and chat history persistence
-├── models/                 # Pydantic models and schemas
-├── config/                 # Settings and configuration
-└── utils/                  # Helper functions (if needed)
-```
+### Backend Organization
+- **api/**: Route handlers (thin layer) - handle HTTP requests/responses only
+- **services/**: Business logic (thick layer) - all core functionality lives here
+- **models/**: Pydantic models and schemas for validation and serialization
+- **config/**: Application settings and configuration
+- Repository pattern for data persistence (connection_repository, query_repository)
 
-### Frontend Directory Structure
-```
-frontend/src/
-├── components/             # React components
-│   ├── ConnectionManager.tsx    # Connection CRUD interface
-│   ├── ConnectionForm.tsx       # Connection creation/edit form
-│   ├── QueryList.tsx            # Left panel: list of queries
-│   ├── QueryDetail.tsx          # Right panel: query details with chat and table cards
-│   ├── ChatInterface.tsx        # AI chat for interactive SQL editing
-│   ├── AddTablesModal.tsx       # Multi-step modal for adding tables
-│   ├── MetadataSidebar.tsx      # Metadata tree view (if used)
-│   └── ui/                      # shadcn/ui components
-├── services/               # API client and external services
-├── types/                  # TypeScript type definitions
-├── hooks/                  # Custom React hooks (if needed)
-├── utils/                  # Helper functions
-├── lib/                    # Utility libraries (cn helper, etc.)
-└── App.tsx                 # Main app with top navigation
-```
+### Frontend Organization
+- **components/**: React components (keep small and focused)
+  - **ui/**: shadcn/ui base components
+- **services/**: API client and external service integrations
+- **types/**: TypeScript type definitions
+- **hooks/**: Custom React hooks
+- **utils/**: Helper functions
+- **lib/**: Utility libraries
 
 ## Query Architecture
 
@@ -192,27 +148,18 @@ frontend/src/
 6. 🔜 MySQL/MariaDB
 
 ### Metadata Collection
-- Metadata is collected per connection on demand (when "Add to Workspace" is clicked)
-- PostgreSQL: Uses information_schema queries to get tables, columns, constraints
+- Metadata is collected per connection on demand
+- Uses information_schema queries to get tables, columns, constraints
 - Includes: table names, column names/types, nullable, primary keys, row counts
-- Future: Add descriptions, foreign keys, indexes
 
-## Security & Best Practices
+## Best Practices
 
 ### Security
 - Never log sensitive data (passwords, API keys)
-- Passwords stored in SQLite connections.db (consider encryption for production)
-- Use environment variables for secrets (if/when needed)
+- Use environment variables for secrets
 - Validate all user input
 - Sanitize file paths for CSV/Excel access
 - In Electron: use `contextIsolation` and disable `nodeIntegration`
-
-### Error Handling
-- Use try/catch for all async operations
-- Return user-friendly error messages
-- Log technical details server-side
-- Show loading states during operations
-- Provide retry mechanisms where appropriate
 
 ### Performance
 - Cache schema information where reasonable
@@ -271,57 +218,13 @@ frontend/src/
 - "Create New Connection" button in header and empty state
 - Dialog forms for create/edit
 
-### REST Endpoints
+### API Patterns
 - Use proper HTTP methods (GET, POST, DELETE, etc.)
 - Return consistent response formats
 - Include success/error flags in responses
 - Use HTTP status codes correctly
 - Version APIs if needed (`/api/v1/...`)
-
-### Request/Response Models
-```python
-# Connection
-class ConnectionConfig(BaseModel):
-    name: str
-    type: Literal["postgres", "s3", "csv", "excel"]
-    config: dict
-
-# Metadata
-class ConnectionMetadata(BaseModel):
-    connection_id: str
-    connection_name: str
-    source_type: str
-    schemas: list[SchemaMetadata]
-
-# Query
-class Query(BaseModel):
-    id: str
-    name: str
-    sql_text: str
-    created_at: str
-    updated_at: str
-
-class QueryTableSelection(BaseModel):
-    query_id: str
-    connection_id: str
-    schema_name: str
-    table_name: str
-
-# Chat
-class ChatMessage(BaseModel):
-    id: int
-    query_id: str
-    role: Literal["user", "assistant"]
-    message: str
-    created_at: str
-
-class ChatRequest(BaseModel):
-    message: str
-
-class ChatResponse(BaseModel):
-    message: ChatMessage
-    updated_sql: str
-```
+- Use Pydantic models for request/response validation
 
 ## Testing Approach
 
@@ -339,175 +242,60 @@ class ChatResponse(BaseModel):
 
 ## Electron Migration Considerations
 
-### Current Development
 - All API calls use relative URLs or configurable base URLs
-- No browser-specific APIs (no `window.location`, prefer React Router)
+- No browser-specific APIs (prefer React Router)
 - File operations should use APIs, not direct file system access
-- Think about window management (multiple windows in the future?)
+- Backend will run as child process in Electron
+- Think about native features: file pickers, system tray, native menus, auto-updates
 
-### Future Electron Features
-- Native file picker for CSV/Excel
-- System tray integration
-- Native menus and keyboard shortcuts
-- Auto-updates
-- Offline mode support
-- Better error dialogs using native notifications
+## Testing Approach
 
-## Common Patterns
+### Frontend State Management
+- Use React hooks (useState, useEffect) for component state
+- Fetch data on component mount with useEffect
+- Handle loading, error, and success states
+- Use async/await for API calls with try/catch error handling
+- Update parent components via callback props when needed
 
-### Loading Query on Startup (Frontend)
-```typescript
-useEffect(() => {
-  const loadQueryData = async () => {
-    // 1. Get query info
-    const query = await api.getQuery(queryId);
-    
-    // 2. Get query selections
-    const { selections } = await api.getQuerySelections(queryId);
-    
-    // 3. Get chat history
-    const chatHistory = await api.getChatHistory(queryId);
-    
-    // 4. Display selections with their metadata
-    // Metadata is fetched on-demand when viewing table details
-  };
-  loadQueryData();
-}, [queryId]);
-```
+### Backend Service Layer
+- Repository pattern for database operations
+- Separate concerns: API layer (thin) handles HTTP, service layer (thick) contains business logic
+- Use Pydantic models for data validation
+- Return structured responses with proper typing
+- Handle errors with appropriate HTTP status codes
 
-### Table Selection Pattern (Frontend)
-```typescript
-const handleAddTables = async () => {
-  // 1. Open multi-step modal
-  // 2. Select connection
-  const metadata = await api.getMetadata(connectionId);
-  
-  // 3. Select schema
-  // 4. Select tables
-  
-  // 5. Add each selected table to query
-  for (const tableName of selectedTables) {
-    await api.addQuerySelection(queryId, {
-      connection_id: connectionId,
-      schema_name: schemaName,
-      table_name: tableName,
-    });
-  }
-};
-```
+### Data Flow Pattern
+1. User interacts with UI component
+2. Component calls API service method
+3. API client makes HTTP request to backend
+4. Backend API route delegates to service layer
+5. Service layer performs business logic and database operations
+6. Response flows back through layers with proper typing
+7. UI updates state and re-renders
 
-### Chat Interaction Pattern (Frontend)
-```typescript
-const handleSendMessage = async () => {
-  const response = await api.chatWithAI(queryId, {
-    message: userMessage,
-  });
-  
-  // Add chat message to history
-  setChatHistory(prev => [...prev, response.message]);
-  
-  // Update SQL text
-  setSqlText(response.updated_sql);
-  
-  // Update parent component
-  onSQLUpdate({ ...query, sql_text: response.updated_sql });
-};
-```
+### Error Handling Pattern
+- Try/catch blocks around all async operations
+- Display user-friendly error messages
+- Show loading states during operations
+- Provide retry mechanisms where appropriate
+- Validate input with Pydantic models (backend)
+- Return appropriate HTTP status codes (backend)
+- Log technical details server-side (backend)
 
-### API Call Pattern (Frontend)
-```typescript
-const [data, setData] = useState<DataType | null>(null);
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState<string | null>(null);
+## Prefer & Avoid
 
-const fetchData = async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const result = await api.someMethod();
-    setData(result);
-  } catch (err: any) {
-    setError(err.response?.data?.detail || 'An error occurred');
-  } finally {
-    setLoading(false);
-  }
-};
-```
-
-### Service Layer Pattern (Backend)
-```python
-class QueryRepository:
-    """SQLite persistence for queries and selections."""
-    
-    def create_query(self, name: str, sql_text: str = "") -> Query:
-        # INSERT into queries
-        
-    def get_all_queries(self) -> list[Query]:
-        # SELECT * from queries
-        
-    def delete_query(self, query_id: str) -> bool:
-        # DELETE query and all selections + chat history (CASCADE)
-    
-    def add_table_selection(self, query_id: str, connection_id: str, 
-                     schema_name: str, table_name: str):
-        # INSERT into query_selections
-        
-    def remove_table_selection(self, query_id: str, connection_id: str,
-                        schema_name: str, table_name: str):
-        # DELETE from query_selections
-        
-    def get_query_selections(self, query_id: str) -> list[QueryTableSelection]:
-        # SELECT * from query_selections WHERE query_id = ?
-    
-    def add_chat_message(self, query_id: str, role: str, message: str) -> ChatMessage:
-        # INSERT into query_chat_history
-    
-    def get_chat_history(self, query_id: str) -> list[ChatMessage]:
-        # SELECT * from query_chat_history WHERE query_id = ? ORDER BY created_at
-```
-
-### Metadata Collection Pattern (Backend)
-```python
-async def collect_postgres_metadata(connection_id: str, config: PostgresConnectionConfig) -> ConnectionMetadata:
-    # 1. Connect to database
-    # 2. Query information_schema for schemas
-    # 3. For each schema, get tables
-    # 4. For each table, get columns and constraints
-    # 5. Return structured metadata
-```
-
-## When to Ask for Clarification
-
-Ask the user when:
-- Adding new data source types (implementation details needed)
-- Changing API contracts (breaking changes)
-- Adding new dependencies (approval needed)
-- Security-sensitive features (credentials, encryption)
-- Major architectural decisions (state management, caching strategy)
-- UI/UX changes that affect the workspace workflow
-
-## Documentation
-
-- **Do NOT create separate documentation files for every change**
-- Update existing documentation (README.md, ARCHITECTURE.md) only when significant features are added
-- Code comments are preferred for explaining complex logic
-- Let git commit messages serve as change documentation
-
-## Prefer
-
+### Prefer
 - ✅ Async/await over callbacks
 - ✅ Type hints and interfaces over dynamic typing
 - ✅ Repository pattern for data persistence
 - ✅ Small, focused functions over large monolithic ones
 - ✅ Explicit error handling over silent failures
-- ✅ Configuration via environment variables (when needed)
 - ✅ RESTful API design
 - ✅ Functional React components with hooks
 - ✅ TailwindCSS utility classes over custom CSS
 - ✅ shadcn/ui components over building from scratch
 
-## Avoid
-
+### Avoid
 - ❌ Global state (use React state or backend persistence)
 - ❌ Blocking I/O operations
 - ❌ Hardcoded values (use constants or config)
@@ -516,38 +304,5 @@ Ask the user when:
 - ❌ Direct DOM manipulation (use React)
 - ❌ Synchronous database operations
 - ❌ Storing credentials in code or version control
-- ❌ Theme toggles or light mode (dark theme only)
+- ❌ Dark/light theme toggles (dark theme only)
 - ❌ Custom CSS when TailwindCSS utilities exist
-
-## Git Commit Style
-
-Use conventional commits:
-- `feat:` New features
-- `fix:` Bug fixes
-- `refactor:` Code refactoring
-- `docs:` Documentation
-- `test:` Tests
-- `chore:` Maintenance tasks
-
-Example: `feat: add schema-level checkbox selection to workspace`
-
-## Priority Order for Development
-
-1. **Core Functionality**: Database connections, query management, metadata collection, AI chat integration
-2. **User Experience**: Loading states, error handling, responsive design
-3. **Extensibility**: Easy to add new data sources
-4. **Testing**: Ensure reliability
-5. **Documentation**: Keep README and code comments updated
-6. **Optimization**: Performance improvements
-7. **Polish**: UI refinements, animations
-
-## Remember
-
-- This app will become an Electron desktop application - design accordingly
-- Keep frontend and backend loosely coupled
-- Focus on local-first experience with SQLite persistence
-- Security is important (handling database credentials)
-- Performance matters (working with potentially large datasets)
-- User experience should feel native and fast
-- Dark theme only - no light mode or theme switching
-- Query is the main concept - everything revolves around interactive SQL editing with AI assistance and table metadata viewing

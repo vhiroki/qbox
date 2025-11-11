@@ -4,7 +4,7 @@ import { useQueryStore } from "../stores";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { ScrollArea } from "./ui/scroll-area";
-import { AlertCircle, Loader2, Send, RotateCcw } from "lucide-react";
+import { AlertCircle, Loader2, Send, RotateCcw, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
 interface ChatInterfaceProps {
@@ -27,6 +27,7 @@ export default function ChatInterface({
 
   const [userMessage, setUserMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const chatHistory = queryChatHistory.get(query.id) || [];
@@ -85,6 +86,20 @@ export default function ChatInterface({
     }
   };
 
+  const handleCopyMessage = async (messageId: string, messageText: string) => {
+    try {
+      await navigator.clipboard.writeText(messageText);
+      setCopiedMessageId(messageId);
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedMessageId(null);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy message:", err);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
@@ -129,23 +144,40 @@ export default function ChatInterface({
                     <p className="text-xs opacity-70">
                       {new Date(msg.created_at).toLocaleTimeString()}
                     </p>
-                    {msg.is_pending && (
-                      <div className="flex items-center gap-1 text-xs opacity-70">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        <span>Sending...</span>
-                      </div>
-                    )}
-                    {msg.has_error && (
-                      <Button
-                        onClick={() => handleRetry(String(msg.id))}
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 px-2 text-xs"
-                      >
-                        <RotateCcw className="h-3 w-3 mr-1" />
-                        Retry
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {msg.is_pending && (
+                        <div className="flex items-center gap-1 text-xs opacity-70">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Sending...</span>
+                        </div>
+                      )}
+                      {msg.has_error && (
+                        <Button
+                          onClick={() => handleRetry(String(msg.id))}
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs"
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Retry
+                        </Button>
+                      )}
+                      {!msg.is_pending && (
+                        <Button
+                          onClick={() => handleCopyMessage(String(msg.id), msg.message)}
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          title="Copy message"
+                        >
+                          {copiedMessageId === String(msg.id) ? (
+                            <Check className="h-3 w-3" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -28,6 +28,7 @@ export default function QueryList({
   const navigate = useNavigate();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [queryName, setQueryName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Zustand store
   const queries = useQueryStore((state) => state.queries);
@@ -35,7 +36,6 @@ export default function QueryList({
   const error = useQueryStore((state) => state.error);
   const loadQueries = useQueryStore((state) => state.loadQueries);
   const createQuery = useQueryStore((state) => state.createQuery);
-  const setError = useQueryStore((state) => state.setError);
   const clearError = useQueryStore((state) => state.clearError);
 
   useEffect(() => {
@@ -44,15 +44,17 @@ export default function QueryList({
 
   const handleCreate = () => {
     setQueryName("");
-    clearError();
+    setCreateError(null);
     setCreateDialogOpen(true);
   };
 
   const handleCreateSubmit = async () => {
     if (!queryName.trim()) {
-      setError("Query name is required");
+      setCreateError("Query name is required");
       return;
     }
+
+    setCreateError(null);
 
     try {
       const newQuery = await createQuery(queryName.trim());
@@ -60,7 +62,7 @@ export default function QueryList({
       setQueryName("");
       navigate(`/query/${newQuery.id}`);
     } catch (err) {
-      // Error is already set in the store
+      setCreateError("Failed to create query. Please try again.");
     }
   };
 
@@ -182,6 +184,12 @@ export default function QueryList({
                 autoFocus
               />
             </div>
+
+            {createError && (
+              <Alert variant="destructive">
+                <AlertDescription>{createError}</AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <DialogFooter>

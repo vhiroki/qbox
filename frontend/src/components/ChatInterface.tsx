@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { api } from "../services/api";
-import type { Query, ChatMessage } from "../types";
+import type { Query } from "../types";
+import { useQueryStore } from "../stores";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { ScrollArea } from "./ui/scroll-area";
@@ -9,33 +9,31 @@ import { Alert, AlertDescription } from "./ui/alert";
 
 interface ChatInterfaceProps {
   query: Query;
-  onSQLUpdate: (updatedQuery: Query) => void;
   onSQLChange?: (sqlText: string) => void;
 }
 
 export default function ChatInterface({
   query,
-  onSQLUpdate,
   onSQLChange,
 }: ChatInterfaceProps) {
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  // Zustand store
+  const sendChatMessage = useQueryStore((state) => state.sendChatMessage);
+  const loadChatHistory = useQueryStore((state) => state.loadChatHistory);
+  const clearChatHistory = useQueryStore((state) => state.clearChatHistory);
+  const queryChatHistory = useQueryStore((state) => state.queryChatHistory);
+  const isLoading = useQueryStore((state) => state.isLoading);
+  const storeError = useQueryStore((state) => state.error);
+
   const [userMessage, setUserMessage] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const chatHistory = queryChatHistory.get(query.id) || [];
+
   // Load chat history on mount
   useEffect(() => {
-    const loadChatHistory = async () => {
-      try {
-        const history = await api.getChatHistory(query.id);
-        setChatHistory(history);
-      } catch (err: any) {
-        console.error("Failed to load chat history:", err);
-      }
-    };
-    loadChatHistory();
-  }, [query.id]);
+    loadChatHistory(query.id);
+  }, [query.id, loadChatHistory]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -46,66 +44,30 @@ export default function ChatInterface({
     if (!userMessage.trim()) return;
 
     const messageText = userMessage;
-    setLoading(true);
     setError(null);
     setUserMessage(""); // Clear input immediately for better UX
 
-    // Optimistically add user message to chat history
-    const optimisticUserMessage: ChatMessage = {
-      id: Date.now(), // Temporary ID
-      query_id: query.id,
-      role: "user",
-      message: messageText,
-      created_at: new Date().toISOString(),
-    };
-
-    setChatHistory((prev) => [...prev, optimisticUserMessage]);
-
     try {
-      const response = await api.chatWithAI(query.id, {
-        message: messageText,
-      });
-
-      // Add assistant response to chat
-      setChatHistory((prev) => [...prev, response.message]);
-
-      // Update parent component with new query data
-      onSQLUpdate({
-        ...query,
-        sql_text: response.updated_sql,
-      });
+      const response = await sendChatMessage(query.id, messageText);
 
       // Notify parent of SQL change if callback provided
       if (onSQLChange) {
-        onSQLChange(response.updated_sql);
+        onSQLChange(response.updatedSQL);
       }
     } catch (err: any) {
-      // Remove optimistic user message on error
-      setChatHistory((prev) =>
-        prev.filter((msg) => msg.id !== optimisticUserMessage.id)
-      );
       // Restore the message in the input
       setUserMessage(messageText);
-      setError(
-        err.response?.data?.detail ||
-          "Failed to process message. Please try again."
-      );
-    } finally {
-      setLoading(false);
+      setError(storeError || "Failed to process message. Please try again.");
     }
   };
 
   const handleClearChat = async () => {
-    if (!confirm("Clear all chat history? This cannot be undone.")) return;
+    if (!window.confirm("Clear all chat history? This cannot be undone.")) return;
 
     try {
-      await api.clearChatHistory(query.id);
-      setChatHistory([]);
+      await clearChatHistory(query.id);
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail ||
-          "Failed to clear chat history. Please try again."
-      );
+      setError(storeError || "Failed to clear chat history. Please try again.");
     }
   };
 
@@ -136,16 +98,14 @@ export default function ChatInterface({
             {chatHistory.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    msg.role === "user"
+                  className={`max-w-[80%] rounded-lg p-3 ${msg.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
-                  }`}
+                    }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                   <p className="text-xs opacity-70 mt-1">
@@ -180,15 +140,15 @@ export default function ChatInterface({
           }}
           placeholder="Ask AI to modify your SQL query... (Shift+Enter for new line)"
           className="flex-1 min-h-[60px] max-h-[120px] resize-none"
-          disabled={loading}
+          disabled={isLoading}
         />
         <Button
           onClick={handleSendMessage}
-          disabled={loading || !userMessage.trim()}
+          disabled={isLoading || !userMessage.trim()}
           size="icon"
           className="h-[60px] w-[60px]"
         >
-          {loading ? (
+          {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />

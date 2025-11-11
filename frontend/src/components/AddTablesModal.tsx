@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { api } from '../services/api';
+import { useConnectionStore, useQueryStore } from '../stores';
 import type { SavedConnection, ConnectionMetadata, SchemaMetadata } from '../types';
 
 interface AddTablesModalProps {
@@ -25,12 +25,20 @@ interface AddTablesModalProps {
 type Step = 'connection' | 'schema' | 'tables';
 
 export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }: AddTablesModalProps) {
+  // Zustand stores
+  const connections = useConnectionStore((state) => state.connections);
+  const loadConnections = useConnectionStore((state) => state.loadConnections);
+  const loadMetadata = useConnectionStore((state) => state.loadMetadata);
+  const connectionError = useConnectionStore((state) => state.error);
+  const isConnectionLoading = useConnectionStore((state) => state.isLoading);
+
+  const addQuerySelection = useQueryStore((state) => state.addQuerySelection);
+  const queryError = useQueryStore((state) => state.error);
+
   const [step, setStep] = useState<Step>('connection');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Step 1: Connection selection
-  const [connections, setConnections] = useState<SavedConnection[]>([]);
   const [selectedConnection, setSelectedConnection] = useState<SavedConnection | null>(null);
 
   // Step 2: Schema selection
@@ -40,13 +48,14 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
   // Step 3: Table selection
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       loadConnections();
       resetState();
     }
-  }, [open]);
+  }, [open, loadConnections]);
 
   const resetState = () => {
     setStep('connection');
@@ -58,32 +67,17 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
     setError(null);
   };
 
-  const loadConnections = async () => {
-    try {
-      setLoading(true);
-      const data = await api.listSavedConnections();
-      setConnections(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load connections');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleConnectionSelect = async (connection: SavedConnection) => {
     try {
-      setLoading(true);
       setError(null);
       setSelectedConnection(connection);
-      
+
       // Load metadata for this connection
-      const meta = await api.getMetadata(connection.id);
+      const meta = await loadMetadata(connection.id);
       setMetadata(meta);
       setStep('schema');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load connection metadata');
-    } finally {
-      setLoading(false);
+      setError(connectionError || 'Failed to load connection metadata');
     }
   };
 
@@ -106,10 +100,10 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
 
   const handleSelectAllTables = () => {
     if (!selectedSchema) return;
-    
+
     const allTables = selectedSchema.tables.map(t => t.name);
     const allSelected = allTables.every(t => selectedTables.has(t));
-    
+
     if (allSelected) {
       setSelectedTables(new Set());
     } else {
@@ -123,12 +117,12 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
     }
 
     try {
-      setLoading(true);
+      setIsSubmitting(true);
       setError(null);
 
       // Add each selected table to the query
       for (const tableName of selectedTables) {
-        await api.addQuerySelection(queryId, {
+        await addQuerySelection(queryId, {
           connection_id: selectedConnection.id,
           schema_name: selectedSchema.name,
           table_name: tableName,
@@ -138,9 +132,9 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
       onTablesAdded();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to add tables');
+      setError(queryError || 'Failed to add tables');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -204,10 +198,10 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
           {/* Step 1: Connection Selection */}
           {step === 'connection' && (
             <div className="space-y-2">
-              {loading && connections.length === 0 && (
+              {isConnectionLoading && connections.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">Loading connections...</div>
               )}
-              {connections.length === 0 && !loading && (
+              {connections.length === 0 && !isConnectionLoading && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Database className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>No connections available</p>
@@ -218,7 +212,7 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
                 <button
                   key={connection.id}
                   onClick={() => handleConnectionSelect(connection)}
-                  disabled={loading}
+                  disabled={isConnectionLoading}
                   className="w-full p-4 border rounded-lg hover:bg-accent text-left transition-colors disabled:opacity-50"
                 >
                   <div className="flex items-center gap-3">
@@ -240,7 +234,7 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
                 <button
                   key={schema.name}
                   onClick={() => handleSchemaSelect(schema)}
-                  disabled={loading}
+                  disabled={isConnectionLoading}
                   className="w-full p-4 border rounded-lg hover:bg-accent text-left transition-colors disabled:opacity-50"
                 >
                   <div className="flex items-center gap-3">
@@ -293,7 +287,7 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
                         {selectedSchema.tables.every(t => selectedTables.has(t.name)) ? 'Deselect All' : 'Select All'}
                       </Button>
                     </div>
-                    
+
                     {filteredTables.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Table className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -354,17 +348,17 @@ export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }
 
         <DialogFooter>
           {step !== 'connection' && (
-            <Button variant="outline" onClick={handleBack} disabled={loading}>
+            <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
               Back
             </Button>
           )}
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           {step === 'tables' && (
             <Button
               onClick={handleSubmit}
-              disabled={loading || selectedTables.size === 0}
+              disabled={isSubmitting || selectedTables.size === 0}
             >
               Add {selectedTables.size} {selectedTables.size === 1 ? 'Table' : 'Tables'}
             </Button>

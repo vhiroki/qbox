@@ -22,6 +22,7 @@ For detailed setup and usage instructions, see the [README](../README.md).
 - Use functional components with hooks (no class components)
 - TypeScript for all code (strict mode enabled)
 - Keep components small and focused
+- **Zustand for state management** - centralized stores for queries, connections, and UI state
 - TailwindCSS for styling with shadcn/ui component library
 - Dark theme only (no theme toggle)
 - API calls should go through the `services/api.ts` client
@@ -50,6 +51,7 @@ For detailed setup and usage instructions, see the [README](../README.md).
 ### Frontend
 - **React 18**: UI library
 - **TypeScript 5+**: Type safety
+- **Zustand**: Lightweight state management with Redux DevTools
 - **Vite**: Build tool (fast, Electron-compatible)
 - **TailwindCSS**: Utility-first CSS framework
 - **shadcn/ui**: High-quality React component library
@@ -87,6 +89,10 @@ For detailed setup and usage instructions, see the [README](../README.md).
 ### Frontend Organization
 - **components/**: React components (keep small and focused)
   - **ui/**: shadcn/ui base components
+- **stores/**: Zustand state management stores
+  - **useQueryStore.ts**: Query state and operations
+  - **useConnectionStore.ts**: Connection state and metadata cache
+  - **useUIStore.ts**: UI state (modals, toasts, loading)
 - **services/**: API client and external service integrations
 - **types/**: TypeScript type definitions
 - **hooks/**: Custom React hooks
@@ -248,14 +254,51 @@ For detailed setup and usage instructions, see the [README](../README.md).
 - Backend will run as child process in Electron
 - Think about native features: file pickers, system tray, native menus, auto-updates
 
+## State Management with Zustand
+
+### Store Architecture
+- **useQueryStore**: Manages all query-related state (queries list, selections, chat history)
+- **useConnectionStore**: Manages connections and caches metadata for performance
+- **useUIStore**: Manages UI state (modal visibility, toasts, global loading)
+
+### Store Patterns
+```typescript
+// Reading from store (granular selectors for optimized re-renders)
+const queries = useQueryStore((state) => state.queries);
+const isLoading = useQueryStore((state) => state.isLoading);
+
+// Calling store actions
+const createQuery = useQueryStore((state) => state.createQuery);
+await createQuery("My Query");
+
+// Accessing derived state
+const query = queries.find((q) => q.id === queryId);
+const selections = querySelections.get(queryId) || [];
+```
+
+### Benefits
+- **Centralized state**: Single source of truth for all data
+- **Automatic reactivity**: Components re-render when subscribed data changes
+- **Performance**: Metadata caching, granular selectors, no prop drilling
+- **DevTools**: Redux DevTools integration for debugging
+- **Type-safe**: Full TypeScript support with strict mode
+
+### Best Practices
+- Use granular selectors to avoid unnecessary re-renders
+- Keep store actions async and handle errors within the store
+- Cache expensive data (like metadata) in stores
+- Use devtools middleware for debugging
+- Avoid local state for data that should be shared across components
+
 ## Testing Approach
 
 ### Frontend State Management
-- Use React hooks (useState, useEffect) for component state
-- Fetch data on component mount with useEffect
-- Handle loading, error, and success states
+- Use Zustand stores for shared application state
+- Use local useState for UI-only state (form inputs, toggles)
+- Fetch data through store actions on component mount
+- Handle loading, error, and success states via stores
 - Use async/await for API calls with try/catch error handling
-- Update parent components via callback props when needed
+- Stores handle all API integration and state updates
 
 ### Backend Service Layer
 - Repository pattern for database operations
@@ -266,12 +309,13 @@ For detailed setup and usage instructions, see the [README](../README.md).
 
 ### Data Flow Pattern
 1. User interacts with UI component
-2. Component calls API service method
-3. API client makes HTTP request to backend
+2. Component calls Zustand store action
+3. Store action makes API call through `services/api.ts`
 4. Backend API route delegates to service layer
 5. Service layer performs business logic and database operations
 6. Response flows back through layers with proper typing
-7. UI updates state and re-renders
+7. Store updates state automatically
+8. All subscribed components re-render with new data
 
 ### Error Handling Pattern
 - Try/catch blocks around all async operations
@@ -296,7 +340,8 @@ For detailed setup and usage instructions, see the [README](../README.md).
 - ✅ shadcn/ui components over building from scratch
 
 ### Avoid
-- ❌ Global state (use React state or backend persistence)
+- ❌ Local state for shared data (use Zustand stores)
+- ❌ Prop drilling (use stores instead)
 - ❌ Blocking I/O operations
 - ❌ Hardcoded values (use constants or config)
 - ❌ Complex class hierarchies

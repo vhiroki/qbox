@@ -16,8 +16,9 @@ QBox is a local data query application that helps you build and manage SQL queri
 ## Tech Stack
 
 - **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, shadcn/ui
+- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, shadcn/ui, Zustand
 - **Data Storage**: SQLite (connections and query persistence), DuckDB (query execution)
+- **State Management**: Zustand (centralized frontend state)
 - **Package Management**: uv (Python), pnpm (Node.js)
 
 ## Prerequisites
@@ -182,6 +183,10 @@ pnpm add package-name
   - `ChatInterface.tsx` - AI chat for interactive SQL editing
   - `AddTablesModal.tsx` - Multi-step modal for adding tables
   - `ConnectionManager.tsx` - Connection CRUD interface
+- `stores/` - Zustand state management stores
+  - `useQueryStore.ts` - Query state and operations
+  - `useConnectionStore.ts` - Connection state and metadata cache
+  - `useUIStore.ts` - UI state (modals, toasts, loading)
 - `services/api.ts` - Backend API client
 - `types/` - TypeScript definitions
 
@@ -191,6 +196,7 @@ pnpm add package-name
 - **Chat History**: Conversational context for iterative SQL editing with AI
 - **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases
 - **Metadata**: Auto-collected schema info (tables, columns, types, constraints, row counts)
+- **State Management**: Zustand stores provide centralized state with automatic reactivity and Redux DevTools integration
 
 ### Troubleshooting
 

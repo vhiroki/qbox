@@ -14,47 +14,37 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SettingsModal from "./SettingsModal";
-import { api } from "../services/api";
-import type { Query } from "../types";
+import { useQueryStore } from "../stores";
 
 interface QueryListProps {
   currentPage?: 'queries' | 'connections';
   selectedQueryId?: string | null;
-  onDataCleared?: () => void;
 }
 
 export default function QueryList({
   currentPage = 'queries',
   selectedQueryId,
-  onDataCleared,
 }: QueryListProps) {
   const navigate = useNavigate();
-  const [queries, setQueries] = useState<Query[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [queryName, setQueryName] = useState("");
 
+  // Zustand store
+  const queries = useQueryStore((state) => state.queries);
+  const isLoading = useQueryStore((state) => state.isLoading);
+  const error = useQueryStore((state) => state.error);
+  const loadQueries = useQueryStore((state) => state.loadQueries);
+  const createQuery = useQueryStore((state) => state.createQuery);
+  const setError = useQueryStore((state) => state.setError);
+  const clearError = useQueryStore((state) => state.clearError);
+
   useEffect(() => {
     loadQueries();
-  }, []);
-
-  const loadQueries = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await api.listQueries();
-      setQueries(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load queries");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadQueries]);
 
   const handleCreate = () => {
     setQueryName("");
+    clearError();
     setCreateDialogOpen(true);
   };
 
@@ -65,17 +55,12 @@ export default function QueryList({
     }
 
     try {
-      setLoading(true);
-      setError(null);
-      const newQuery = await api.createQuery({ name: queryName.trim() });
+      const newQuery = await createQuery(queryName.trim());
       setCreateDialogOpen(false);
       setQueryName("");
-      await loadQueries();
       navigate(`/query/${newQuery.id}`);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to create query");
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      // Error is already set in the store
     }
   };
 
@@ -95,10 +80,6 @@ export default function QueryList({
     navigate('/');
     // Reload queries
     await loadQueries();
-    // Notify parent if callback provided
-    if (onDataCleared) {
-      onDataCleared();
-    }
   };
 
   return (
@@ -109,7 +90,7 @@ export default function QueryList({
           <h1 className="text-2xl font-bold">QBox</h1>
           <p className="text-xs text-muted-foreground">Data Query Application</p>
         </div>
-        
+
         {/* Navigation Button */}
         <Button
           variant={currentPage === 'connections' ? 'default' : 'outline'}
@@ -121,17 +102,17 @@ export default function QueryList({
         </Button>
 
         {/* Create Query Button */}
-        <Button onClick={handleCreate} disabled={loading} className="w-full">
+        <Button onClick={handleCreate} disabled={isLoading} className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           Create Query
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">{loading && queries.length === 0 && (
-          <div className="p-4 text-center text-muted-foreground">
-            Loading queries...
-          </div>
-        )}
+      <div className="flex-1 overflow-y-auto">{isLoading && queries.length === 0 && (
+        <div className="p-4 text-center text-muted-foreground">
+          Loading queries...
+        </div>
+      )}
 
         {error && (
           <div className="p-4">
@@ -141,7 +122,7 @@ export default function QueryList({
           </div>
         )}
 
-        {!loading && queries.length === 0 && (
+        {!isLoading && queries.length === 0 && (
           <div className="p-8 text-center text-muted-foreground">
             <FileCode className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">No queries yet</p>
@@ -156,11 +137,10 @@ export default function QueryList({
             <button
               key={query.id}
               onClick={() => navigate(`/query/${query.id}`)}
-              className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
-                selectedQueryId === query.id
+              className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${selectedQueryId === query.id
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-accent"
-              }`}
+                }`}
             >
               <div className="font-medium truncate">{query.name}</div>
               <div className="text-xs opacity-70 mt-1">
@@ -211,7 +191,7 @@ export default function QueryList({
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateSubmit} disabled={loading}>
+            <Button onClick={handleCreateSubmit} disabled={isLoading}>
               Create
             </Button>
           </DialogFooter>

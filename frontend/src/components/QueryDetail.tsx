@@ -44,30 +44,40 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api } from "../services/api";
+import { useQueryStore, useConnectionStore } from "../stores";
 import ChatInterface from "./ChatInterface";
 import AddTablesModal from "./AddTablesModal";
 import type {
-  Query,
-  QueryTableSelection,
   TableMetadata,
+  QueryTableSelection,
 } from "../types";
 
 interface QueryDetailProps {
   queryId: string;
   onQueryDeleted: () => void;
-  onQueryRenamed?: () => void;
 }
 
 export default function QueryDetail({
   queryId,
   onQueryDeleted,
-  onQueryRenamed,
 }: QueryDetailProps) {
-  const [query, setQuery] = useState<Query | null>(null);
-  const [selections, setSelections] = useState<QueryTableSelection[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Zustand stores
+  const queries = useQueryStore((state) => state.queries);
+  const selectQuery = useQueryStore((state) => state.selectQuery);
+  const updateQuerySQL = useQueryStore((state) => state.updateQuerySQL);
+  const updateQueryName = useQueryStore((state) => state.updateQueryName);
+  const deleteQuery = useQueryStore((state) => state.deleteQuery);
+  const loadQuerySelections = useQueryStore((state) => state.loadQuerySelections);
+  const querySelections = useQueryStore((state) => state.querySelections);
+  const removeQuerySelection = useQueryStore((state) => state.removeQuerySelection);
+  const queryError = useQueryStore((state) => state.error);
+  const isQueryLoading = useQueryStore((state) => state.isLoading);
+  const setQueryError = useQueryStore((state) => state.setError);
+
+  const loadMetadata = useConnectionStore((state) => state.loadMetadata);
+  const connectionMetadata = useConnectionStore((state) => state.connectionMetadata);
+
+  // Local UI state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [newQueryName, setNewQueryName] = useState("");
@@ -75,12 +85,16 @@ export default function QueryDetail({
   const [sqlEdited, setSqlEdited] = useState(false);
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [tableMetadataCache, setTableMetadataCache] = useState<Map<string, TableMetadata>>(new Map());
-  const [connectionNames, setConnectionNames] = useState<Map<string, string>>(new Map());
   const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
 
+  // Derived state
+  const query = queries.find((q) => q.id === queryId);
+  const selections = querySelections.get(queryId) || [];
+
   useEffect(() => {
-    loadQueryData();
-  }, [queryId]);
+    selectQuery(queryId);
+    loadQuerySelections(queryId);
+  }, [queryId, selectQuery, loadQuerySelections]);
 
   useEffect(() => {
     if (query) {
@@ -89,100 +103,41 @@ export default function QueryDetail({
     }
   }, [query?.sql_text]);
 
-  const loadQueryData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [queryData, selectionsData, connectionsData] = await Promise.all([
-        api.getQuery(queryId),
-        api.getQuerySelections(queryId),
-        api.listConnections(),
-      ]);
-
-      setQuery(queryData);
-      setSelections(selectionsData.selections);
-      
-      // Build connection names map - need to get full connection details
-      const namesMap = new Map<string, string>();
-      for (const conn of connectionsData) {
-        try {
-          const metadata = await api.getMetadata(conn.id);
-          namesMap.set(conn.id, metadata.connection_name);
-        } catch {
-          namesMap.set(conn.id, conn.id);
-        }
-      }
-      setConnectionNames(namesMap);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load query");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRemoveTable = async (selection: QueryTableSelection) => {
     try {
-      await api.removeQuerySelection(queryId, {
+      await removeQuerySelection(queryId, {
         connection_id: selection.connection_id,
         schema_name: selection.schema_name,
         table_name: selection.table_name,
       });
-
-      setSelections((prev) =>
-        prev.filter(
-          (s) =>
-            !(
-              s.connection_id === selection.connection_id &&
-              s.schema_name === selection.schema_name &&
-              s.table_name === selection.table_name
-            )
-        )
-      );
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to remove table");
+      // Error is already set in store
     }
   };
 
   const handleDeleteQuery = async () => {
     try {
-      setLoading(true);
-      await api.deleteQuery(queryId);
+      await deleteQuery(queryId);
       setDeleteDialogOpen(false);
       onQueryDeleted();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to delete query");
-      setLoading(false);
+      // Error is already set in store
     }
   };
 
   const handleRenameQuery = async () => {
     if (!newQueryName.trim()) {
-      setError("Query name cannot be empty");
+      setQueryError("Query name cannot be empty");
       return;
     }
 
     try {
-      setLoading(true);
-      const updatedQuery = await api.updateQueryName(queryId, newQueryName.trim());
-      setQuery(updatedQuery);
+      await updateQueryName(queryId, newQueryName.trim());
       setRenameDialogOpen(false);
       setNewQueryName("");
-      setError(null);
-      
-      // Notify parent to refresh the query list
-      if (onQueryRenamed) {
-        onQueryRenamed();
-      }
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to rename query");
-    } finally {
-      setLoading(false);
+      // Error is already set in store
     }
-  };
-
-  const handleSQLUpdate = (updatedQuery: Query) => {
-    setQuery(updatedQuery);
   };
 
   const getTableKey = (selection: QueryTableSelection) => {
@@ -192,21 +147,21 @@ export default function QueryDetail({
   const toggleTableExpansion = async (selection: QueryTableSelection) => {
     const key = getTableKey(selection);
     const newExpanded = new Set(expandedTables);
-    
+
     if (newExpanded.has(key)) {
       newExpanded.delete(key);
       setExpandedTables(newExpanded);
     } else {
       newExpanded.add(key);
       setExpandedTables(newExpanded);
-      
+
       // Load metadata if not cached
       if (!tableMetadataCache.has(key)) {
         try {
-          const metadata = await api.getMetadata(selection.connection_id);
+          const metadata = await loadMetadata(selection.connection_id);
           const schema = metadata.schemas.find((s) => s.name === selection.schema_name);
           const table = schema?.tables.find((t) => t.name === selection.table_name);
-          
+
           if (table) {
             setTableMetadataCache(new Map(tableMetadataCache).set(key, table));
           }
@@ -227,19 +182,14 @@ export default function QueryDetail({
     if (!sqlEdited || !query) return;
 
     try {
-      const updated = await api.updateQuerySQL(query.id, {
-        sql_text: sqlText,
-      });
+      await updateQuerySQL(query.id, sqlText);
       setSqlEdited(false);
-      setQuery(updated);
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Failed to save SQL. Please try again."
-      );
+      // Error is already set in store
     }
   };
 
-  if (loading && !query) {
+  if (isQueryLoading && !query) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-muted-foreground">Loading query...</div>
@@ -255,6 +205,12 @@ export default function QueryDetail({
     );
   }
 
+  // Get connection names from metadata
+  const getConnectionName = (connectionId: string) => {
+    const metadata = connectionMetadata.get(connectionId);
+    return metadata?.connection_name || connectionId;
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -268,7 +224,7 @@ export default function QueryDetail({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => {
                   setNewQueryName(query.name);
                   setRenameDialogOpen(true);
@@ -277,7 +233,7 @@ export default function QueryDetail({
                 <Pencil className="h-4 w-4 mr-2" />
                 Rename Query
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => setDeleteDialogOpen(true)}
                 className="text-destructive focus:text-destructive"
               >
@@ -288,9 +244,9 @@ export default function QueryDetail({
           </DropdownMenu>
         </div>
 
-        {error && (
+        {queryError && (
           <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{queryError}</AlertDescription>
           </Alert>
         )}
       </div>
@@ -394,11 +350,11 @@ export default function QueryDetail({
                                         </span>
                                       </div>
                                       <div className="text-xs text-muted-foreground mt-0.5">
-                                        {connectionNames.get(selection.connection_id) || selection.connection_id}
+                                        {getConnectionName(selection.connection_id)}
                                         {metadata && (
                                           <span className="ml-2">
                                             • {metadata.columns.length} columns
-                                            {metadata.row_count !== undefined && 
+                                            {metadata.row_count !== undefined &&
                                               ` • ${metadata.row_count.toLocaleString()} rows`
                                             }
                                           </span>
@@ -483,9 +439,8 @@ export default function QueryDetail({
           {/* Right Panel - Chat */}
           <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
             <div className="h-full pl-3">
-              <ChatInterface 
-                query={query} 
-                onSQLUpdate={handleSQLUpdate}
+              <ChatInterface
+                query={query}
                 onSQLChange={(sql) => {
                   setSqlText(sql);
                   setSqlEdited(false);
@@ -532,7 +487,7 @@ export default function QueryDetail({
             >
               Cancel
             </Button>
-            <Button onClick={handleRenameQuery} disabled={loading || !newQueryName.trim()}>
+            <Button onClick={handleRenameQuery} disabled={isQueryLoading || !newQueryName.trim()}>
               Rename
             </Button>
           </DialogFooter>
@@ -551,7 +506,7 @@ export default function QueryDetail({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteQuery} disabled={loading}>
+            <AlertDialogAction onClick={handleDeleteQuery} disabled={isQueryLoading}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -564,8 +519,8 @@ export default function QueryDetail({
         onClose={() => setAddTablesModalOpen(false)}
         queryId={queryId}
         onTablesAdded={() => {
-          // Reload query data to reflect new table selections
-          loadQueryData();
+          // Reload query selections to reflect new table selections
+          loadQuerySelections(queryId);
         }}
       />
     </div>

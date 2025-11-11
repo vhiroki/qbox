@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { SavedConnection, PostgresConfig, ConnectionConfig } from '../types';
 import { api } from '../services/api';
+import { useConnectionStore } from '../stores';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,9 +35,14 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function ConnectionManager() {
-  const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Zustand store
+  const connections = useConnectionStore((state) => state.connections);
+  const isLoading = useConnectionStore((state) => state.isLoading);
+  const error = useConnectionStore((state) => state.error);
+  const loadConnections = useConnectionStore((state) => state.loadConnections);
+  const createConnection = useConnectionStore((state) => state.createConnection);
+  const updateConnection = useConnectionStore((state) => state.updateConnection);
+  const deleteConnection = useConnectionStore((state) => state.deleteConnection);
   
   // Create dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -69,20 +75,7 @@ export default function ConnectionManager() {
 
   useEffect(() => {
     loadConnections();
-  }, []);
-
-  const loadConnections = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const connections = await api.listSavedConnections();
-      setSavedConnections(connections);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load connections');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadConnections]);
 
   const handleCreate = () => {
     setCreateConnectionName('');
@@ -99,28 +92,21 @@ export default function ConnectionManager() {
 
   const handleCreateSubmit = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
       const config: ConnectionConfig = {
         name: createConnectionName,
         type: 'postgres',
         config: createFormData,
       };
 
-      await api.createConnection(config);
+      await createConnection(config);
       setCreateDialogOpen(false);
-      await loadConnections();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create connection');
-    } finally {
-      setLoading(false);
+      // Error is already set in store
     }
   };
 
   const handleEdit = async (connection: SavedConnection) => {
     try {
-      setLoading(true);
       const fullConfig = await api.getSavedConnection(connection.id);
       
       setEditingConnection(connection);
@@ -135,9 +121,8 @@ export default function ConnectionManager() {
       });
       setEditDialogOpen(true);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load connection details');
-    } finally {
-      setLoading(false);
+      // Handle API error locally as this is a pre-edit operation
+      console.error('Failed to load connection details:', err);
     }
   };
 
@@ -145,24 +130,18 @@ export default function ConnectionManager() {
     if (!editingConnection) return;
 
     try {
-      setLoading(true);
-      setError(null);
-
       const updateConfig: ConnectionConfig = {
         name: editConnectionName,
         type: 'postgres',
         config: editFormData,
       };
 
-      await api.updateSavedConnection(editingConnection.id, updateConfig);
+      await updateConnection(editingConnection.id, updateConfig);
       
       setEditDialogOpen(false);
       setEditingConnection(null);
-      await loadConnections();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update connection');
-    } finally {
-      setLoading(false);
+      // Error is already set in store
     }
   };
 
@@ -175,19 +154,13 @@ export default function ConnectionManager() {
     if (!deletingConnection) return;
 
     try {
-      setLoading(true);
-      setError(null);
-      
       // Delete both active and saved connection
-      await api.deleteConnection(deletingConnection.id, true);
+      await deleteConnection(deletingConnection.id, true);
       
       setDeleteDialogOpen(false);
       setDeletingConnection(null);
-      await loadConnections();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete connection');
-    } finally {
-      setLoading(false);
+      // Error is already set in store
     }
   };
 
@@ -206,7 +179,7 @@ export default function ConnectionManager() {
                 Manage your saved database connections - edit, delete, or reconnect to existing connections
               </CardDescription>
             </div>
-            <Button onClick={handleCreate} disabled={loading}>
+            <Button onClick={handleCreate} disabled={isLoading}>
               Create New Connection
             </Button>
           </div>
@@ -218,9 +191,9 @@ export default function ConnectionManager() {
             </Alert>
           )}
 
-          {loading && savedConnections.length === 0 ? (
+          {isLoading && connections.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Loading connections...</div>
-          ) : savedConnections.length === 0 ? (
+          ) : connections.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground mb-4">No saved connections yet</p>
               <Button onClick={handleCreate}>
@@ -240,7 +213,7 @@ export default function ConnectionManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {savedConnections.map((connection) => (
+                {connections.map((connection) => (
                   <TableRow key={connection.id}>
                     <TableCell className="font-medium">{connection.name}</TableCell>
                     <TableCell className="capitalize">{connection.type}</TableCell>
@@ -259,7 +232,7 @@ export default function ConnectionManager() {
                           size="sm"
                           variant="outline"
                           onClick={() => handleEdit(connection)}
-                          disabled={loading}
+                          disabled={isLoading}
                         >
                           Edit
                         </Button>
@@ -267,7 +240,7 @@ export default function ConnectionManager() {
                           size="sm"
                           variant="destructive"
                           onClick={() => handleDeleteClick(connection)}
-                          disabled={loading}
+                          disabled={isLoading}
                         >
                           Delete
                         </Button>
@@ -366,7 +339,7 @@ export default function ConnectionManager() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={loading}>
+            <Button onClick={handleSaveEdit} disabled={isLoading}>
               Save Changes
             </Button>
           </DialogFooter>
@@ -457,7 +430,7 @@ export default function ConnectionManager() {
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateSubmit} disabled={loading}>
+            <Button onClick={handleCreateSubmit} disabled={isLoading}>
               Create Connection
             </Button>
           </DialogFooter>

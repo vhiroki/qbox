@@ -339,6 +339,22 @@ class QueryRepository:
             )
             conn.commit()
 
+    def delete_selections_by_connection(self, connection_id: str) -> int:
+        """Remove all table selections for a specific connection.
+        
+        Returns the number of selections deleted.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM query_selections
+                WHERE connection_id = ?
+                """,
+                (connection_id,),
+            )
+            conn.commit()
+            return cursor.rowcount
+
     # Chat history operations
 
     def add_chat_message(self, query_id: str, role: str, message: str) -> ChatMessage:

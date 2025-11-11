@@ -37,7 +37,6 @@ export default function ConnectionManager() {
   // Zustand store
   const connections = useConnectionStore((state) => state.connections);
   const isLoading = useConnectionStore((state) => state.isLoading);
-  const error = useConnectionStore((state) => state.error);
   const loadConnections = useConnectionStore((state) => state.loadConnections);
   const createConnection = useConnectionStore((state) => state.createConnection);
   const updateConnection = useConnectionStore((state) => state.updateConnection);
@@ -55,7 +54,9 @@ export default function ConnectionManager() {
   });
   const [createConnectionName, setCreateConnectionName] = useState('');
   const [createConnectionAlias, setCreateConnectionAlias] = useState('');
-
+  const [isCreateAliasValid, setIsCreateAliasValid] = useState(true);
+  const [createError, setCreateError] = useState<string | null>(null);
+  
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<SavedConnection | null>(null);
@@ -69,6 +70,7 @@ export default function ConnectionManager() {
   });
   const [editConnectionName, setEditConnectionName] = useState('');
   const [editConnectionAlias, setEditConnectionAlias] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,10 +91,12 @@ export default function ConnectionManager() {
       password: '',
       schema: 'public',
     });
+    setCreateError(null);
     setCreateDialogOpen(true);
   };
 
   const handleCreateSubmit = async () => {
+    setCreateError(null);
     try {
       const config: ConnectionConfig = {
         name: createConnectionName,
@@ -104,7 +108,9 @@ export default function ConnectionManager() {
       await createConnection(config);
       setCreateDialogOpen(false);
     } catch (err: any) {
-      // Error is already set in store
+      // Show error in dialog instead of global store
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to create connection';
+      setCreateError(errorMessage);
     }
   };
 
@@ -124,6 +130,7 @@ export default function ConnectionManager() {
         password: '', // Don't populate password
         schema: fullConfig.config.schema || 'public',
       });
+      setEditError(null);
       setEditDialogOpen(true);
     } catch (err: any) {
       // Handle API error locally as this is a pre-edit operation
@@ -134,6 +141,7 @@ export default function ConnectionManager() {
   const handleSaveEdit = async () => {
     if (!editingConnection) return;
 
+    setEditError(null);
     try {
       const updateConfig: ConnectionConfig = {
         name: editConnectionName,
@@ -143,11 +151,13 @@ export default function ConnectionManager() {
       };
 
       await updateConnection(editingConnection.id, updateConfig);
-
+      
       setEditDialogOpen(false);
       setEditingConnection(null);
     } catch (err: any) {
-      // Error is already set in store
+      // Show error in dialog instead of global store
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to update connection';
+      setEditError(errorMessage);
     }
   };
 
@@ -191,12 +201,6 @@ export default function ConnectionManager() {
           </div>
         </CardHeader>
         <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
           {isLoading && connections.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Loading connections...</div>
           ) : connections.length === 0 ? (
@@ -291,6 +295,12 @@ export default function ConnectionManager() {
               showPasswordPlaceholder={true}
               aliasReadOnly={true}
             />
+
+            {editError && (
+              <Alert variant="destructive">
+                <AlertDescription>{editError}</AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <DialogFooter>
@@ -322,14 +332,21 @@ export default function ConnectionManager() {
               onNameChange={setCreateConnectionName}
               onAliasChange={setCreateConnectionAlias}
               onFormDataChange={(updates) => setCreateFormData({ ...createFormData, ...updates })}
+              onValidationChange={setIsCreateAliasValid}
             />
+
+            {createError && (
+              <Alert variant="destructive">
+                <AlertDescription>{createError}</AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateSubmit} disabled={isLoading}>
+            <Button onClick={handleCreateSubmit} disabled={isLoading || !isCreateAliasValid}>
               Create Connection
             </Button>
           </DialogFooter>
@@ -341,9 +358,19 @@ export default function ConnectionManager() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the connection "{deletingConnection?.name}".
-              This action cannot be undone.
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                This will permanently delete the connection "{deletingConnection?.name}".
+              </p>
+              <p className="font-medium">
+                This will also remove all table associations using this connection from your queries.
+              </p>
+              <p className="text-muted-foreground">
+                Queries using this connection will not be deleted, but may not work anymore.
+              </p>
+              <p className="font-medium text-destructive">
+                This action cannot be undone.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

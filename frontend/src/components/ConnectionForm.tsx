@@ -29,6 +29,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
   const [saveConnection, setSaveConnection] = useState(true);
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
   const [selectedSavedConnection, setSelectedSavedConnection] = useState<string>('');
+  const [isAliasValid, setIsAliasValid] = useState(true);
 
   // Load saved connections on mount
   useEffect(() => {
@@ -152,6 +153,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
               onAliasChange={setConnectionAlias}
               onFormDataChange={(updates) => setFormData({ ...formData, ...updates })}
               nameRequired={true}
+              onValidationChange={setIsAliasValid}
             />
 
             <div className="flex items-center space-x-2">
@@ -165,7 +167,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
               </Label>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={loading || !isAliasValid} className="w-full">
               {loading ? 'Connecting...' : 'Connect'}
             </Button>
           </form>

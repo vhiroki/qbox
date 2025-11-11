@@ -11,6 +11,7 @@ from app.models.schemas import (
     TableSchema,
 )
 from app.services.connection_repository import connection_repository
+from app.services.query_repository import query_repository
 
 
 class DataSource(ABC):
@@ -259,6 +260,9 @@ class ConnectionManager:
         Args:
             connection_id: The connection ID to disconnect
             delete_saved: Whether to also delete the saved configuration
+        
+        Returns:
+            True if the connection was found and disconnected
         """
         datasource = self.connections.get(connection_id)
         if datasource:
@@ -266,6 +270,10 @@ class ConnectionManager:
             del self.connections[connection_id]
 
         if delete_saved:
+            # Delete all query selections that reference this connection
+            query_repository.delete_selections_by_connection(connection_id)
+            
+            # Delete the connection configuration
             connection_repository.delete(connection_id)
 
         return datasource is not None

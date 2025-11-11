@@ -1,3 +1,4 @@
+import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { PostgresConfig } from '../types';
@@ -12,6 +13,33 @@ interface ConnectionFormFieldsProps {
   showPasswordPlaceholder?: boolean;
   nameRequired?: boolean;
   aliasReadOnly?: boolean;
+  onValidationChange?: (isValid: boolean) => void;
+}
+
+export function validateAlias(alias: string): { isValid: boolean; error: string | null } {
+  if (!alias || alias.trim() === '') {
+    return { isValid: true, error: null }; // Empty is allowed (auto-generate)
+  }
+
+  // Must be 3-50 characters
+  if (alias.length < 3) {
+    return { isValid: false, error: 'Alias must be at least 3 characters long' };
+  }
+  if (alias.length > 50) {
+    return { isValid: false, error: 'Alias cannot exceed 50 characters' };
+  }
+
+  // Must start with a letter
+  if (!/^[a-zA-Z]/.test(alias)) {
+    return { isValid: false, error: 'Alias must start with a letter' };
+  }
+
+  // Must contain only alphanumeric characters and underscores
+  if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(alias)) {
+    return { isValid: false, error: 'Alias can only contain letters, numbers, and underscores' };
+  }
+
+  return { isValid: true, error: null };
 }
 
 export default function ConnectionFormFields({
@@ -24,7 +52,16 @@ export default function ConnectionFormFields({
   showPasswordPlaceholder = false,
   nameRequired = false,
   aliasReadOnly = false,
+  onValidationChange,
 }: ConnectionFormFieldsProps) {
+  const aliasValidation = validateAlias(connectionAlias);
+
+  // Notify parent of validation status changes
+  React.useEffect(() => {
+    if (onValidationChange) {
+      onValidationChange(aliasValidation.isValid);
+    }
+  }, [aliasValidation.isValid, onValidationChange]);
   return (
     <>
       <div className="space-y-2">
@@ -52,15 +89,29 @@ export default function ConnectionFormFields({
           value={connectionAlias}
           onChange={(e) => onAliasChange(e.target.value)}
           placeholder="production"
-          pattern="[a-zA-Z][a-zA-Z0-9_]{2,49}"
-          title="3-50 characters, start with letter, only alphanumeric and underscores"
           readOnly={aliasReadOnly}
           disabled={aliasReadOnly}
-          className={aliasReadOnly ? 'bg-muted cursor-not-allowed' : ''}
+          className={
+            aliasReadOnly
+              ? 'bg-muted cursor-not-allowed'
+              : !aliasValidation.isValid && connectionAlias
+              ? 'border-destructive focus-visible:ring-destructive'
+              : ''
+          }
         />
-        {!showPasswordPlaceholder && !aliasReadOnly && (
+        {!showPasswordPlaceholder && !aliasReadOnly && !connectionAlias && (
           <p className="text-xs text-muted-foreground">
             Leave empty to auto-generate from connection name
+          </p>
+        )}
+        {!aliasReadOnly && connectionAlias && !aliasValidation.isValid && (
+          <p className="text-xs text-destructive">
+            {aliasValidation.error}
+          </p>
+        )}
+        {!aliasReadOnly && connectionAlias && aliasValidation.isValid && (
+          <p className="text-xs text-green-600 dark:text-green-400">
+            ✓ Valid alias format
           </p>
         )}
         {aliasReadOnly && (

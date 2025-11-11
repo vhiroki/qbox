@@ -1,6 +1,7 @@
 """Persistent DuckDB instance manager for QBox."""
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -49,26 +50,60 @@ class DuckDBManager:
             except Exception as e:
                 logger.warning(f"Could not load extension {ext}: {e}")
 
+    def _sanitize_alias(self, name: str, connection_id: str) -> str:
+        """Create a valid SQL identifier from connection name.
+        
+        Args:
+            name: The connection name
+            connection_id: The connection ID (used for uniqueness suffix)
+            
+        Returns:
+            A valid SQL identifier like 'pg_production_db'
+        """
+        # Convert to lowercase and replace spaces/special chars with underscores
+        sanitized = re.sub(r'[^a-z0-9]+', '_', name.lower())
+        
+        # Remove leading/trailing underscores
+        sanitized = sanitized.strip('_')
+        
+        # Ensure it doesn't start with a digit
+        if sanitized and sanitized[0].isdigit():
+            sanitized = f"db_{sanitized}"
+        
+        # Add short unique suffix from connection_id (first 8 chars)
+        # This prevents collisions if two connections have similar names
+        suffix = connection_id.replace('-', '')[:8]
+        
+        # Combine with pg_ prefix
+        alias = f"pg_{sanitized}_{suffix}"
+        
+        return alias
+
     def attach_postgres(
         self,
         connection_id: str,
+        connection_name: str,
         config: PostgresConnectionConfig,
-        alias: Optional[str] = None,
+        custom_alias: Optional[str] = None,
     ) -> str:
         """Attach a PostgreSQL database to DuckDB.
 
         Args:
             connection_id: Unique identifier for this connection
+            connection_name: Human-readable name for the connection
             config: PostgreSQL connection configuration
-            alias: Optional alias for the attachment
-                   (defaults to 'pg_' + connection_id)
+            custom_alias: Optional custom alias (if set by user)
+                         Falls back to auto-generated from connection_name
 
         Returns:
             The alias used for the attachment
         """
         conn = self.connect()
-        # Prefix with 'pg_' to ensure valid identifier (can't start with digit)
-        alias = alias or f"pg_{connection_id.replace('-', '_')}"
+        # Use custom alias if provided, otherwise generate from connection name
+        if custom_alias:
+            alias = f"pg_{custom_alias}"
+        else:
+            alias = self._sanitize_alias(connection_name, connection_id)
 
         # Detach if already exists
         try:

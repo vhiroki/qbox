@@ -2,6 +2,7 @@ export interface ConnectionConfig {
   name: string;
   type: "postgres" | "s3" | "csv" | "excel";
   config: Record<string, any>;
+  alias?: string;
 }
 
 export interface PostgresConfig {
@@ -28,6 +29,7 @@ export interface SavedConnection {
   id: string;
   name: string;
   type: string;
+  alias?: string;
   created_at: string;
   updated_at: string;
 }

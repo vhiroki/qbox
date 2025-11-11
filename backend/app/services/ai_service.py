@@ -304,8 +304,8 @@ EXPLANATION:
             columns = table_meta.get("columns", [])
             row_count = table_meta.get("row_count", "unknown")
 
-            # Format DuckDB alias (pg_connection_id with underscores)
-            alias = f"pg_{connection_id.replace('-', '_')}"
+            # Get the DuckDB alias (now human-readable from connection name)
+            alias = table_meta.get("alias", f"pg_{connection_id.replace('-', '_')}")
 
             table_info = f"\nTable: {alias}.{schema_name}.{table_name}"
             table_info += f"\nConnection: {connection_name}"

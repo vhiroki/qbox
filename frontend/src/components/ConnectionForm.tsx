@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import type { PostgresConfig, ConnectionStatus, SavedConnection } from '../types';
 import { api } from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import ConnectionFormFields from './ConnectionFormFields';
 
 interface ConnectionFormProps {
   onConnectionSuccess: (connectionId: string, connectionName: string) => void;
@@ -23,6 +23,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
     schema: 'public',
   });
   const [connectionName, setConnectionName] = useState('');
+  const [connectionAlias, setConnectionAlias] = useState('');
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [saveConnection, setSaveConnection] = useState(true);
@@ -83,6 +84,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
         name: connectionName,
         type: 'postgres',
         config: formData,
+        alias: connectionAlias || undefined, // Send undefined if empty
       });
       setStatus(result);
       if (result.success && result.connection_id) {
@@ -94,6 +96,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
 
         // Reset form on success
         setConnectionName('');
+        setConnectionAlias('');
         setFormData({
           host: 'localhost',
           port: 5432,
@@ -141,84 +144,15 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="connection-name">Connection Name</Label>
-              <Input
-                id="connection-name"
-                type="text"
-                value={connectionName}
-                onChange={(e) => setConnectionName(e.target.value)}
-                required
-                placeholder="My Database"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="host">Host</Label>
-                <Input
-                  id="host"
-                  type="text"
-                  value={formData.host}
-                  onChange={(e) => setFormData({ ...formData, host: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="port">Port</Label>
-                <Input
-                  id="port"
-                  type="number"
-                  value={formData.port}
-                  onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="database">Database</Label>
-              <Input
-                id="database"
-                type="text"
-                value={formData.database}
-                onChange={(e) => setFormData({ ...formData, database: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="schema">Schema</Label>
-              <Input
-                id="schema"
-                type="text"
-                value={formData.schema}
-                onChange={(e) => setFormData({ ...formData, schema: e.target.value })}
-              />
-            </div>
+            <ConnectionFormFields
+              connectionName={connectionName}
+              connectionAlias={connectionAlias}
+              formData={formData}
+              onNameChange={setConnectionName}
+              onAliasChange={setConnectionAlias}
+              onFormDataChange={(updates) => setFormData({ ...formData, ...updates })}
+              nameRequired={true}
+            />
 
             <div className="flex items-center space-x-2">
               <Checkbox

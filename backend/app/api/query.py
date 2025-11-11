@@ -205,7 +205,10 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
                 from app.models.schemas import PostgresConnectionConfig
 
                 pg_config = PostgresConnectionConfig(**conn_config.config)
-                duckdb.attach_postgres(selection.connection_id, pg_config)
+                duckdb.attach_postgres(
+                    selection.connection_id, conn_config.name, pg_config,
+                    custom_alias=conn_config.alias
+                )
                 attached_connections.add(selection.connection_id)
 
         # Execute query with pagination
@@ -295,7 +298,10 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
                 from app.models.schemas import PostgresConnectionConfig
 
                 pg_config = PostgresConnectionConfig(**conn_config.config)
-                duckdb.attach_postgres(selection.connection_id, pg_config)
+                duckdb.attach_postgres(
+                    selection.connection_id, conn_config.name, pg_config,
+                    custom_alias=conn_config.alias
+                )
                 attached_connections.add(selection.connection_id)
 
         # Execute full query (no pagination)

@@ -22,6 +22,7 @@ class ConnectionRepository:
     def _init_db(self):
         """Initialize the database schema."""
         with sqlite3.connect(self.db_path) as conn:
+            # Create table without alias initially (for backward compatibility)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS connections (
@@ -34,25 +35,50 @@ class ConnectionRepository:
                 )
             """
             )
+            
+            # Migration: Add alias column if it doesn't exist
+            try:
+                conn.execute("ALTER TABLE connections ADD COLUMN alias TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            # Create indexes after column exists
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_connections_name 
                 ON connections(name)
             """
             )
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_alias 
+                ON connections(alias) WHERE alias IS NOT NULL
+            """
+            )
             conn.commit()
 
     def save(self, connection_id: str, config: ConnectionConfig) -> None:
         """Save or update a connection configuration."""
+        # Validate alias uniqueness if provided
+        if config.alias:
+            if not self._is_alias_valid(config.alias):
+                raise ValueError(
+                    "Invalid alias. Must be alphanumeric with underscores, "
+                    "start with a letter, and be 3-50 characters long."
+                )
+            if not self._is_alias_unique(config.alias, connection_id):
+                raise ValueError(f"Alias '{config.alias}' is already in use by another connection.")
+        
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO connections (id, name, type, config, updated_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO connections (id, name, type, config, alias, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(id) DO UPDATE SET
                     name = excluded.name,
                     type = excluded.type,
                     config = excluded.config,
+                    alias = excluded.alias,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -60,6 +86,7 @@ class ConnectionRepository:
                     config.name,
                     config.type.value,
                     json.dumps(config.config),
+                    config.alias,
                 ),
             )
             conn.commit()
@@ -69,7 +96,7 @@ class ConnectionRepository:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
-                "SELECT name, type, config FROM connections WHERE id = ?",
+                "SELECT name, type, config, alias FROM connections WHERE id = ?",
                 (connection_id,),
             )
             row = cursor.fetchone()
@@ -79,6 +106,7 @@ class ConnectionRepository:
                     name=row["name"],
                     type=DataSourceType(row["type"]),
                     config=json.loads(row["config"]),
+                    alias=row["alias"],
                 )
             return None
 
@@ -88,7 +116,7 @@ class ConnectionRepository:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT id, name, type, created_at, updated_at 
+                SELECT id, name, type, alias, created_at, updated_at 
                 FROM connections 
                 ORDER BY updated_at DESC
                 """
@@ -107,6 +135,28 @@ class ConnectionRepository:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT 1 FROM connections WHERE id = ?", (connection_id,))
             return cursor.fetchone() is not None
+
+    def _is_alias_valid(self, alias: str) -> bool:
+        """Validate alias format: alphanumeric + underscores, start with letter, 3-50 chars."""
+        import re
+        # Must start with letter, contain only alphanumeric and underscores, 3-50 chars
+        pattern = r'^[a-zA-Z][a-zA-Z0-9_]{2,49}$'
+        return bool(re.match(pattern, alias))
+
+    def _is_alias_unique(self, alias: str, exclude_connection_id: Optional[str] = None) -> bool:
+        """Check if alias is unique across all connections."""
+        with sqlite3.connect(self.db_path) as conn:
+            if exclude_connection_id:
+                cursor = conn.execute(
+                    "SELECT 1 FROM connections WHERE alias = ? AND id != ?",
+                    (alias, exclude_connection_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT 1 FROM connections WHERE alias = ?",
+                    (alias,),
+                )
+            return cursor.fetchone() is None
 
 
 # Global repository instance

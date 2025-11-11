@@ -40,8 +40,11 @@ class MetadataService:
             Complete metadata for the connection
         """
         try:
-            # Attach the database
-            alias = self.duckdb_manager.attach_postgres(connection_id, config)
+            # Attach the database (custom_alias is None here since it's part of connection config)
+            # This is called from API with just PostgresConnectionConfig, not the full ConnectionConfig
+            alias = self.duckdb_manager.attach_postgres(
+                connection_id, connection_name, config, custom_alias=None
+            )
 
             # Get schema information
             schemas = await self._get_postgres_schemas(alias, config.schema_name)
@@ -264,23 +267,19 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
         # Get connection name from the config object
         connection_name = connection_config.name
 
-        # Get DuckDB alias for this connection
-        alias = f"pg_{connection_id.replace('-', '_')}"
-
         # Check if catalog exists in DuckDB, if not, try to attach it
         try:
-            conn = duckdb_manager.connect()
-            # Check if the catalog exists by querying available databases
-            databases_result = conn.execute("SHOW DATABASES").fetchall()
-            attached_databases = [db[0] for db in databases_result]
+            # Parse connection config
+            from app.models.schemas import PostgresConnectionConfig
+            # connection_config is a ConnectionConfig object, access .config attribute
+            postgres_config = PostgresConnectionConfig(**connection_config.config)
             
-            if alias not in attached_databases:
-                logger.info(f"Catalog {alias} not attached, re-attaching connection {connection_id}")
-                # Parse connection config and re-attach
-                from app.models.schemas import PostgresConnectionConfig
-                # connection_config is a ConnectionConfig object, access .config attribute
-                postgres_config = PostgresConnectionConfig(**connection_config.config)
-                duckdb_manager.attach_postgres(connection_id, postgres_config, alias)
+            # Attach (or re-attach) the connection - this will detach if already exists
+            # Use custom alias from connection_config if available
+            alias = duckdb_manager.attach_postgres(
+                connection_id, connection_name, postgres_config, 
+                custom_alias=connection_config.alias
+            )
         except Exception as e:
             logger.error(f"Failed to attach connection {connection_id}: {e}")
             # Skip this entire connection if we can't attach it
@@ -313,6 +312,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                     {
                         "connection_id": connection_id,
                         "connection_name": connection_name,
+                        "alias": alias,  # Include DuckDB alias for SQL generation
                         "schema_name": schema_name,
                         "table_name": table_name,
                         "columns": [

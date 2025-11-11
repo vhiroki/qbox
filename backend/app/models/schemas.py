@@ -20,6 +20,7 @@ class ConnectionConfig(BaseModel):
     name: str
     type: DataSourceType
     config: dict[str, Any]
+    alias: Optional[str] = None
 
 
 class PostgresConnectionConfig(BaseModel):

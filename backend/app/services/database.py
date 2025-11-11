@@ -191,10 +191,20 @@ class ConnectionManager:
 
             # Save to repository if requested
             if save:
-                connection_repository.save(connection_id, config)
+                try:
+                    connection_repository.save(connection_id, config)
+                except ValueError as e:
+                    # Validation error (e.g., duplicate alias)
+                    # Disconnect the connection since we can't save it
+                    await datasource.disconnect()
+                    del self.connections[connection_id]
+                    return False, str(e), ""
 
             return True, f"Successfully connected to {config.name}", connection_id
 
+        except ValueError as e:
+            # Validation errors from repository
+            return False, str(e), ""
         except Exception as e:
             return False, f"Error creating connection: {str(e)}", ""
 
@@ -286,6 +296,7 @@ class ConnectionManager:
             "name": config.name,
             "type": config.type.value,
             "config": safe_config,
+            "alias": config.alias,
         }
 
     def update_saved_connection(
@@ -302,7 +313,11 @@ class ConnectionManager:
                 config.config["password"] = existing.config["password"]
 
         # Save the updated config
-        connection_repository.save(connection_id, config)
+        try:
+            connection_repository.save(connection_id, config)
+        except ValueError as e:
+            # Validation error (e.g., duplicate alias)
+            return False, str(e)
 
         # If the connection is currently active, disconnect it
         # (it will need to be reconnected with the new config)

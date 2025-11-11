@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,12 +8,30 @@ from app.api import connections, metadata, query
 from app.api import settings as settings_api
 from app.config.settings import get_settings
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# Set specific loggers to appropriate levels
+logging.getLogger("uvicorn").setLevel(logging.INFO)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+# Reduce LiteLLM noise - keep only important messages
+logging.getLogger("LiteLLM").setLevel(logging.INFO)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     # Startup
     print("🚀 Starting QBox API...")
+    print("📊 Debug logging enabled for AI and metadata services")
     yield
     # Shutdown
     print("👋 Shutting down QBox API...")

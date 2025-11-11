@@ -1,64 +1,187 @@
-"""AI service for SQL query generation with provider abstraction."""
+"""AI service for SQL query generation using LiteLLM."""
 
-from abc import ABC, abstractmethod
+import logging
+import time
 from typing import Any
 
-from openai import AsyncOpenAI
+import litellm
+from litellm import acompletion
 
 from app.config.settings import get_settings
 
+logger = logging.getLogger(__name__)
 
-class AIProvider(ABC):
-    """Abstract base class for AI providers."""
+# Automatically drop unsupported parameters for different models
+# This handles temperature, top_p, etc. for models that don't support them
+litellm.drop_params = True
 
-    @abstractmethod
-    async def generate_sql(
-        self, prompt: str, schema_context: str, additional_instructions: str | None = None
+
+class AIService:
+    """Service for AI-powered SQL generation and editing."""
+
+    def __init__(self, model: str, temperature: float = 0.1):
+        """
+        Initialize AI service.
+
+        Args:
+            model: Model to use (e.g., "gpt-4o", "claude-3-5-sonnet-20241022", "ollama/llama2")
+            temperature: Temperature for generation (0.0-2.0, lower = more deterministic)
+        """
+        self.model = model
+        self.temperature = temperature
+        
+        # LiteLLM automatically reads API keys from environment variables
+        # No need to set them manually - they're already set by pydantic-settings
+
+    async def edit_sql_from_chat(
+        self,
+        current_sql: str,
+        user_message: str,
+        chat_history: list[Any],
+        query_metadata: list[dict[str, Any]],
+    ) -> dict[str, str]:
+        """
+        Edit SQL query based on chat conversation.
+
+        Args:
+            current_sql: Current state of the SQL query
+            user_message: Latest user message/instruction
+            chat_history: Previous chat messages
+            query_metadata: List of table metadata from query
+
+        Returns:
+            Dictionary with 'sql' and 'explanation' keys
+        """
+        logger.debug("=" * 80)
+        logger.debug("Starting edit_sql_from_chat")
+        logger.debug(f"Model: {self.model}, Temperature: {self.temperature}")
+        logger.debug(f"User message: {user_message}")
+        logger.debug(f"Current SQL length: {len(current_sql)} chars")
+        logger.debug(f"Chat history: {len(chat_history)} messages")
+        logger.debug(f"Query metadata: {len(query_metadata)} tables")
+        
+        schema_context = self._format_schema_context(query_metadata)
+        system_prompt = self._build_chat_system_prompt(schema_context, current_sql)
+
+        logger.debug("-" * 80)
+        logger.debug("System prompt:")
+        logger.debug(system_prompt)
+        logger.debug("-" * 80)
+
+        # Build conversation history
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # Add previous chat messages (last 10 for context)
+        context_messages = 0
+        for msg in chat_history[-10:]:
+            if hasattr(msg, "role") and hasattr(msg, "message"):
+                messages.append({"role": msg.role, "content": msg.message})
+                context_messages += 1
+
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
+
+        logger.debug(f"Total messages to LLM: {len(messages)} (system + {context_messages} context + 1 new)")
+
+        try:
+            logger.debug(f"Calling LLM ({self.model})...")
+            start_time = time.time()
+            
+            # LiteLLM automatically handles provider differences
+            response = await acompletion(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+            )
+            
+            elapsed_time = time.time() - start_time
+            logger.debug(f"LLM call completed in {elapsed_time:.2f} seconds")
+
+            content = response.choices[0].message.content or ""
+            logger.debug("-" * 80)
+            logger.debug("LLM Response:")
+            logger.debug(content)
+            logger.debug("-" * 80)
+            
+            sql, explanation = self._parse_response(content)
+            
+            logger.debug(f"Parsed SQL length: {len(sql)} chars")
+            logger.debug(f"Explanation: {explanation[:100]}..." if len(explanation) > 100 else f"Explanation: {explanation}")
+            logger.debug("=" * 80)
+
+            return {"sql": sql or current_sql, "explanation": explanation}
+
+        except Exception as e:
+            logger.error(f"LLM call failed after {time.time() - start_time:.2f}s: {e}")
+            logger.debug("=" * 80)
+            raise RuntimeError(f"Failed to edit SQL: {str(e)}")
+
+    async def generate_sql_from_prompt(
+        self,
+        prompt: str,
+        query_metadata: list[dict[str, Any]],
+        additional_instructions: str | None = None,
     ) -> dict[str, str]:
         """
         Generate SQL query from natural language prompt.
 
         Args:
             prompt: Natural language query from user
-            schema_context: Database schema information (tables, columns, types)
-            additional_instructions: Optional additional context or constraints
+            query_metadata: List of table metadata from query
+            additional_instructions: Optional additional context
 
         Returns:
             Dictionary with 'sql' and 'explanation' keys
         """
-        pass
-
-
-class OpenAIProvider(AIProvider):
-    """OpenAI implementation of AI provider."""
-
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
-        """Initialize OpenAI provider."""
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.model = model
-
-    async def generate_sql(
-        self, prompt: str, schema_context: str, additional_instructions: str | None = None
-    ) -> dict[str, str]:
-        """Generate SQL query using OpenAI."""
+        logger.debug("=" * 80)
+        logger.debug("Starting generate_sql_from_prompt")
+        logger.debug(f"Model: {self.model}, Temperature: {self.temperature}")
+        logger.debug(f"Prompt: {prompt}")
+        logger.debug(f"Query metadata: {len(query_metadata)} tables")
+        logger.debug(f"Additional instructions: {additional_instructions}")
+        
+        schema_context = self._format_schema_context(query_metadata)
         system_prompt = self._build_system_prompt(schema_context, additional_instructions)
 
+        logger.debug("-" * 80)
+        logger.debug("System prompt:")
+        logger.debug(system_prompt)
+        logger.debug("-" * 80)
+
         try:
-            response = await self.client.chat.completions.create(
+            logger.debug(f"Calling LLM ({self.model})...")
+            start_time = time.time()
+            
+            # LiteLLM automatically handles provider differences
+            response = await acompletion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.1,  # Lower temperature for more deterministic SQL generation
+                temperature=self.temperature,
             )
+            
+            elapsed_time = time.time() - start_time
+            logger.debug(f"LLM call completed in {elapsed_time:.2f} seconds")
 
             content = response.choices[0].message.content or ""
+            logger.debug("-" * 80)
+            logger.debug("LLM Response:")
+            logger.debug(content)
+            logger.debug("-" * 80)
+            
             sql, explanation = self._parse_response(content)
+            
+            logger.debug(f"Parsed SQL length: {len(sql)} chars")
+            logger.debug(f"Explanation: {explanation[:100]}..." if len(explanation) > 100 else f"Explanation: {explanation}")
+            logger.debug("=" * 80)
 
             return {"sql": sql, "explanation": explanation}
 
         except Exception as e:
+            logger.error(f"LLM call failed after {time.time() - start_time:.2f}s: {e}")
+            logger.debug("=" * 80)
             raise RuntimeError(f"Failed to generate SQL: {str(e)}")
 
     def _build_system_prompt(
@@ -97,6 +220,41 @@ EXPLANATION:
 
         return base_prompt
 
+    def _build_chat_system_prompt(self, schema_context: str, current_sql: str) -> str:
+        """Build system prompt for chat-based SQL editing."""
+        return f"""You are an expert SQL query editor specializing in DuckDB syntax.
+
+You are helping a user iteratively build and refine a SQL query through conversation.
+
+DATABASE SCHEMA:
+{schema_context}
+
+CURRENT SQL QUERY:
+```sql
+{current_sql if current_sql.strip() else "(empty - no query yet)"}
+```
+
+INSTRUCTIONS:
+1. Listen to the user's instructions and modify the SQL query accordingly
+2. If the query is empty, create a new query based on the user's request
+3. If the query exists, edit it to incorporate the user's new requirements
+4. Use proper DuckDB syntax and functions
+5. Reference tables with their full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
+6. Preserve the user's manual edits unless they ask you to change them
+7. Return the COMPLETE updated SQL query, not just the changes
+
+RESPONSE FORMAT:
+Provide your response in the following format:
+
+SQL:
+```sql
+<complete updated SQL query here>
+```
+
+EXPLANATION:
+<brief explanation of what you changed or added>
+"""
+
     def _parse_response(self, content: str) -> tuple[str, str]:
         """Parse SQL and explanation from LLM response."""
         sql = ""
@@ -134,123 +292,6 @@ EXPLANATION:
 
         return sql, explanation
 
-
-class AIService:
-    """Service for AI-powered SQL generation and editing."""
-
-    def __init__(self, provider: AIProvider):
-        """Initialize AI service with a provider."""
-        self.provider = provider
-
-    async def edit_sql_from_chat(
-        self,
-        current_sql: str,
-        user_message: str,
-        chat_history: list[Any],
-        query_metadata: list[dict[str, Any]],
-    ) -> dict[str, str]:
-        """
-        Edit SQL query based on chat conversation.
-
-        Args:
-            current_sql: Current state of the SQL query
-            user_message: Latest user message/instruction
-            chat_history: Previous chat messages
-            query_metadata: List of table metadata from query
-
-        Returns:
-            Dictionary with 'sql' and 'explanation' keys
-        """
-        schema_context = self._format_schema_context(query_metadata)
-
-        # Build messages for chat-based editing
-        system_prompt = self._build_chat_system_prompt(schema_context, current_sql)
-
-        # Build conversation history
-        messages = [{"role": "system", "content": system_prompt}]
-
-        # Add previous chat messages (excluding system messages)
-        for msg in chat_history[-10:]:  # Last 10 messages for context
-            if hasattr(msg, "role") and hasattr(msg, "message"):
-                messages.append({"role": msg.role, "content": msg.message})
-
-        # Add current user message
-        messages.append({"role": "user", "content": user_message})
-
-        # Get AI response using the provider's client directly
-        if isinstance(self.provider, OpenAIProvider):
-            try:
-                response = await self.provider.client.chat.completions.create(
-                    model=self.provider.model,
-                    messages=messages,
-                    temperature=0.1,
-                )
-
-                content = response.choices[0].message.content or ""
-                sql, explanation = self.provider._parse_response(content)
-
-                return {"sql": sql or current_sql, "explanation": explanation}
-
-            except Exception as e:
-                raise RuntimeError(f"Failed to edit SQL: {str(e)}")
-        else:
-            raise NotImplementedError("Only OpenAI provider supported for now")
-
-    def _build_chat_system_prompt(self, schema_context: str, current_sql: str) -> str:
-        """Build system prompt for chat-based SQL editing."""
-        return f"""You are an expert SQL query editor specializing in DuckDB syntax.
-
-You are helping a user iteratively build and refine a SQL query through conversation.
-
-DATABASE SCHEMA:
-{schema_context}
-
-CURRENT SQL QUERY:
-```sql
-{current_sql if current_sql.strip() else "(empty - no query yet)"}
-```
-
-INSTRUCTIONS:
-1. Listen to the user's instructions and modify the SQL query accordingly
-2. If the query is empty, create a new query based on the user's request
-3. If the query exists, edit it to incorporate the user's new requirements
-4. Use proper DuckDB syntax and functions
-5. Reference tables with their full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
-6. Preserve the user's manual edits unless they ask you to change them
-7. Return the COMPLETE updated SQL query, not just the changes
-
-RESPONSE FORMAT:
-Provide your response in the following format:
-
-SQL:
-```sql
-<complete updated SQL query here>
-```
-
-EXPLANATION:
-<brief explanation of what you changed or added>
-"""
-
-    async def generate_sql_from_prompt(
-        self,
-        prompt: str,
-        query_metadata: list[dict[str, Any]],
-        additional_instructions: str | None = None,
-    ) -> dict[str, str]:
-        """
-        Generate SQL query from natural language prompt.
-
-        Args:
-            prompt: Natural language query from user
-            query_metadata: List of table metadata from query
-            additional_instructions: Optional additional context
-
-        Returns:
-            Dictionary with 'sql' and 'explanation' keys
-        """
-        schema_context = self._format_schema_context(query_metadata)
-        return await self.provider.generate_sql(prompt, schema_context, additional_instructions)
-
     def _format_schema_context(self, query_metadata: list[dict[str, Any]]) -> str:
         """Format query metadata into a schema context string."""
         context_parts = []
@@ -284,13 +325,33 @@ EXPLANATION:
 
 
 def get_ai_service() -> AIService:
-    """Get AI service instance with configured provider."""
+    """Get AI service instance with configured model."""
     settings = get_settings()
 
-    if not settings.OPENAI_API_KEY:
-        raise RuntimeError(
-            "OPENAI_API_KEY not configured. Please set it in your .env file or environment."
-        )
+    model = settings.AI_MODEL
+    
+    # Validate that appropriate API key is set for the model
+    # Models can be prefixed with provider (e.g., "openai/gpt-4o") or not (e.g., "gpt-4o")
+    model_lower = model.lower()
+    
+    # OpenAI models
+    if any(prefix in model_lower for prefix in ["openai/", "gpt-", "o1-", "o3-"]):
+        if not settings.OPENAI_API_KEY:
+            raise RuntimeError(
+                "OPENAI_API_KEY not configured. Please set it in your .env file."
+            )
+    # Anthropic models
+    elif any(prefix in model_lower for prefix in ["anthropic/", "claude-"]):
+        if not settings.ANTHROPIC_API_KEY:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY not configured. Please set it in your .env file."
+            )
+    # Google models (Gemini or Vertex AI)
+    elif any(prefix in model_lower for prefix in ["gemini/", "gemini-", "vertex_ai/"]):
+        if not settings.GEMINI_API_KEY:
+            raise RuntimeError(
+                "GEMINI_API_KEY not configured. Please set it in your .env file."
+            )
+    # Local models (Ollama, etc.) don't need API keys
 
-    provider = OpenAIProvider(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL)
-    return AIService(provider)
+    return AIService(model=model, temperature=settings.AI_TEMPERATURE)

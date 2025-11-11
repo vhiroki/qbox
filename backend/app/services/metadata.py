@@ -261,15 +261,30 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
             logger.warning(f"Connection {connection_id} not found, skipping selections")
             continue
 
-        # Get connection name from repository
-        all_connections = connection_repository.get_all()
-        connection_name = next(
-            (c["name"] for c in all_connections if c["id"] == connection_id),
-            "Unknown",
-        )
+        # Get connection name from the config object
+        connection_name = connection_config.name
 
         # Get DuckDB alias for this connection
         alias = f"pg_{connection_id.replace('-', '_')}"
+
+        # Check if catalog exists in DuckDB, if not, try to attach it
+        try:
+            conn = duckdb_manager.connect()
+            # Check if the catalog exists by querying available databases
+            databases_result = conn.execute("SHOW DATABASES").fetchall()
+            attached_databases = [db[0] for db in databases_result]
+            
+            if alias not in attached_databases:
+                logger.info(f"Catalog {alias} not attached, re-attaching connection {connection_id}")
+                # Parse connection config and re-attach
+                from app.models.schemas import PostgresConnectionConfig
+                # connection_config is a ConnectionConfig object, access .config attribute
+                postgres_config = PostgresConnectionConfig(**connection_config.config)
+                duckdb_manager.attach_postgres(connection_id, postgres_config, alias)
+        except Exception as e:
+            logger.error(f"Failed to attach connection {connection_id}: {e}")
+            # Skip this entire connection if we can't attach it
+            continue
 
         # For each table selection in this connection
         for selection in conn_selections:

@@ -155,21 +155,37 @@ async def remove_query_selection(query_id: str, selection: QueryTableSelectionRe
 @router.post("/{query_id}/chat", response_model=ChatResponse)
 async def chat_with_ai(query_id: str, request: ChatRequest):
     """Send a chat message to edit the query SQL interactively."""
+    import time
+    request_start = time.time()
+    
+    logger.debug("=" * 100)
+    logger.debug(f"📨 Received chat request for query_id: {query_id}")
+    logger.debug(f"User message: {request.message}")
+    
     # Verify query exists
     query = query_repository.get_query(query_id)
     if not query:
+        logger.error(f"Query {query_id} not found")
         raise HTTPException(status_code=404, detail="Query not found")
+    
+    logger.debug(f"✓ Query found: {query.name}")
 
     # Get query metadata for context
+    logger.debug("Fetching query metadata...")
+    metadata_start = time.time()
     try:
         query_metadata = await get_query_metadata(query_id)
+        metadata_elapsed = time.time() - metadata_start
+        logger.debug(f"✓ Metadata fetched in {metadata_elapsed:.2f}s - {len(query_metadata)} tables")
     except Exception as e:
+        logger.error(f"Failed to get query metadata: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get query metadata: {str(e)}",
         )
 
     if not query_metadata:
+        logger.warning("No tables in query")
         raise HTTPException(
             status_code=400,
             detail="No tables in query. Add tables before chatting.",
@@ -177,11 +193,11 @@ async def chat_with_ai(query_id: str, request: ChatRequest):
 
     # Get chat history for context
     chat_history = query_repository.get_chat_history(query_id)
+    logger.debug(f"✓ Chat history: {len(chat_history)} messages")
 
-    # Save user message
-    user_message = query_repository.add_chat_message(query_id, "user", request.message)
-
-    # Generate updated SQL using AI
+    # Generate updated SQL using AI (don't save messages until this succeeds)
+    logger.debug("Calling AI service...")
+    ai_start = time.time()
     try:
         ai_service = get_ai_service()
         result = await ai_service.edit_sql_from_chat(
@@ -190,19 +206,33 @@ async def chat_with_ai(query_id: str, request: ChatRequest):
             chat_history=chat_history,
             query_metadata=query_metadata,
         )
+        ai_elapsed = time.time() - ai_start
+        logger.debug(f"✓ AI service completed in {ai_elapsed:.2f}s")
     except Exception as e:
+        ai_elapsed = time.time() - ai_start
+        logger.error(f"AI service failed after {ai_elapsed:.2f}s: {e}")
+        # If AI call fails, don't save any messages
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate SQL: {str(e)}",
         )
 
     # Update query SQL
+    logger.debug("Updating query SQL...")
     query_repository.update_query_sql(query_id, result["sql"])
+    logger.debug("✓ Query SQL updated")
 
-    # Save assistant response
+    # Only save messages after successful AI generation
+    logger.debug("Saving chat messages...")
+    user_message = query_repository.add_chat_message(query_id, "user", request.message)
     assistant_message = query_repository.add_chat_message(
         query_id, "assistant", result.get("explanation", "SQL updated")
     )
+    logger.debug("✓ Chat messages saved")
+
+    total_elapsed = time.time() - request_start
+    logger.debug(f"✅ Request completed successfully in {total_elapsed:.2f}s")
+    logger.debug("=" * 100)
 
     return ChatResponse(
         message=assistant_message,

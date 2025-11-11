@@ -22,9 +22,15 @@ class QueryRepository:
         self.db_path = db_path
         self._init_db()
 
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get a database connection with foreign keys enabled."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
     def _init_db(self):
         """Initialize the database schema."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Queries table
             conn.execute(
                 """
@@ -125,7 +131,7 @@ class QueryRepository:
         query_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute(
                 """
                 INSERT INTO queries (id, name, sql_text, created_at, updated_at)
@@ -145,7 +151,7 @@ class QueryRepository:
 
     def get_query(self, query_id: str) -> Optional[Query]:
         """Get a query by ID."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
@@ -169,7 +175,7 @@ class QueryRepository:
 
     def get_all_queries(self) -> list[Query]:
         """Get all queries, ordered by most recently updated."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
@@ -195,7 +201,7 @@ class QueryRepository:
         """Update the SQL text of a query."""
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute(
                 """
                 UPDATE queries
@@ -211,7 +217,7 @@ class QueryRepository:
         """Update the name of a query."""
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute(
                 """
                 UPDATE queries
@@ -225,7 +231,7 @@ class QueryRepository:
 
     def delete_query(self, query_id: str) -> bool:
         """Delete a query and all its selections and chat history (CASCADE)."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute("DELETE FROM queries WHERE id = ?", (query_id,))
             conn.commit()
             return cursor.rowcount > 0
@@ -238,7 +244,7 @@ class QueryRepository:
         """Add a table to query selections."""
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO query_selections
@@ -264,7 +270,7 @@ class QueryRepository:
         """Remove a table from query selections."""
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute(
                 """
                 DELETE FROM query_selections
@@ -287,7 +293,7 @@ class QueryRepository:
 
     def get_query_selections(self, query_id: str) -> list[QueryTableSelection]:
         """Get all table selections for a query."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
@@ -314,7 +320,7 @@ class QueryRepository:
         """Remove all table selections from a query."""
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute(
                 """
                 DELETE FROM query_selections
@@ -339,7 +345,7 @@ class QueryRepository:
         """Add a message to query chat history."""
         now = datetime.now().isoformat()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO query_chat_history (query_id, role, message, created_at)
@@ -366,7 +372,7 @@ class QueryRepository:
 
     def get_chat_history(self, query_id: str) -> list[ChatMessage]:
         """Get all chat messages for a query."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
@@ -392,7 +398,7 @@ class QueryRepository:
 
     def clear_chat_history(self, query_id: str) -> None:
         """Clear all chat messages for a query."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute(
                 """
                 DELETE FROM query_chat_history

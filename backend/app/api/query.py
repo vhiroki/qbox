@@ -134,6 +134,7 @@ async def add_query_selection(query_id: str, selection: QueryTableSelectionReque
             selection.connection_id,
             selection.schema_name,
             selection.table_name,
+            selection.source_type,
         )
         return {"success": True, "message": "Table added to query"}
     except Exception as e:

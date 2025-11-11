@@ -78,7 +78,7 @@ QBox is a query-based data management application for building and managing SQL 
 
 ## Query Architecture
 
-**Query**: Named SQL query with connected tables from one/multiple sources. Persisted in SQLite with SQL text, chat history, and table selections.
+**Query**: Named SQL query with Tables from one/multiple sources. Persisted in SQLite with SQL text, chat history, and table selections.
 
 **Connection**: Saved database connection (PostgreSQL). Stored in SQLite with credentials.
 
@@ -126,7 +126,7 @@ Tables:
 
 **QueryList**: Query list ordered newest first, click to select
 
-**QueryDetail**: Header with actions, tabs for "Chat & SQL" and "Connected Tables"
+**QueryDetail**: Header with actions, tabs for "Chat & SQL" and "Tables"
 
 **ChatInterface**: SQL editor, chat history, message input, AI refinement
 

@@ -130,6 +130,7 @@ class QueryTableSelectionRequest(BaseModel):
     connection_id: str
     schema_name: str
     table_name: str
+    source_type: str = "connection"  # Default to 'connection' for backwards compatibility
 
 
 class QueryTableSelection(BaseModel):
@@ -139,6 +140,7 @@ class QueryTableSelection(BaseModel):
     connection_id: str
     schema_name: str
     table_name: str
+    source_type: str = "connection"  # 'connection', 'file', 's3', etc.
 
 
 class QuerySelections(BaseModel):

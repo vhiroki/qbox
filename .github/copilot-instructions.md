@@ -103,7 +103,7 @@ For detailed setup and usage instructions, see the [README](../README.md).
 
 ### Core Concepts
 
-**Query**: A named SQL query with connected tables from one or more data sources. Each query is independent and can contain tables from multiple connections. Queries are persisted in SQLite with SQL text, chat history, and table selections automatically restored on app startup.
+**Query**: A named SQL query with Tables from one or more data sources. Each query is independent and can contain tables from multiple connections. Queries are persisted in SQLite with SQL text, chat history, and table selections automatically restored on app startup.
 
 **Connection**: A saved database connection configuration (PostgreSQL). Stored in SQLite with credentials.
 
@@ -195,9 +195,9 @@ For detailed setup and usage instructions, see the [README](../README.md).
 
 **QueryDetail** (Right Panel):
 - Header with query name and actions (Add Tables, Delete Query)
-- Two tabs: "Chat & SQL" and "Connected Tables"
+- Two tabs: "Chat & SQL" and "Tables"
 - Chat & SQL tab: ChatInterface component with SQL editor and chat history
-- Connected Tables tab: Table cards showing all selected tables
+- Tables tab: Table cards showing all selected tables
 - Each card displays: connection name, schema, table name, column count, row count
 - Click card to view detailed metadata in a dialog
 - X button on each card to remove from query

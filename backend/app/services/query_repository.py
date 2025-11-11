@@ -53,6 +53,7 @@ class QueryRepository:
                     connection_id TEXT NOT NULL,
                     schema_name TEXT NOT NULL,
                     table_name TEXT NOT NULL,
+                    source_type TEXT DEFAULT 'connection',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(query_id, connection_id, schema_name, table_name),
                     FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
@@ -111,6 +112,9 @@ class QueryRepository:
             # Migrate old tables if they exist
             self._migrate_from_workspaces(conn)
 
+            # Add source_type column to existing query_selections if it doesn't exist
+            self._add_source_type_column(conn)
+
             conn.commit()
 
     def _migrate_from_workspaces(self, conn):
@@ -141,6 +145,21 @@ class QueryRepository:
                     (query_id, connection_id, schema_name, table_name, created_at)
                 SELECT workspace_id, connection_id, schema_name, table_name, created_at 
                 FROM workspace_selections
+                """
+            )
+
+    def _add_source_type_column(self, conn):
+        """Add source_type column to existing query_selections table if it doesn't exist."""
+        # Check if source_type column exists
+        cursor = conn.execute("PRAGMA table_info(query_selections)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if "source_type" not in columns:
+            # Add the column with default value 'connection'
+            conn.execute(
+                """
+                ALTER TABLE query_selections 
+                ADD COLUMN source_type TEXT DEFAULT 'connection'
                 """
             )
 
@@ -272,7 +291,7 @@ class QueryRepository:
     # Table selection operations
 
     def add_table_selection(
-        self, query_id: str, connection_id: str, schema_name: str, table_name: str
+        self, query_id: str, connection_id: str, schema_name: str, table_name: str, source_type: str = "connection"
     ) -> None:
         """Add a table to query selections."""
         now = datetime.now().isoformat()
@@ -281,10 +300,10 @@ class QueryRepository:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO query_selections
-                    (query_id, connection_id, schema_name, table_name, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                    (query_id, connection_id, schema_name, table_name, source_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (query_id, connection_id, schema_name, table_name, now),
+                (query_id, connection_id, schema_name, table_name, source_type, now),
             )
             # Update query updated_at
             conn.execute(
@@ -330,7 +349,7 @@ class QueryRepository:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT query_id, connection_id, schema_name, table_name
+                SELECT query_id, connection_id, schema_name, table_name, source_type
                 FROM query_selections
                 WHERE query_id = ?
                 ORDER BY created_at
@@ -345,6 +364,7 @@ class QueryRepository:
                     connection_id=row["connection_id"],
                     schema_name=row["schema_name"],
                     table_name=row["table_name"],
+                    source_type=row["source_type"],
                 )
                 for row in rows
             ]

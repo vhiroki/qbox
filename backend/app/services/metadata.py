@@ -67,22 +67,21 @@ class MetadataService:
         """Get schemas and tables from PostgreSQL."""
         conn = self.duckdb_manager.connect()
 
-        # Query to get all schemas
+        # Use DuckDB's system tables to get schemas for this specific database
         if schema_filter:
             schema_query = f"""
-                SELECT DISTINCT table_schema
-                FROM information_schema.tables
-                WHERE table_schema = '{schema_filter}'
-                AND table_type = 'BASE TABLE'
+                SELECT DISTINCT schema_name
+                FROM duckdb_schemas()
+                WHERE database_name = '{alias}'
+                AND schema_name = '{schema_filter}'
+                AND schema_name NOT IN ('information_schema', 'pg_catalog')
             """
         else:
-            schema_query = """
-                SELECT DISTINCT table_schema
-                FROM information_schema.tables
-                WHERE table_schema NOT IN (
-                    'information_schema', 'pg_catalog'
-                )
-                AND table_type = 'BASE TABLE'
+            schema_query = f"""
+                SELECT DISTINCT schema_name
+                FROM duckdb_schemas()
+                WHERE database_name = '{alias}'
+                AND schema_name NOT IN ('information_schema', 'pg_catalog')
             """
 
         result = conn.execute(schema_query)
@@ -91,7 +90,8 @@ class MetadataService:
         schemas = []
         for schema_name in schema_names:
             tables = await self._get_postgres_tables(alias, schema_name)
-            schemas.append(SchemaMetadata(name=schema_name, tables=tables))
+            if tables:  # Only include schemas with tables
+                schemas.append(SchemaMetadata(name=schema_name, tables=tables))
 
         return schemas
 
@@ -99,12 +99,12 @@ class MetadataService:
         """Get tables and columns for a specific schema."""
         conn = self.duckdb_manager.connect()
 
-        # Query to get tables
+        # Use DuckDB's system tables to get tables for this specific database and schema
         tables_query = f"""
             SELECT DISTINCT table_name
-            FROM information_schema.tables
-            WHERE table_schema = '{schema_name}'
-            AND table_type = 'BASE TABLE'
+            FROM duckdb_tables()
+            WHERE database_name = '{alias}'
+            AND schema_name = '{schema_name}'
             ORDER BY table_name
         """
 
@@ -141,30 +141,18 @@ class MetadataService:
         """Get column information for a specific table."""
         conn = self.duckdb_manager.connect()
 
-        # Query to get columns with constraints
+        # Use DuckDB's system tables to get columns for this specific table
         columns_query = f"""
             SELECT
-                c.column_name,
-                c.data_type,
-                c.is_nullable,
-                CASE
-                    WHEN pk.column_name IS NOT NULL THEN true
-                    ELSE false
-                END as is_primary_key
-            FROM information_schema.columns c
-            LEFT JOIN (
-                SELECT ku.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage ku
-                    ON tc.constraint_name = ku.constraint_name
-                    AND tc.table_schema = ku.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                AND tc.table_schema = '{schema_name}'
-                AND tc.table_name = '{table_name}'
-            ) pk ON c.column_name = pk.column_name
-            WHERE c.table_schema = '{schema_name}'
-            AND c.table_name = '{table_name}'
-            ORDER BY c.ordinal_position
+                column_name,
+                data_type,
+                is_nullable,
+                false as is_primary_key
+            FROM duckdb_columns()
+            WHERE database_name = '{alias}'
+            AND schema_name = '{schema_name}'
+            AND table_name = '{table_name}'
+            ORDER BY column_index
         """
 
         result = conn.execute(columns_query)
@@ -177,7 +165,7 @@ class MetadataService:
                 ColumnMetadata(
                     name=column_name,
                     type=data_type,
-                    nullable=(is_nullable == "YES"),
+                    nullable=bool(is_nullable),  # DuckDB returns boolean
                     is_primary_key=bool(is_pk),
                 )
             )

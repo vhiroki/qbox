@@ -82,6 +82,11 @@ export const api = {
   },
 
   // Metadata endpoints
+  async getAllMetadata(): Promise<ConnectionMetadata[]> {
+    const response = await axios.get(`${API_BASE_URL}/metadata/`);
+    return response.data;
+  },
+
   async getMetadata(connectionId: string): Promise<ConnectionMetadata> {
     const response = await axios.get(
       `${API_BASE_URL}/metadata/${connectionId}`

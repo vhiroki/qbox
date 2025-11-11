@@ -108,6 +108,7 @@ export interface QueryTableSelection {
   connection_id: string;
   schema_name: string;
   table_name: string;
+  source_type: string; // 'connection', 'file', 's3', etc.
 }
 
 export interface QuerySelections {

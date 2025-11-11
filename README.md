@@ -114,11 +114,11 @@ The application will be available at:
 3. Type a message to the AI like "Write a SELECT query to get all active users"
 4. The AI will generate SQL and update the editor
 5. Continue chatting to refine: "Add a WHERE clause for created_at > '2024-01-01'"
-6. Each message iteratively improves the SQL based on your connected tables
+6. Each message iteratively improves the SQL based on your Tables
 
 ### 5. View Table Metadata
 
-1. Switch to the "Connected Tables" tab
+1. Switch to the "Tables" tab
 2. Click on any table card to view detailed metadata:
    - Column names and data types
    - Nullable fields
@@ -191,7 +191,7 @@ pnpm add package-name
 - `types/` - TypeScript definitions
 
 **Key Concepts:**
-- **Query**: A named SQL query with connected tables (can include tables from multiple connections)
+- **Query**: A named SQL query with Tables (can include tables from multiple connections)
 - **Connection**: Saved database configuration (PostgreSQL)
 - **Chat History**: Conversational context for iterative SQL editing with AI
 - **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases

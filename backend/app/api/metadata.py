@@ -12,6 +12,49 @@ router = APIRouter(prefix="/metadata", tags=["metadata"])
 logger = logging.getLogger(__name__)
 
 
+@router.get("/", response_model=list[ConnectionMetadata])
+async def get_all_connections_metadata():
+    """Get metadata for all saved connections.
+
+    Returns:
+        List of metadata for all connections
+    """
+    try:
+        all_connections = connection_repository.get_all()
+        metadata_list = []
+        metadata_service = get_metadata_service()
+
+        for connection_data in all_connections:
+            try:
+                # Get full connection config
+                connection_config = connection_repository.get(connection_data["id"])
+                if not connection_config:
+                    continue
+                
+                metadata = await metadata_service.refresh_metadata(
+                    connection_id=connection_data["id"],
+                    connection_name=connection_config.name,
+                    source_type=connection_config.type,
+                    config=connection_config.config,
+                )
+                metadata_list.append(metadata)
+            except Exception as e:
+                logger.error(
+                    f"Failed to get metadata for {connection_data['id']}: {e}"
+                )
+                # Skip connections that fail to load metadata
+                continue
+
+        return metadata_list
+
+    except Exception as e:
+        logger.error(f"Failed to get all metadata: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve metadata: {str(e)}",
+        )
+
+
 @router.get("/{connection_id}", response_model=ConnectionMetadata)
 async def get_connection_metadata(connection_id: str):
     """Get metadata for a specific connection.

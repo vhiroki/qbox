@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Database, X, ChevronDown, ChevronRight, Pencil, Play, History } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, Play, History } from "lucide-react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -47,11 +47,10 @@ import { Label } from "@/components/ui/label";
 import { useQueryStore, useConnectionStore } from "../stores";
 import { api } from "../services/api";
 import ChatInterface from "./ChatInterface";
-import AddTablesModal from "./AddTablesModal";
 import QueryResults from "./QueryResults";
 import SQLHistoryModal from "./SQLHistoryModal";
+import DataSourcesTreeView from "./DataSourcesTreeView";
 import type {
-  TableMetadata,
   QueryTableSelection,
 } from "../types";
 
@@ -90,9 +89,6 @@ export default function QueryDetail({
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [newQueryName, setNewQueryName] = useState("");
   const [sqlText, setSqlText] = useState("");
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
-  const [tableMetadataCache, setTableMetadataCache] = useState<Map<string, TableMetadata>>(new Map());
-  const [addTablesModalOpen, setAddTablesModalOpen] = useState(false);
   const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -153,15 +149,36 @@ export default function QueryDetail({
     return () => clearTimeout(timeoutId);
   }, [sqlText, query, updateQuerySQL]);
 
-  const handleRemoveTable = async (selection: QueryTableSelection) => {
+  const handleSelectionChange = async (
+    connectionId: string,
+    schemaName: string,
+    tableName: string,
+    checked: boolean,
+    sourceType: string
+  ) => {
     try {
-      await removeQuerySelection(queryId, {
-        connection_id: selection.connection_id,
-        schema_name: selection.schema_name,
-        table_name: selection.table_name,
-      });
+      if (checked) {
+        // Add table
+        await api.addQuerySelection(queryId, {
+          connection_id: connectionId,
+          schema_name: schemaName,
+          table_name: tableName,
+          source_type: sourceType,
+        });
+      } else {
+        // Remove table
+        await api.removeQuerySelection(queryId, {
+          connection_id: connectionId,
+          schema_name: schemaName,
+          table_name: tableName,
+          source_type: sourceType,
+        });
+      }
+      // Reload selections after change
+      await loadQuerySelections(queryId);
     } catch (err: any) {
-      // Error is already set in store
+      const errorMsg = err.response?.data?.detail || err.message || "Failed to update table selection";
+      setQueryError(errorMsg);
     }
   };
 
@@ -190,37 +207,6 @@ export default function QueryDetail({
     }
   };
 
-  const getTableKey = (selection: QueryTableSelection) => {
-    return `${selection.connection_id}:${selection.schema_name}:${selection.table_name}`;
-  };
-
-  const toggleTableExpansion = async (selection: QueryTableSelection) => {
-    const key = getTableKey(selection);
-    const newExpanded = new Set(expandedTables);
-
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
-      setExpandedTables(newExpanded);
-    } else {
-      newExpanded.add(key);
-      setExpandedTables(newExpanded);
-
-      // Load metadata if not cached
-      if (!tableMetadataCache.has(key)) {
-        try {
-          const metadata = await loadMetadata(selection.connection_id);
-          const schema = metadata.schemas.find((s) => s.name === selection.schema_name);
-          const table = schema?.tables.find((t) => t.name === selection.table_name);
-
-          if (table) {
-            setTableMetadataCache(new Map(tableMetadataCache).set(key, table));
-          }
-        } catch (err: any) {
-          console.error("Failed to load table metadata:", err);
-        }
-      }
-    }
-  };
 
   const handleSQLChange = (value: string | undefined) => {
     const newValue = value || "";
@@ -378,11 +364,6 @@ export default function QueryDetail({
     );
   }
 
-  // Get connection names from metadata
-  const getConnectionName = (connectionId: string) => {
-    const metadata = connectionMetadata.get(connectionId);
-    return metadata?.connection_name || connectionId;
-  };
 
   return (
     <div className="h-full flex flex-col">
@@ -434,7 +415,7 @@ export default function QueryDetail({
                 <TabsList className="w-full justify-start mb-4 flex-shrink-0">
                   <TabsTrigger value="sql">SQL Query</TabsTrigger>
                   <TabsTrigger value="tables">
-                    Connected Tables ({selections.length})
+                    Tables ({selections.length})
                   </TabsTrigger>
                 </TabsList>
 
@@ -506,134 +487,20 @@ export default function QueryDetail({
                   </ResizablePanelGroup>
                 </TabsContent>
 
-                {/* Connected Tables Tab */}
+                {/* Tables Tab - Tree View */}
                 <TabsContent value="tables" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
                   <div className="h-full flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between mb-3 flex-shrink-0">
                       <h3 className="text-sm font-medium text-muted-foreground">
-                        {selections.length} {selections.length === 1 ? "table" : "tables"} connected
+                        {selections.length} {selections.length === 1 ? "table" : "tables"} selected
                       </h3>
-                      <Button onClick={() => setAddTablesModalOpen(true)} size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Tables
-                      </Button>
                     </div>
-                    {selections.length === 0 ? (
-                      <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
-                        <div>
-                          <Database className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                          <p className="text-sm">No tables connected yet</p>
-                          <p className="text-xs mt-1">
-                            Click "Add Tables" to get started
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex-1 overflow-y-auto space-y-2">
-                        {selections.map((selection) => {
-                          const key = getTableKey(selection);
-                          const isExpanded = expandedTables.has(key);
-                          const metadata = tableMetadataCache.get(key);
-
-                          return (
-                            <Card key={key} className="overflow-hidden py-0 gap-0">
-                              <CardHeader className="p-3 pb-2 px-3">
-                                <div className="flex items-start justify-between gap-2">
-                                  <button
-                                    onClick={() => toggleTableExpansion(selection)}
-                                    className="flex items-center gap-2 flex-1 text-left group"
-                                  >
-                                    {isExpanded ? (
-                                      <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                                    ) : (
-                                      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Database className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
-                                        <span className="font-medium text-sm truncate">
-                                          {selection.schema_name}.{selection.table_name}
-                                        </span>
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-0.5">
-                                        {getConnectionName(selection.connection_id)}
-                                        {metadata && (
-                                          <span className="ml-2">
-                                            • {metadata.columns.length} columns
-                                            {metadata.row_count !== undefined &&
-                                              ` • ${metadata.row_count.toLocaleString()} rows`
-                                            }
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
-                                    onClick={() => handleRemoveTable(selection)}
-                                    title="Remove table"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              </CardHeader>
-
-                              {isExpanded && (
-                                <CardContent className="p-3 pt-0 border-t">
-                                  {metadata ? (
-                                    <div className="mt-2">
-                                      <Table>
-                                        <TableHeader>
-                                          <TableRow className="border-b">
-                                            <TableHead className="h-7 py-1 text-xs font-medium">Column</TableHead>
-                                            <TableHead className="h-7 py-1 text-xs font-medium">Type</TableHead>
-                                            <TableHead className="h-7 py-1 text-xs font-medium w-20">Constraints</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {metadata.columns.map((column) => (
-                                            <TableRow key={column.name} className="hover:bg-muted/50">
-                                              <TableCell className="py-1 font-medium text-sm">
-                                                {column.name}
-                                              </TableCell>
-                                              <TableCell className="py-1 font-mono text-xs text-muted-foreground">
-                                                <div className="break-words whitespace-normal">
-                                                  {column.type}
-                                                </div>
-                                              </TableCell>
-                                              <TableCell className="py-1">
-                                                <div className="flex gap-1">
-                                                  {column.is_primary_key && (
-                                                    <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                                      PK
-                                                    </span>
-                                                  )}
-                                                  {!column.nullable && (
-                                                    <span className="text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 px-1.5 py-0.5 rounded">
-                                                      NN
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
-                                    </div>
-                                  ) : (
-                                    <div className="text-center py-3 text-sm text-muted-foreground">
-                                      Loading columns...
-                                    </div>
-                                  )}
-                                </CardContent>
-                              )}
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <div className="flex-1 overflow-hidden">
+                      <DataSourcesTreeView
+                        selections={selections}
+                        onSelectionChange={handleSelectionChange}
+                      />
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -717,17 +584,6 @@ export default function QueryDetail({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Add Tables Modal */}
-      <AddTablesModal
-        open={addTablesModalOpen}
-        onClose={() => setAddTablesModalOpen(false)}
-        queryId={queryId}
-        onTablesAdded={() => {
-          // Reload query selections to reflect new table selections
-          loadQuerySelections(queryId);
-        }}
-      />
 
       {/* SQL History Modal */}
       <SQLHistoryModal

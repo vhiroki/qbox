@@ -45,15 +45,28 @@ export default function ChatInterface({
   const handleSendMessage = async () => {
     if (!userMessage.trim()) return;
 
+    const messageText = userMessage;
     setLoading(true);
     setError(null);
+    setUserMessage(""); // Clear input immediately for better UX
+
+    // Optimistically add user message to chat history
+    const optimisticUserMessage: ChatMessage = {
+      id: Date.now(), // Temporary ID
+      query_id: query.id,
+      role: "user",
+      message: messageText,
+      created_at: new Date().toISOString(),
+    };
+
+    setChatHistory((prev) => [...prev, optimisticUserMessage]);
 
     try {
       const response = await api.chatWithAI(query.id, {
-        message: userMessage,
+        message: messageText,
       });
 
-      // Add both user message and assistant response to chat
+      // Add assistant response to chat
       setChatHistory((prev) => [...prev, response.message]);
 
       // Update parent component with new query data
@@ -66,10 +79,13 @@ export default function ChatInterface({
       if (onSQLChange) {
         onSQLChange(response.updated_sql);
       }
-
-      // Clear input
-      setUserMessage("");
     } catch (err: any) {
+      // Remove optimistic user message on error
+      setChatHistory((prev) =>
+        prev.filter((msg) => msg.id !== optimisticUserMessage.id)
+      );
+      // Restore the message in the input
+      setUserMessage(messageText);
       setError(
         err.response?.data?.detail ||
           "Failed to process message. Please try again."

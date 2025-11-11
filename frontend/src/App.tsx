@@ -10,7 +10,13 @@ import {
   ResizablePanelGroup,
 } from './components/ui/resizable';
 
-function QueryPage({ onQueryDeleted }: { onQueryDeleted: () => void }) {
+function QueryPage({ 
+  onQueryDeleted, 
+  onQueryRenamed 
+}: { 
+  onQueryDeleted: () => void;
+  onQueryRenamed: () => void;
+}) {
   const { queryId } = useParams<{ queryId: string }>();
   const navigate = useNavigate();
 
@@ -25,6 +31,7 @@ function QueryPage({ onQueryDeleted }: { onQueryDeleted: () => void }) {
         <QueryDetail
           queryId={queryId}
           onQueryDeleted={handleQueryDeleted}
+          onQueryRenamed={onQueryRenamed}
         />
       ) : (
         <div className="h-full flex items-center justify-center">
@@ -54,7 +61,15 @@ function AppContent() {
   const currentPage = location.pathname.startsWith('/connections') ? 'connections' : 'queries';
   const [queryListKey, setQueryListKey] = useState(0);
 
+  // Extract queryId from pathname
+  const selectedQueryId = location.pathname.match(/^\/query\/([^/]+)$/)?.[1] || null;
+
   const handleQueryDeleted = () => {
+    // Force QueryList to reload by changing its key
+    setQueryListKey(prev => prev + 1);
+  };
+
+  const handleQueryRenamed = () => {
     // Force QueryList to reload by changing its key
     setQueryListKey(prev => prev + 1);
   };
@@ -72,7 +87,8 @@ function AppContent() {
           <div className="h-full border-r flex flex-col">
             <QueryList 
               key={queryListKey} 
-              currentPage={currentPage} 
+              currentPage={currentPage}
+              selectedQueryId={selectedQueryId}
               onDataCleared={handleDataCleared}
             />
           </div>
@@ -84,8 +100,8 @@ function AppContent() {
         <ResizablePanel defaultSize={85}>
           <div className="h-full flex flex-col overflow-hidden">
             <Routes>
-              <Route path="/" element={<QueryPage onQueryDeleted={handleQueryDeleted} />} />
-              <Route path="/query/:queryId" element={<QueryPage onQueryDeleted={handleQueryDeleted} />} />
+              <Route path="/" element={<QueryPage onQueryDeleted={handleQueryDeleted} onQueryRenamed={handleQueryRenamed} />} />
+              <Route path="/query/:queryId" element={<QueryPage onQueryDeleted={handleQueryDeleted} onQueryRenamed={handleQueryRenamed} />} />
               <Route path="/connections" element={<ConnectionsPage />} />
             </Routes>
           </div>

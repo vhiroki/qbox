@@ -50,7 +50,7 @@ async def get_query(query_id: str):
     return query
 
 
-@router.patch("/{query_id}/sql")
+@router.patch("/{query_id}/sql", response_model=Query)
 async def update_query_sql(query_id: str, request: QueryUpdateRequest):
     """Update the SQL text of a query."""
     query = query_repository.get_query(query_id)
@@ -61,7 +61,9 @@ async def update_query_sql(query_id: str, request: QueryUpdateRequest):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update query")
 
-    return {"success": True, "sql_text": request.sql_text}
+    # Return updated query
+    updated_query = query_repository.get_query(query_id)
+    return updated_query
 
 
 @router.patch("/{query_id}/name")

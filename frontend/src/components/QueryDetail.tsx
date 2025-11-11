@@ -56,11 +56,13 @@ import type {
 interface QueryDetailProps {
   queryId: string;
   onQueryDeleted: () => void;
+  onQueryRenamed?: () => void;
 }
 
 export default function QueryDetail({
   queryId,
   onQueryDeleted,
+  onQueryRenamed,
 }: QueryDetailProps) {
   const [query, setQuery] = useState<Query | null>(null);
   const [selections, setSelections] = useState<QueryTableSelection[]>([]);
@@ -167,6 +169,11 @@ export default function QueryDetail({
       setRenameDialogOpen(false);
       setNewQueryName("");
       setError(null);
+      
+      // Notify parent to refresh the query list
+      if (onQueryRenamed) {
+        onQueryRenamed();
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to rename query");
     } finally {

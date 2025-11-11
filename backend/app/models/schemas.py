@@ -103,53 +103,7 @@ class TableSchema(BaseModel):
     row_count: Optional[int] = None
 
 
-class Workspace(BaseModel):
-    """A workspace containing selected tables."""
-
-    id: str
-    name: str
-    created_at: str
-    updated_at: str
-
-
-class WorkspaceCreate(BaseModel):
-    """Request to create a new workspace."""
-
-    name: str
-
-
-class WorkspaceTableSelectionRequest(BaseModel):
-    """Request to add/remove a table from workspace."""
-
-    connection_id: str
-    schema_name: str
-    table_name: str
-
-
-class WorkspaceTableSelection(BaseModel):
-    """Represents a table selected in a workspace."""
-
-    workspace_id: str
-    connection_id: str
-    schema_name: str
-    table_name: str
-
-
-class WorkspaceSelections(BaseModel):
-    """All table selections in a workspace."""
-
-    workspace_id: str
-    selections: list[WorkspaceTableSelection]
-
-
-class WorkspaceMetadataExport(BaseModel):
-    """Metadata export for workspace selections."""
-
-    markdown: str
-    filename: str
-
-
-# Query Models (replaces Workspace concept)
+# Query Models
 
 
 class Query(BaseModel):
@@ -269,7 +223,7 @@ class QueryHistoryItem(BaseModel):
     """A query history item."""
 
     id: str
-    workspace_id: str
+    query_id: str
     prompt: str
     generated_sql: str
     executed_sql: Optional[str] = None
@@ -283,6 +237,6 @@ class QueryHistoryItem(BaseModel):
 class QueryHistoryList(BaseModel):
     """List of query history items."""
 
-    workspace_id: str
+    query_id: str
     queries: list[QueryHistoryItem]
     total: int

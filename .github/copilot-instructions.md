@@ -43,7 +43,7 @@ For detailed setup and usage instructions, see the [README](../README.md).
 - **Python 3.13+**: Modern Python features
 - **FastAPI**: Async web framework
 - **DuckDB**: Embedded analytical database (persistent instance at `~/.qbox/qbox.duckdb`)
-- **SQLite**: Local persistence for connections and workspace selections
+- **SQLite**: Local persistence for connections and query data
 - **uvicorn**: ASGI server
 - **uv**: Package management
 

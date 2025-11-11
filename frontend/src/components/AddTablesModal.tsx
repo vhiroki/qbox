@@ -18,13 +18,13 @@ import type { SavedConnection, ConnectionMetadata, SchemaMetadata } from '../typ
 interface AddTablesModalProps {
   open: boolean;
   onClose: () => void;
-  workspaceId: string; // Keep this name for backward compatibility with App.tsx
+  queryId: string;
   onTablesAdded: () => void;
 }
 
 type Step = 'connection' | 'schema' | 'tables';
 
-export default function AddTablesModal({ open, onClose, workspaceId: queryId, onTablesAdded }: AddTablesModalProps) {
+export default function AddTablesModal({ open, onClose, queryId, onTablesAdded }: AddTablesModalProps) {
   const [step, setStep] = useState<Step>('connection');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

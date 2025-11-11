@@ -1,4 +1,4 @@
-"""API endpoints for query operations (renamed from workspace)."""
+"""API endpoints for query operations."""
 
 import logging
 

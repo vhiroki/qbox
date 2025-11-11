@@ -234,7 +234,7 @@ EXPLANATION:
     async def generate_sql_from_prompt(
         self,
         prompt: str,
-        workspace_metadata: list[dict[str, Any]],
+        query_metadata: list[dict[str, Any]],
         additional_instructions: str | None = None,
     ) -> dict[str, str]:
         """
@@ -242,20 +242,20 @@ EXPLANATION:
 
         Args:
             prompt: Natural language query from user
-            workspace_metadata: List of table metadata from workspace
+            query_metadata: List of table metadata from query
             additional_instructions: Optional additional context
 
         Returns:
             Dictionary with 'sql' and 'explanation' keys
         """
-        schema_context = self._format_schema_context(workspace_metadata)
+        schema_context = self._format_schema_context(query_metadata)
         return await self.provider.generate_sql(prompt, schema_context, additional_instructions)
 
-    def _format_schema_context(self, workspace_metadata: list[dict[str, Any]]) -> str:
-        """Format workspace metadata into a schema context string."""
+    def _format_schema_context(self, query_metadata: list[dict[str, Any]]) -> str:
+        """Format query metadata into a schema context string."""
         context_parts = []
 
-        for table_meta in workspace_metadata:
+        for table_meta in query_metadata:
             connection_id = table_meta.get("connection_id", "unknown")
             connection_name = table_meta.get("connection_name", "unknown")
             schema_name = table_meta.get("schema_name", "public")

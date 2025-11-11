@@ -25,7 +25,7 @@ class QueryRepository:
     def _init_db(self):
         """Initialize the database schema."""
         with sqlite3.connect(self.db_path) as conn:
-            # Queries table (renamed from workspaces)
+            # Queries table
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS queries (
@@ -38,7 +38,7 @@ class QueryRepository:
             """
             )
 
-            # Query selections table (renamed from workspace_selections)
+            # Query selections table
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS query_selections (
@@ -88,7 +88,7 @@ class QueryRepository:
             conn.commit()
 
     def _migrate_from_workspaces(self, conn):
-        """Migrate data from old workspace tables to new query tables."""
+        """Migrate data from old tables to new query tables."""
         # Check if old tables exist
         cursor = conn.execute(
             """

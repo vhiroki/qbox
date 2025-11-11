@@ -555,7 +555,7 @@ export default function QueryDetail({
       <AddTablesModal
         open={addTablesModalOpen}
         onClose={() => setAddTablesModalOpen(false)}
-        workspaceId={queryId}
+        queryId={queryId}
         onTablesAdded={() => {
           // Reload query data to reflect new table selections
           loadQueryData();

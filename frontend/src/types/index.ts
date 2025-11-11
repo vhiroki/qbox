@@ -86,7 +86,7 @@ export interface QueryResult {
   error?: string;
 }
 
-// Query Models (replaces Workspace concept)
+// Query Models
 
 export interface Query {
   id: string;
@@ -134,36 +134,6 @@ export interface QueryUpdateRequest {
   sql_text: string;
 }
 
-// Legacy Workspace types (for backward compatibility during migration)
-
-export interface Workspace {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface WorkspaceCreate {
-  name: string;
-}
-
-export interface WorkspaceTableSelection {
-  workspace_id: string;
-  connection_id: string;
-  schema_name: string;
-  table_name: string;
-}
-
-export interface WorkspaceSelections {
-  workspace_id: string;
-  selections: WorkspaceTableSelection[];
-}
-
-export interface WorkspaceMetadataExport {
-  markdown: string;
-  filename: string;
-}
-
 // AI Query Types
 
 export interface AIQueryRequest {
@@ -194,7 +164,7 @@ export interface QueryExecutionResult {
 
 export interface QueryHistoryItem {
   id: string;
-  workspace_id: string;
+  query_id: string;
   prompt: string;
   generated_sql: string;
   executed_sql?: string;
@@ -206,7 +176,7 @@ export interface QueryHistoryItem {
 }
 
 export interface QueryHistoryList {
-  workspace_id: string;
+  query_id: string;
   queries: QueryHistoryItem[];
   total: number;
 }

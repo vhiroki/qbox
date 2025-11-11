@@ -17,7 +17,7 @@ QBox is a local data query application that helps you build and manage SQL queri
 
 - **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite
 - **Frontend**: React 18, TypeScript, Vite, TailwindCSS, shadcn/ui
-- **Data Storage**: SQLite (connections and workspace persistence), DuckDB (query execution)
+- **Data Storage**: SQLite (connections and query persistence), DuckDB (query execution)
 - **Package Management**: uv (Python), pnpm (Node.js)
 
 ## Prerequisites
@@ -44,7 +44,7 @@ npm install -g pnpm
 
 ### 2. Environment Setup
 
-No environment variables are required for basic operation. The application stores connection information and workspace selections in local SQLite databases at `~/.qbox/`.
+No environment variables are required for basic operation. The application stores connection information and query data in local SQLite databases at `~/.qbox/`.
 
 ### 3. Install Backend Dependencies
 

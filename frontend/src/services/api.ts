@@ -20,6 +20,9 @@ import type {
   SQLHistoryRestoreRequest,
   AISettings,
   AISettingsUpdate,
+  FileInfo,
+  FileUploadResponse,
+  FileMetadata,
 } from "../types";
 
 const API_BASE_URL = "/api";
@@ -245,5 +248,37 @@ export const api = {
 
   async clearAllData(): Promise<void> {
     await axios.post(`${API_BASE_URL}/settings/clear-all-data`);
+  },
+
+  // File endpoints
+  async uploadFile(file: File): Promise<FileUploadResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axios.post(`${API_BASE_URL}/files/upload`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  async listFiles(): Promise<FileInfo[]> {
+    const response = await axios.get(`${API_BASE_URL}/files/`);
+    return response.data;
+  },
+
+  async getFile(fileId: string): Promise<FileInfo> {
+    const response = await axios.get(`${API_BASE_URL}/files/${fileId}`);
+    return response.data;
+  },
+
+  async getFileMetadata(fileId: string): Promise<FileMetadata> {
+    const response = await axios.get(`${API_BASE_URL}/files/${fileId}/metadata`);
+    return response.data;
+  },
+
+  async deleteFile(fileId: string): Promise<void> {
+    await axios.delete(`${API_BASE_URL}/files/${fileId}`);
   },
 };

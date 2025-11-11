@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useConnectionStore } from "@/stores/useConnectionStore";
 import type { ConnectionMetadata, SchemaMetadata, TableMetadata, QueryTableSelection } from "@/types";
 
-interface DataSourcesTreeViewProps {
+interface ConnectionsTreeViewProps {
   selections: QueryTableSelection[];
   onSelectionChange: (
     connectionId: string,
@@ -23,10 +23,10 @@ interface ExpandedState {
   [key: string]: boolean;
 }
 
-export default function DataSourcesTreeView({
+export default function ConnectionsTreeView({
   selections,
   onSelectionChange,
-}: DataSourcesTreeViewProps) {
+}: ConnectionsTreeViewProps) {
   // Use Zustand store for cached metadata
   const loadAllMetadata = useConnectionStore((state) => state.loadAllMetadata);
   const storeError = useConnectionStore((state) => state.error);
@@ -66,12 +66,14 @@ export default function DataSourcesTreeView({
       const newExpanded: ExpandedState = { ...expanded };
 
       selections.forEach((selection) => {
-        const connectionKey = `connection:${selection.connection_id}`;
-        const schemaKey = `schema:${selection.connection_id}:${selection.schema_name}`;
+        if (selection.source_type === "connection") {
+          const connectionKey = `connection:${selection.connection_id}`;
+          const schemaKey = `schema:${selection.connection_id}:${selection.schema_name}`;
 
-        // Expand connection and schema if they have selected tables
-        newExpanded[connectionKey] = true;
-        newExpanded[schemaKey] = true;
+          // Expand connection and schema if they have selected tables
+          newExpanded[connectionKey] = true;
+          newExpanded[schemaKey] = true;
+        }
       });
 
       setExpanded(newExpanded);
@@ -104,7 +106,8 @@ export default function DataSourcesTreeView({
       (s) =>
         s.connection_id === connectionId &&
         s.schema_name === schemaName &&
-        s.table_name === tableName
+        s.table_name === tableName &&
+        s.source_type === "connection"
     );
   };
 
@@ -112,8 +115,7 @@ export default function DataSourcesTreeView({
     connectionId: string,
     schemaName: string,
     tableName: string,
-    currentlyChecked: boolean,
-    sourceType: string = "connection"
+    currentlyChecked: boolean
   ) => {
     const key = `${connectionId}:${schemaName}:${tableName}`;
     setTogglingTable(key);
@@ -124,7 +126,7 @@ export default function DataSourcesTreeView({
         schemaName,
         tableName,
         !currentlyChecked,
-        sourceType
+        "connection"
       );
     } finally {
       setTogglingTable(null);
@@ -170,7 +172,7 @@ export default function DataSourcesTreeView({
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
         <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        Loading data sources...
+        Loading connections...
       </div>
     );
   }
@@ -196,9 +198,8 @@ export default function DataSourcesTreeView({
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-1 pr-4">
-        {/* Database Connections Section */}
+    <ScrollArea className="h-full w-full">
+      <div className="space-y-1 pr-4 h-full">
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3 px-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -263,7 +264,7 @@ export default function DataSourcesTreeView({
               const connectionKey = `connection:${connection.connection_id}`;
               const isConnectionExpanded = expanded[connectionKey] || false;
               const hasSelectedTables = selections.some(
-                (s) => s.connection_id === connection.connection_id
+                (s) => s.connection_id === connection.connection_id && s.source_type === "connection"
               );
 
               return (
@@ -287,7 +288,7 @@ export default function DataSourcesTreeView({
                     </span>
                     {hasSelectedTables && (
                       <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                        {selections.filter((s) => s.connection_id === connection.connection_id).length}
+                        {selections.filter((s) => s.connection_id === connection.connection_id && s.source_type === "connection").length}
                       </span>
                     )}
                   </button>
@@ -346,8 +347,7 @@ export default function DataSourcesTreeView({
                                               connection.connection_id,
                                               schema.name,
                                               table.name,
-                                              isSelected,
-                                              "connection"
+                                              isSelected
                                             )
                                           }
                                           className="flex-shrink-0"

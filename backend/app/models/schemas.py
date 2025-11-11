@@ -316,3 +316,40 @@ class AISettingsUpdate(BaseModel):
     gemini_api_key: Optional[str] = None
     ai_model: Optional[str] = None
     ai_temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+
+
+# File Models
+
+
+class FileUploadResponse(BaseModel):
+    """Response after file upload."""
+
+    id: str
+    name: str
+    original_filename: str
+    file_type: str
+    size_bytes: int
+    created_at: str
+
+
+class FileInfo(BaseModel):
+    """File information."""
+
+    id: str
+    name: str
+    original_filename: str
+    file_type: str
+    size_bytes: int
+    created_at: str
+    updated_at: str
+
+
+class FileMetadata(BaseModel):
+    """File metadata with schema information."""
+
+    file_id: str
+    file_name: str
+    file_type: str
+    view_name: str
+    columns: list[ColumnMetadata]
+    row_count: Optional[int] = None

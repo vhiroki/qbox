@@ -36,7 +36,6 @@ export default function QueryList({
   const error = useQueryStore((state) => state.error);
   const loadQueries = useQueryStore((state) => state.loadQueries);
   const createQuery = useQueryStore((state) => state.createQuery);
-  const clearError = useQueryStore((state) => state.clearError);
 
   useEffect(() => {
     loadQueries();

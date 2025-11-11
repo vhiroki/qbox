@@ -193,9 +193,13 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
         # Get DuckDB manager
         duckdb = get_duckdb_manager()
 
-        # Attach all required connections
+        # Attach all required connections (skip files as they're already registered as views)
         attached_connections = set()
         for selection in selections:
+            # Skip files - they're already registered as views in DuckDB
+            if selection.source_type == "file":
+                continue
+                
             if selection.connection_id not in attached_connections:
                 # Get connection config
                 conn_config = connection_repository.get(selection.connection_id)
@@ -286,9 +290,13 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
         # Get DuckDB manager
         duckdb = get_duckdb_manager()
 
-        # Attach all required connections
+        # Attach all required connections (skip files as they're already registered as views)
         attached_connections = set()
         for selection in selections:
+            # Skip files - they're already registered as views in DuckDB
+            if selection.source_type == "file":
+                continue
+                
             if selection.connection_id not in attached_connections:
                 # Get connection config
                 conn_config = connection_repository.get(selection.connection_id)

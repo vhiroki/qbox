@@ -4,20 +4,11 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,15 +35,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useQueryStore, useConnectionStore } from "../stores";
+import { useQueryStore } from "../stores";
 import { api } from "../services/api";
 import ChatInterface from "./ChatInterface";
 import QueryResults from "./QueryResults";
 import SQLHistoryModal from "./SQLHistoryModal";
-import DataSourcesTreeView from "./DataSourcesTreeView";
-import type {
-  QueryTableSelection,
-} from "../types";
+import DataSourcesPanel from "./DataSourcesPanel";
 
 interface QueryDetailProps {
   queryId: string;
@@ -71,13 +59,9 @@ export default function QueryDetail({
   const deleteQuery = useQueryStore((state) => state.deleteQuery);
   const loadQuerySelections = useQueryStore((state) => state.loadQuerySelections);
   const querySelections = useQueryStore((state) => state.querySelections);
-  const removeQuerySelection = useQueryStore((state) => state.removeQuerySelection);
   const queryError = useQueryStore((state) => state.error);
   const isQueryLoading = useQueryStore((state) => state.isLoading);
   const setQueryError = useQueryStore((state) => state.setError);
-
-  const loadMetadata = useConnectionStore((state) => state.loadMetadata);
-  const connectionMetadata = useConnectionStore((state) => state.connectionMetadata);
 
   // Query execution state from store
   const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
@@ -179,6 +163,28 @@ export default function QueryDetail({
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || "Failed to update table selection";
       setQueryError(errorMsg);
+    }
+  };
+
+  const handleFileAdded = async (fileId: string, fileName: string) => {
+    // Auto-add file to query selections
+    await handleSelectionChange(fileId, fileName, fileName, true, "file");
+  };
+
+  const handleFileDeleted = async (fileId: string) => {
+    // Remove file from query selections
+    // Find the file in selections to get its schema_name and table_name
+    const fileSelection = selections.find(
+      (s) => s.source_type === "file" && s.connection_id === fileId
+    );
+    if (fileSelection) {
+      await handleSelectionChange(
+        fileId,
+        fileSelection.schema_name,
+        fileSelection.table_name,
+        false,
+        "file"
+      );
     }
   };
 
@@ -496,9 +502,11 @@ export default function QueryDetail({
                       </h3>
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <DataSourcesTreeView
+                      <DataSourcesPanel
                         selections={selections}
                         onSelectionChange={handleSelectionChange}
+                        onFileAdded={handleFileAdded}
+                        onFileDeleted={handleFileDeleted}
                       />
                     </div>
                   </div>

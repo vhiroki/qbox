@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import connections, metadata, query
+from app.api import connections, files, metadata, query
 from app.api import settings as settings_api
 from app.config.settings import get_settings
 
@@ -66,6 +66,7 @@ app.include_router(
 app.include_router(query.router, prefix="/api", tags=["queries"])
 app.include_router(metadata.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api", tags=["settings"])
+app.include_router(files.router, prefix="/api", tags=["files"])
 
 
 @app.get("/")

@@ -241,3 +241,33 @@ export interface AISettingsUpdate {
   ai_model?: string;
   ai_temperature?: number;
 }
+
+// File Types
+
+export interface FileInfo {
+  id: string;
+  name: string;
+  original_filename: string;
+  file_type: "csv" | "xlsx";
+  size_bytes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FileUploadResponse {
+  id: string;
+  name: string;
+  original_filename: string;
+  file_type: "csv" | "xlsx";
+  size_bytes: number;
+  created_at: string;
+}
+
+export interface FileMetadata {
+  file_id: string;
+  file_name: string;
+  file_type: "csv" | "xlsx";
+  view_name: string;
+  columns: ColumnMetadata[];
+  row_count?: number;
+}

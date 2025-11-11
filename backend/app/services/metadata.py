@@ -213,12 +213,13 @@ def get_metadata_service() -> MetadataService:
 
 async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
     """
-    Get metadata for all tables in a query.
+    Get metadata for all tables and files in a query.
 
-    Returns a list of dictionaries containing table metadata with:
-    - connection_id
-    - connection_name
-    - schema_name
+    Returns a list of dictionaries containing table/file metadata with:
+    - source_type: 'connection' or 'file'
+    - connection_id (for tables) or file_id (for files)
+    - connection_name or file_name
+    - schema_name (for tables)
     - table_name
     - columns (list of column metadata)
     - row_count
@@ -226,6 +227,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
     from collections import defaultdict
 
     from app.services.connection_repository import connection_repository
+    from app.services.file_repository import file_repository
     from app.services.query_repository import query_repository
 
     metadata_service = get_metadata_service()
@@ -239,9 +241,14 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
 
     query_metadata = []
 
+    # Separate selections by source type
+    connection_selections = [s for s in selections if s.source_type == "connection"]
+    file_selections = [s for s in selections if s.source_type == "file"]
+
+    # Process connection selections
     # Group selections by connection
     selections_by_connection = defaultdict(list)
-    for selection in selections:
+    for selection in connection_selections:
         selections_by_connection[selection.connection_id].append(selection)
 
     # For each connection, get table metadata
@@ -298,6 +305,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
 
                 query_metadata.append(
                     {
+                        "source_type": "connection",
                         "connection_id": connection_id,
                         "connection_name": connection_name,
                         "alias": alias,  # Include DuckDB alias for SQL generation
@@ -320,5 +328,47 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                 logger.error(f"Failed to get metadata for " f"{schema_name}.{table_name}: {e}")
                 # Continue with other tables
                 continue
+
+    # Process file selections
+    for selection in file_selections:
+        file_id = selection.connection_id  # For files, we store file_id in connection_id field
+        
+        try:
+            # Get file info
+            file_info = file_repository.get_file(file_id)
+            if not file_info:
+                logger.warning(f"File {file_id} not found, skipping")
+                continue
+            
+            # Get file metadata from DuckDB
+            file_metadata = duckdb_manager.get_file_metadata(file_id, file_info["name"])
+            
+            # Generate view name for SQL generation
+            view_name = f"file_{file_id.replace('-', '_')}"
+            
+            query_metadata.append(
+                {
+                    "source_type": "file",
+                    "file_id": file_id,
+                    "file_name": file_info["name"],
+                    "file_type": file_info["file_type"],
+                    "view_name": view_name,  # For SQL generation
+                    "table_name": file_info["name"],  # Use file name as table name
+                    "columns": [
+                        {
+                            "name": col.name,
+                            "type": col.type,
+                            "nullable": col.nullable,
+                            "is_primary_key": col.is_primary_key,
+                        }
+                        for col in file_metadata["columns"]
+                    ],
+                    "row_count": file_metadata.get("row_count"),
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to get metadata for file {file_id}: {e}")
+            continue
 
     return query_metadata

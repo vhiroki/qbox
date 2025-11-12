@@ -340,11 +340,14 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                 logger.warning(f"File {file_id} not found, skipping")
                 continue
             
-            # Get file metadata from DuckDB
-            file_metadata = duckdb_manager.get_file_metadata(file_id, file_info["name"])
+            # Get the stored view_name from file_info
+            view_name = file_info.get("view_name")
+            if not view_name:
+                logger.warning(f"File {file_id} has no view_name, skipping")
+                continue
             
-            # Generate view name for SQL generation
-            view_name = f"file_{file_id.replace('-', '_')}"
+            # Get file metadata from DuckDB using the stored view_name
+            file_metadata = duckdb_manager.get_file_metadata_by_view_name(view_name)
             
             query_metadata.append(
                 {

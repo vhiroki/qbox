@@ -198,8 +198,9 @@ DATABASE SCHEMA:
 INSTRUCTIONS:
 1. Generate a valid DuckDB SQL query based on the user's natural language request
 2. Use proper DuckDB syntax and functions
-3. Reference tables with their full schema-qualified names
-   (e.g., pg_connection_alias.schema_name.table_name)
+3. Reference data sources correctly:
+   - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
+   - For files: use ONLY the view name directly (e.g., file_sales or file_duplicatedstudentids)
 4. Be precise with column names and data types
 5. Add appropriate WHERE clauses, JOINs, GROUP BY, and ORDER BY as needed
 6. Optimize for readability and performance
@@ -253,7 +254,9 @@ INSTRUCTIONS:
 2. If the query is empty, create a new query based on the user's request
 3. If the query exists, edit it to incorporate the user's new requirements
 4. Use proper DuckDB syntax and functions
-5. Reference tables with their full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
+5. Reference data sources correctly:
+   - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
+   - For files: use ONLY the view name directly (e.g., file_sales or file_duplicatedstudentids)
 6. Preserve the user's manual edits unless they ask you to change them
 7. Return the COMPLETE updated SQL query, not just the changes
 
@@ -329,29 +332,51 @@ I cannot generate the SQL you requested because [explain what tables/columns are
         context_parts = []
 
         for table_meta in query_metadata:
-            connection_id = table_meta.get("connection_id", "unknown")
-            connection_name = table_meta.get("connection_name", "unknown")
-            schema_name = table_meta.get("schema_name", "public")
-            table_name = table_meta.get("table_name", "unknown")
+            source_type = table_meta.get("source_type", "connection")
             columns = table_meta.get("columns", [])
             row_count = table_meta.get("row_count", "unknown")
-
-            # Get the DuckDB alias (now human-readable from connection name)
-            alias = table_meta.get("alias", f"pg_{connection_id.replace('-', '_')}")
-
-            table_info = f"\nTable: {alias}.{schema_name}.{table_name}"
-            table_info += f"\nConnection: {connection_name}"
-            table_info += f"\nRow Count: {row_count}"
-            table_info += "\nColumns:"
-
-            for col in columns:
-                col_name = col.get("name", "")
-                col_type = col.get("type", "")
-                nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
-                is_pk = " (PRIMARY KEY)" if col.get("is_primary_key", False) else ""
-                table_info += f"\n  - {col_name}: {col_type} {nullable}{is_pk}"
-
-            context_parts.append(table_info)
+            
+            if source_type == "file":
+                # Format file metadata
+                view_name = table_meta.get("view_name", "unknown")
+                file_name = table_meta.get("file_name", "unknown")
+                file_type = table_meta.get("file_type", "unknown")
+                
+                table_info = f"\nFile: {view_name}"
+                table_info += f"\nOriginal File: {file_name}.{file_type}"
+                table_info += f"\nRow Count: {row_count}"
+                table_info += "\nColumns:"
+                
+                for col in columns:
+                    col_name = col.get("name", "")
+                    col_type = col.get("type", "")
+                    nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+                    table_info += f"\n  - {col_name}: {col_type} {nullable}"
+                
+                context_parts.append(table_info)
+            else:
+                # Format database table metadata
+                connection_id = table_meta.get("connection_id", "unknown")
+                connection_name = table_meta.get("connection_name", "unknown")
+                schema_name = table_meta.get("schema_name", "public")
+                table_name = table_meta.get("table_name", "unknown")
+                
+                # Get the DuckDB alias (now human-readable from connection name)
+                alias = table_meta.get("alias", f"pg_{connection_id.replace('-', '_')}")
+                
+                table_info = f"\nTable: {alias}.{schema_name}.{table_name}"
+                table_info += f"\nConnection: {connection_name}"
+                table_info += f"\nRow Count: {row_count}"
+                table_info += "\nColumns:"
+                
+                for col in columns:
+                    col_name = col.get("name", "")
+                    col_type = col.get("type", "")
+                    nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+                    is_pk = " (PRIMARY KEY)" if col.get("is_primary_key", False) else ""
+                    table_info += f"\n  - {col_name}: {col_type} {nullable}{is_pk}"
+                
+                context_parts.append(table_info)
 
         return "\n".join(context_parts)
 

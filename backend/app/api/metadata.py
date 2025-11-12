@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import ConnectionMetadata, TableMetadata
+from app.models.schemas import ConnectionMetadataLite, TableMetadata
 from app.services.connection_repository import connection_repository
 from app.services.metadata import get_metadata_service
 
@@ -12,12 +12,12 @@ router = APIRouter(prefix="/metadata", tags=["metadata"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/", response_model=list[ConnectionMetadata])
+@router.get("/", response_model=list[ConnectionMetadataLite])
 async def get_all_connections_metadata():
-    """Get metadata for all saved connections.
+    """Get lightweight metadata for all saved connections (table names only).
 
     Returns:
-        List of metadata for all connections
+        List of lightweight metadata for all connections
     """
     try:
         all_connections = connection_repository.get_all()
@@ -55,15 +55,15 @@ async def get_all_connections_metadata():
         )
 
 
-@router.get("/{connection_id}", response_model=ConnectionMetadata)
+@router.get("/{connection_id}", response_model=ConnectionMetadataLite)
 async def get_connection_metadata(connection_id: str):
-    """Get metadata for a specific connection.
+    """Get lightweight metadata for a specific connection (table names only).
 
     Args:
         connection_id: The connection identifier
 
     Returns:
-        Complete metadata including schemas, tables, and columns
+        Lightweight metadata including schemas and table names
     """
     # Get connection config from repository
     connection_config = connection_repository.get(connection_id)
@@ -90,15 +90,15 @@ async def get_connection_metadata(connection_id: str):
         )
 
 
-@router.post("/{connection_id}/refresh", response_model=ConnectionMetadata)
+@router.post("/{connection_id}/refresh", response_model=ConnectionMetadataLite)
 async def refresh_connection_metadata(connection_id: str):
-    """Manually refresh metadata for a connection.
+    """Manually refresh lightweight metadata for a connection.
 
     Args:
         connection_id: The connection identifier
 
     Returns:
-        Updated metadata
+        Updated lightweight metadata (table names only)
     """
     # Reuse the get endpoint logic (they're the same for now)
     return await get_connection_metadata(connection_id)

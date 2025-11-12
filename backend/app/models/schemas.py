@@ -107,7 +107,7 @@ class ColumnMetadata(BaseModel):
 
 
 class TableMetadata(BaseModel):
-    """Table metadata information."""
+    """Table metadata information (full details)."""
 
     name: str
     schema_name: Optional[str] = None
@@ -116,20 +116,27 @@ class TableMetadata(BaseModel):
     description: Optional[str] = None
 
 
-class SchemaMetadata(BaseModel):
-    """Schema metadata information."""
+class TableMetadataLite(BaseModel):
+    """Lightweight table metadata (name only) for list endpoints."""
 
     name: str
-    tables: list[TableMetadata]
+    schema_name: Optional[str] = None
 
 
-class ConnectionMetadata(BaseModel):
-    """Complete metadata for a connection."""
+class SchemaMetadataLite(BaseModel):
+    """Lightweight schema metadata for list endpoints."""
+
+    name: str
+    tables: list[TableMetadataLite]
+
+
+class ConnectionMetadataLite(BaseModel):
+    """Lightweight connection metadata for list endpoints."""
 
     connection_id: str
     connection_name: str
     source_type: DataSourceType
-    schemas: list[SchemaMetadata]
+    schemas: list[SchemaMetadataLite]
     last_updated: Optional[str] = None
 
 

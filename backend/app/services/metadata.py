@@ -6,13 +6,13 @@ from typing import Any, Optional
 
 from app.models.schemas import (
     ColumnMetadata,
-    ConnectionMetadata,
+    ConnectionMetadataLite,
     DataSourceType,
     PostgresConnectionConfig,
-    SchemaMetadata,
     TableMetadata,
 )
 from app.services.duckdb_manager import get_duckdb_manager
+from app.services.metadata_collectors import PostgresMetadataCollector
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ class MetadataService:
         connection_id: str,
         connection_name: str,
         config: PostgresConnectionConfig,
-    ) -> ConnectionMetadata:
-        """Collect metadata from a PostgreSQL database.
+    ) -> ConnectionMetadataLite:
+        """Collect lightweight metadata from a PostgreSQL database using native connection.
 
         Args:
             connection_id: Unique connection identifier
@@ -37,168 +37,22 @@ class MetadataService:
             config: PostgreSQL connection configuration
 
         Returns:
-            Complete metadata for the connection
+            Lightweight metadata for the connection (table names only)
         """
         try:
-            # Attach the database (custom_alias is None here since it's part of connection config)
-            # This is called from API with just PostgresConnectionConfig, not the full ConnectionConfig
-            alias = self.duckdb_manager.attach_postgres(
-                connection_id, connection_name, config, custom_alias=None
-            )
-
-            # Get schema information
-            schemas = await self._get_postgres_schemas(alias, config.schema_names)
-
-            return ConnectionMetadata(
-                connection_id=connection_id,
-                connection_name=connection_name,
-                source_type=DataSourceType.POSTGRES,
-                schemas=schemas,
-                last_updated=datetime.utcnow().isoformat(),
-            )
+            # Use native PostgreSQL collector (no DuckDB attachment needed for metadata)
+            collector = PostgresMetadataCollector(config)
+            metadata = await collector.collect_metadata(connection_id, connection_name)
+            
+            # Set timestamp
+            metadata.last_updated = datetime.utcnow().isoformat()
+            
+            return metadata
 
         except Exception as e:
             logger.error(f"Failed to collect PostgreSQL metadata: {e}")
             raise
 
-    async def _get_postgres_schemas(
-        self, alias: str, schema_filters: Optional[list[str]] = None
-    ) -> list[SchemaMetadata]:
-        """Get schemas and tables from PostgreSQL.
-        
-        Args:
-            alias: DuckDB database alias
-            schema_filters: List of schema names to filter by. If None or empty, gets all schemas.
-        """
-        conn = self.duckdb_manager.connect()
-
-        # Use DuckDB's system tables to get schemas for this specific database
-        if schema_filters and len(schema_filters) > 0:
-            # Filter by specific schemas
-            schema_list = "', '".join(schema_filters)
-            schema_query = f"""
-                SELECT DISTINCT schema_name
-                FROM duckdb_schemas()
-                WHERE database_name = '{alias}'
-                AND schema_name IN ('{schema_list}')
-                AND schema_name NOT IN ('information_schema', 'pg_catalog')
-            """
-        else:
-            # Get all schemas
-            schema_query = f"""
-                SELECT DISTINCT schema_name
-                FROM duckdb_schemas()
-                WHERE database_name = '{alias}'
-                AND schema_name NOT IN ('information_schema', 'pg_catalog')
-            """
-
-        result = conn.execute(schema_query)
-        schema_names = [row[0] for row in result.fetchall()]
-
-        schemas = []
-        for schema_name in schema_names:
-            tables = await self._get_postgres_tables(alias, schema_name)
-            if tables:  # Only include schemas with tables
-                schemas.append(SchemaMetadata(name=schema_name, tables=tables))
-
-        return schemas
-
-    async def _get_postgres_tables(
-        self, alias: str, schema_name: str, include_details: bool = False
-    ) -> list[TableMetadata]:
-        """Get tables for a specific schema.
-        
-        Args:
-            alias: DuckDB database alias
-            schema_name: Schema name
-            include_details: If True, includes columns and row counts. If False, only table names.
-        """
-        conn = self.duckdb_manager.connect()
-
-        # Use DuckDB's system tables to get tables for this specific database and schema
-        tables_query = f"""
-            SELECT DISTINCT table_name
-            FROM duckdb_tables()
-            WHERE database_name = '{alias}'
-            AND schema_name = '{schema_name}'
-            ORDER BY table_name
-        """
-
-        result = conn.execute(tables_query)
-        table_names = [row[0] for row in result.fetchall()]
-
-        tables = []
-        for table_name in table_names:
-            if include_details:
-                # Load full details (columns + row count)
-                columns = await self._get_postgres_columns(alias, schema_name, table_name)
-
-                # Get row count
-                try:
-                    count_query = f"SELECT COUNT(*) FROM {alias}." f"{schema_name}.{table_name}"
-                    count_result = conn.execute(count_query)
-                    row_count = count_result.fetchone()[0]
-                except Exception as e:
-                    logger.warning(f"Could not get row count for " f"{schema_name}.{table_name}: {e}")
-                    row_count = None
-
-                tables.append(
-                    TableMetadata(
-                        name=table_name,
-                        schema_name=schema_name,
-                        columns=columns,
-                        row_count=row_count,
-                    )
-                )
-            else:
-                # Lightweight: only table name
-                tables.append(
-                    TableMetadata(
-                        name=table_name,
-                        schema_name=schema_name,
-                        columns=None,  # Will be loaded on-demand
-                        row_count=None,
-                    )
-                )
-
-        return tables
-
-    async def _get_postgres_columns(
-        self, alias: str, schema_name: str, table_name: str
-    ) -> list[ColumnMetadata]:
-        """Get column information for a specific table."""
-        conn = self.duckdb_manager.connect()
-
-        # Use DuckDB's system tables to get columns for this specific table
-        columns_query = f"""
-            SELECT
-                column_name,
-                data_type,
-                is_nullable,
-                false as is_primary_key
-            FROM duckdb_columns()
-            WHERE database_name = '{alias}'
-            AND schema_name = '{schema_name}'
-            AND table_name = '{table_name}'
-            ORDER BY column_index
-        """
-
-        result = conn.execute(columns_query)
-        rows = result.fetchall()
-
-        columns = []
-        for row in rows:
-            column_name, data_type, is_nullable, is_pk = row
-            columns.append(
-                ColumnMetadata(
-                    name=column_name,
-                    type=data_type,
-                    nullable=bool(is_nullable),  # DuckDB returns boolean
-                    is_primary_key=bool(is_pk),
-                )
-            )
-
-        return columns
 
     async def get_table_details(
         self,
@@ -209,7 +63,7 @@ class MetadataService:
         schema_name: str,
         table_name: str,
     ) -> TableMetadata:
-        """Get detailed metadata for a specific table.
+        """Get detailed metadata for a specific table using native connection.
 
         Args:
             connection_id: Connection identifier
@@ -225,30 +79,9 @@ class MetadataService:
         if source_type == DataSourceType.POSTGRES:
             postgres_config = PostgresConnectionConfig(**config)
             
-            # Attach the database
-            alias = self.duckdb_manager.attach_postgres(
-                connection_id, connection_name, postgres_config, custom_alias=None
-            )
-            
-            # Get columns
-            columns = await self._get_postgres_columns(alias, schema_name, table_name)
-            
-            # Get row count
-            conn = self.duckdb_manager.connect()
-            try:
-                count_query = f"SELECT COUNT(*) FROM {alias}.{schema_name}.{table_name}"
-                count_result = conn.execute(count_query)
-                row_count = count_result.fetchone()[0]
-            except Exception as e:
-                logger.warning(f"Could not get row count for {schema_name}.{table_name}: {e}")
-                row_count = None
-            
-            return TableMetadata(
-                name=table_name,
-                schema_name=schema_name,
-                columns=columns,
-                row_count=row_count,
-            )
+            # Use native PostgreSQL collector (no DuckDB needed for metadata)
+            collector = PostgresMetadataCollector(postgres_config)
+            return await collector.get_table_details(schema_name, table_name)
         else:
             raise NotImplementedError(f"Table details not implemented for {source_type}")
 
@@ -258,8 +91,8 @@ class MetadataService:
         connection_name: str,
         source_type: DataSourceType,
         config: dict[str, Any],
-    ) -> ConnectionMetadata:
-        """Refresh metadata for a connection.
+    ) -> ConnectionMetadataLite:
+        """Refresh lightweight metadata for a connection.
 
         Args:
             connection_id: Connection identifier
@@ -268,7 +101,7 @@ class MetadataService:
             config: Connection configuration
 
         Returns:
-            Updated metadata
+            Updated lightweight metadata (table names only)
         """
         if source_type == DataSourceType.POSTGRES:
             postgres_config = PostgresConnectionConfig(**config)
@@ -342,22 +175,27 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
         # Get connection name from the config object
         connection_name = connection_config.name
 
-        # Check if catalog exists in DuckDB, if not, try to attach it
+        # Attach to DuckDB for query execution (this is needed for running queries)
+        # The attachment is now cached, so this is a cheap operation after the first time
         try:
             # Parse connection config
             from app.models.schemas import PostgresConnectionConfig
             # connection_config is a ConnectionConfig object, access .config attribute
             postgres_config = PostgresConnectionConfig(**connection_config.config)
             
-            # Attach (or re-attach) the connection - this will detach if already exists
+            # Attach the connection to DuckDB (needed for query execution)
             # Use custom alias from connection_config if available
             alias = duckdb_manager.attach_postgres(
                 connection_id, connection_name, postgres_config, 
                 custom_alias=connection_config.alias
             )
+            
+            # Create native collector for metadata (faster than querying DuckDB)
+            collector = PostgresMetadataCollector(postgres_config)
+            
         except Exception as e:
-            logger.error(f"Failed to attach connection {connection_id}: {e}")
-            # Skip this entire connection if we can't attach it
+            logger.error(f"Failed to prepare connection {connection_id}: {e}")
+            # Skip this entire connection if we can't set it up
             continue
 
         # For each table selection in this connection
@@ -366,22 +204,8 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
             table_name = selection.table_name
 
             try:
-                # Get columns for this table
-                columns = await metadata_service._get_postgres_columns(
-                    alias, schema_name, table_name
-                )
-
-                # Get row count
-                conn = duckdb_manager.connect()
-                try:
-                    count_query = f"SELECT COUNT(*) FROM {alias}." f"{schema_name}.{table_name}"
-                    count_result = conn.execute(count_query)
-                    row_count = count_result.fetchone()[0]
-                except Exception as e:
-                    logger.warning(
-                        f"Could not get row count for " f"{schema_name}.{table_name}: {e}"
-                    )
-                    row_count = None
+                # Get metadata using native collector (no DuckDB queries needed)
+                table_details = await collector.get_table_details(schema_name, table_name)
 
                 query_metadata.append(
                     {
@@ -398,9 +222,9 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                                 "nullable": col.nullable,
                                 "is_primary_key": col.is_primary_key,
                             }
-                            for col in columns
+                            for col in table_details.columns
                         ],
-                        "row_count": row_count,
+                        "row_count": table_details.row_count,
                     }
                 )
 

@@ -155,6 +155,7 @@ async def remove_query_selection(query_id: str, selection: QueryTableSelectionRe
             selection.connection_id,
             selection.schema_name,
             selection.table_name,
+            selection.source_type,
         )
         if not success:
             raise HTTPException(status_code=404, detail="Table not found")

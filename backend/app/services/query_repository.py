@@ -317,7 +317,7 @@ class QueryRepository:
             conn.commit()
 
     def remove_table_selection(
-        self, query_id: str, connection_id: str, schema_name: str, table_name: str
+        self, query_id: str, connection_id: str, schema_name: str, table_name: str, source_type: str = "connection"
     ) -> bool:
         """Remove a table from query selections."""
         now = datetime.now().isoformat()
@@ -327,9 +327,9 @@ class QueryRepository:
                 """
                 DELETE FROM query_selections
                 WHERE query_id = ? AND connection_id = ? 
-                    AND schema_name = ? AND table_name = ?
+                    AND schema_name = ? AND table_name = ? AND source_type = ?
                 """,
-                (query_id, connection_id, schema_name, table_name),
+                (query_id, connection_id, schema_name, table_name, source_type),
             )
             # Update query updated_at
             conn.execute(

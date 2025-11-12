@@ -11,6 +11,7 @@ from app.models.schemas import (
     TableSchema,
 )
 from app.services.connection_repository import connection_repository
+from app.services.duckdb_manager import get_duckdb_manager
 from app.services.query_repository import query_repository
 
 
@@ -282,6 +283,10 @@ class ConnectionManager:
             del self.connections[connection_id]
 
         if delete_saved:
+            # Detach from persistent DuckDB if attached
+            duckdb_manager = get_duckdb_manager()
+            duckdb_manager.detach_by_connection_id(connection_id)
+            
             # Delete all query selections that reference this connection
             query_repository.delete_selections_by_connection(connection_id)
             
@@ -344,6 +349,10 @@ class ConnectionManager:
         if connection_id in self.connections:
             self.connections[connection_id].duckdb_conn = None
             del self.connections[connection_id]
+        
+        # Force detach from persistent DuckDB so it will be re-attached with new config
+        duckdb_manager = get_duckdb_manager()
+        duckdb_manager.detach_by_connection_id(connection_id)
 
         return True, "Connection updated successfully"
 

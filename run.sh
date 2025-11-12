@@ -19,7 +19,9 @@ trap cleanup EXIT INT TERM
 echo "Starting backend server on http://localhost:8080..."
 cd backend
 source .venv/bin/activate
-uvicorn app.main:app --reload --port 8080 &
+# Single worker mode to avoid DuckDB concurrency issues
+# DuckDB supports only one writer process at a time
+uvicorn app.main:app --reload --port 8080 --workers 1 &
 BACKEND_PID=$!
 cd ..
 

@@ -25,6 +25,10 @@ class DuckDBManager:
 
         self.db_path = db_path
         self.conn: Optional[duckdb.DuckDBPyConnection] = None
+        # Cache of attached connections: {connection_id: alias}
+        self._attached_connections: dict[str, str] = {}
+        # Cache of registered files: {file_id: view_name}
+        self._registered_files: dict[str, str] = {}
         logger.info(f"DuckDB database path: {self.db_path}")
 
     def connect(self) -> duckdb.DuckDBPyConnection:
@@ -32,8 +36,37 @@ class DuckDBManager:
         if self.conn is None:
             self.conn = duckdb.connect(str(self.db_path))
             self._install_extensions()
+            self._sync_cache_with_duckdb()
             logger.info("Connected to persistent DuckDB instance")
         return self.conn
+    
+    def _sync_cache_with_duckdb(self) -> None:
+        """Sync the attachment cache with actual DuckDB state.
+        
+        This is called on connection to populate the cache with any
+        connections that were already attached in the persistent database.
+        """
+        if not self.conn:
+            return
+        
+        try:
+            # Get all currently attached databases
+            result = self.conn.execute("SELECT database_name FROM duckdb_databases()")
+            databases = result.fetchall()
+            
+            # Filter for postgres connections (start with pg_)
+            for (db_name,) in databases:
+                if db_name.startswith('pg_') and db_name != 'pg_catalog':
+                    # We can't reconstruct the original connection_id reliably from alias alone
+                    # So we'll just log that connections exist, but won't add to cache
+                    # The cache will be populated as connections are used
+                    logger.debug(f"Found existing attached database: {db_name}")
+            
+            # Note: For files (views), we'd need to query duckdb_views()
+            # But views are cheap to recreate, so we'll let them be re-registered as needed
+            
+        except Exception as e:
+            logger.warning(f"Could not sync cache with DuckDB state: {e}")
 
     def _install_extensions(self) -> None:
         """Install and load necessary DuckDB extensions."""
@@ -80,14 +113,37 @@ class DuckDBManager:
         
         return alias
 
+    def is_attached(self, connection_id: str) -> bool:
+        """Check if a connection is already attached.
+        
+        Args:
+            connection_id: Unique identifier for the connection
+            
+        Returns:
+            True if connection is attached, False otherwise
+        """
+        return connection_id in self._attached_connections
+    
+    def get_attached_alias(self, connection_id: str) -> Optional[str]:
+        """Get the alias for an attached connection.
+        
+        Args:
+            connection_id: Unique identifier for the connection
+            
+        Returns:
+            The alias if attached, None otherwise
+        """
+        return self._attached_connections.get(connection_id)
+
     def attach_postgres(
         self,
         connection_id: str,
         connection_name: str,
         config: PostgresConnectionConfig,
         custom_alias: Optional[str] = None,
+        force_reattach: bool = False,
     ) -> str:
-        """Attach a PostgreSQL database to DuckDB.
+        """Attach a PostgreSQL database to DuckDB (idempotent).
 
         Args:
             connection_id: Unique identifier for this connection
@@ -95,10 +151,17 @@ class DuckDBManager:
             config: PostgreSQL connection configuration
             custom_alias: Optional custom alias (if set by user)
                          Falls back to auto-generated from connection_name
+            force_reattach: If True, detaches and re-attaches even if already attached
 
         Returns:
             The alias used for the attachment
         """
+        # Check if already attached (unless forced to reattach)
+        if not force_reattach and connection_id in self._attached_connections:
+            cached_alias = self._attached_connections[connection_id]
+            logger.debug(f"Connection {connection_id} already attached as '{cached_alias}'")
+            return cached_alias
+        
         conn = self.connect()
         # Use custom alias if provided, otherwise generate from connection name
         if custom_alias:
@@ -106,9 +169,10 @@ class DuckDBManager:
         else:
             alias = self._sanitize_alias(connection_name, connection_id)
 
-        # Detach if already exists
+        # Detach if already exists (in case of reattach or stale state)
         try:
             conn.execute(f"DETACH {alias}")
+            logger.debug(f"Detached existing connection: {alias}")
         except Exception:
             pass  # Ignore if doesn't exist
 
@@ -138,19 +202,41 @@ class DuckDBManager:
 
         try:
             conn.execute(attach_query)
-            logger.info(f"Attached PostgreSQL database as '{alias}'")
+            # Cache the attachment
+            self._attached_connections[connection_id] = alias
+            logger.info(f"Attached PostgreSQL database as '{alias}' (cached)")
             return alias
         except Exception as e:
             logger.error(f"Failed to attach PostgreSQL: {e}")
             raise
 
+    def detach_by_connection_id(self, connection_id: str) -> None:
+        """Detach a connection by its connection_id.
+        
+        Args:
+            connection_id: Unique identifier for the connection
+        """
+        if connection_id in self._attached_connections:
+            alias = self._attached_connections[connection_id]
+            self.detach_source(alias)
+        else:
+            logger.debug(f"Connection {connection_id} not attached, nothing to detach")
+    
     def detach_source(self, alias: str) -> None:
-        """Detach a data source from DuckDB."""
+        """Detach a data source from DuckDB by alias and remove from cache."""
         if not self.conn:
             return
 
         try:
             self.conn.execute(f"DETACH {alias}")
+            # Remove from cache
+            connection_id_to_remove = None
+            for conn_id, cached_alias in self._attached_connections.items():
+                if cached_alias == alias:
+                    connection_id_to_remove = conn_id
+                    break
+            if connection_id_to_remove:
+                del self._attached_connections[connection_id_to_remove]
             logger.info(f"Detached source: {alias}")
         except Exception as e:
             logger.warning(f"Could not detach {alias}: {e}")
@@ -185,7 +271,7 @@ class DuckDBManager:
             return []
 
     def register_file(self, file_id: str, file_name: str, file_path: str, file_type: str) -> str:
-        """Register a CSV or Excel file as a view in DuckDB.
+        """Register a CSV or Excel file as a view in DuckDB (idempotent).
         
         Args:
             file_id: Unique identifier for the file
@@ -196,6 +282,12 @@ class DuckDBManager:
         Returns:
             The view name that was created
         """
+        # Check if already registered
+        if file_id in self._registered_files:
+            cached_view = self._registered_files[file_id]
+            logger.debug(f"File {file_id} already registered as view '{cached_view}'")
+            return cached_view
+        
         conn = self.connect()
         
         # Create human-readable view name from file name
@@ -237,7 +329,9 @@ class DuckDBManager:
                 raise ValueError(f"Unsupported file type: {file_type}")
             
             conn.execute(create_view_query)
-            logger.info(f"Registered {file_type} file as view: {view_name}")
+            # Cache the registration
+            self._registered_files[file_id] = view_name
+            logger.info(f"Registered {file_type} file as view: {view_name} (cached)")
             return view_name
             
         except Exception as e:
@@ -279,7 +373,7 @@ class DuckDBManager:
         return view_name
 
     def unregister_file(self, file_id: str, file_name: str) -> None:
-        """Unregister a file from DuckDB (fallback for old files).
+        """Unregister a file from DuckDB and remove from cache.
         
         Args:
             file_id: Unique identifier for the file
@@ -291,9 +385,12 @@ class DuckDBManager:
         # Get the view name using the same logic as register_file
         view_name = self.get_file_view_name(file_id, file_name)
         self.unregister_file_by_view_name(view_name)
+        # Remove from cache
+        if file_id in self._registered_files:
+            del self._registered_files[file_id]
     
     def unregister_file_by_view_name(self, view_name: str) -> None:
-        """Unregister a file from DuckDB by view name.
+        """Unregister a file from DuckDB by view name and remove from cache.
         
         Args:
             view_name: The view name to drop
@@ -303,6 +400,14 @@ class DuckDBManager:
         
         try:
             self.conn.execute(f"DROP VIEW IF EXISTS {view_name}")
+            # Remove from cache by view name
+            file_id_to_remove = None
+            for fid, cached_view in self._registered_files.items():
+                if cached_view == view_name:
+                    file_id_to_remove = fid
+                    break
+            if file_id_to_remove:
+                del self._registered_files[file_id_to_remove]
             logger.info(f"Unregistered file view: {view_name}")
         except Exception as e:
             logger.warning(f"Could not unregister view {view_name}: {e}")
@@ -364,11 +469,14 @@ class DuckDBManager:
             raise
 
     def close(self) -> None:
-        """Close the DuckDB connection."""
+        """Close the DuckDB connection and clear caches."""
         if self.conn:
             self.conn.close()
             self.conn = None
-            logger.info("Closed DuckDB connection")
+            # Clear caches since connection is closed
+            self._attached_connections.clear()
+            self._registered_files.clear()
+            logger.info("Closed DuckDB connection and cleared caches")
 
 
 # Global DuckDB manager instance

@@ -130,6 +130,9 @@ export default function QueryDetail({
 
   // Load file info for file selections to get view names
   useEffect(() => {
+    // Don't run if query doesn't exist (e.g., after deletion)
+    if (!query) return;
+
     const loadFileInfo = async () => {
       const fileSelections = selections.filter((s) => s.source_type === "file");
       if (fileSelections.length === 0) {
@@ -157,10 +160,13 @@ export default function QueryDetail({
     };
 
     loadFileInfo();
-  }, [selections]);
+  }, [query, selections]);
 
   // Load connection info for database selections to get aliases
   useEffect(() => {
+    // Don't run if query doesn't exist (e.g., after deletion)
+    if (!query) return;
+
     const loadConnectionInfo = async () => {
       const connectionSelections = selections.filter((s) => s.source_type === "connection");
       if (connectionSelections.length === 0) {
@@ -189,7 +195,7 @@ export default function QueryDetail({
     };
 
     loadConnectionInfo();
-  }, [selections]);
+  }, [query, selections]);
 
   useEffect(() => {
     if (query) {
@@ -473,15 +479,15 @@ export default function QueryDetail({
     });
   };
 
-  if (isQueryLoading && !query) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-muted-foreground">Loading query...</div>
-      </div>
-    );
-  }
-
+  // Early return if query doesn't exist - prevents infinite loops and errors after deletion
   if (!query) {
+    if (isQueryLoading) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-muted-foreground">Loading query...</div>
+        </div>
+      );
+    }
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-muted-foreground">Query not found</div>

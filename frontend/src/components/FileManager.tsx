@@ -1,13 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
 import { Upload, FileText, Trash2, Loader2, ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { api } from "@/services/api";
 import type { FileInfo, FileMetadata } from "@/types";
 
 interface FileManagerProps {
   selectedFiles: string[]; // List of file IDs that are selected
-  onFileAdded?: (fileId: string, fileName: string) => Promise<void>; // Called when a file is uploaded
+  onSelectionChange?: (fileId: string, fileName: string, checked: boolean) => Promise<void>; // Called when checkbox is toggled
   onFileDeleted?: (fileId: string) => Promise<void>; // Called when a file is deleted
 }
 
@@ -15,7 +26,7 @@ interface ExpandedState {
   [key: string]: boolean;
 }
 
-export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted }: FileManagerProps) {
+export default function FileManager({ selectedFiles, onSelectionChange, onFileDeleted }: FileManagerProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -25,6 +36,8 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
   const [expandedSchemas, setExpandedSchemas] = useState<ExpandedState>({});
   const [loadingMetadata, setLoadingMetadata] = useState<Set<string>>(new Set());
   const [copiedViewName, setCopiedViewName] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Load files on mount
   useEffect(() => {
@@ -80,10 +93,10 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
       await loadFiles();
 
       // Auto-add uploaded files to the query
-      if (onFileAdded) {
+      if (onSelectionChange) {
         for (const uploadedFile of uploadedFiles) {
           try {
-            await onFileAdded(uploadedFile.id, uploadedFile.name);
+            await onSelectionChange(uploadedFile.id, uploadedFile.name, true);
           } catch (err: any) {
             console.error(`Failed to add file ${uploadedFile.name} to query:`, err);
           }
@@ -96,18 +109,29 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
     }
   };
 
-  const handleDeleteFile = async (fileId: string) => {
+  const handleDeleteClick = (fileId: string, fileName: string) => {
+    setFileToDelete({ id: fileId, name: fileName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!fileToDelete) return;
+
     try {
-      await api.deleteFile(fileId);
+      await api.deleteFile(fileToDelete.id);
       
       // Notify parent if file was in selections (so it can be removed)
-      if (onFileDeleted && selectedFiles.includes(fileId)) {
-        await onFileDeleted(fileId);
+      if (onFileDeleted && selectedFiles.includes(fileToDelete.id)) {
+        await onFileDeleted(fileToDelete.id);
       }
       
       await loadFiles();
+      setDeleteDialogOpen(false);
+      setFileToDelete(null);
     } catch (err: any) {
       setError(err.message || "Failed to delete file");
+      setDeleteDialogOpen(false);
+      setFileToDelete(null);
     }
   };
 
@@ -282,6 +306,17 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
               >
                 {/* File Header */}
                 <div className="p-3 flex items-center gap-3">
+                  {/* Checkbox */}
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={async (checked) => {
+                      if (onSelectionChange) {
+                        await onSelectionChange(file.id, file.name, checked === true);
+                      }
+                    }}
+                    className="flex-shrink-0"
+                  />
+                  
                   {metadata && (
                     <button
                       onClick={() => toggleSchemaExpansion(file.id)}
@@ -347,7 +382,7 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDeleteFile(file.id)}
+                    onClick={() => handleDeleteClick(file.id, file.name)}
                     className="h-7 px-2"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -383,6 +418,24 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
           })}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete File</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{fileToDelete?.name}"? This will permanently remove the file from the system and from all queries. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

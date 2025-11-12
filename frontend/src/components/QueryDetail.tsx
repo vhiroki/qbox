@@ -72,6 +72,14 @@ export default function QueryDetail({
   // Local UI state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [removeSelectionDialogOpen, setRemoveSelectionDialogOpen] = useState(false);
+  const [selectionToRemove, setSelectionToRemove] = useState<{
+    connectionId: string;
+    schemaName: string;
+    tableName: string;
+    sourceType: string;
+    label: string;
+  } | null>(null);
   const [newQueryName, setNewQueryName] = useState("");
   const [sqlText, setSqlText] = useState("");
   const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
@@ -250,9 +258,36 @@ export default function QueryDetail({
     }
   };
 
-  const handleFileAdded = async (fileId: string, fileName: string) => {
-    // Auto-add file to query selections
-    await handleSelectionChange(fileId, fileName, fileName, true, "file");
+  const handleRemoveSelectionClick = (
+    connectionId: string,
+    schemaName: string,
+    tableName: string,
+    sourceType: string,
+    label: string
+  ) => {
+    setSelectionToRemove({
+      connectionId,
+      schemaName,
+      tableName,
+      sourceType,
+      label,
+    });
+    setRemoveSelectionDialogOpen(true);
+  };
+
+  const handleConfirmRemoveSelection = async () => {
+    if (!selectionToRemove) return;
+
+    await handleSelectionChange(
+      selectionToRemove.connectionId,
+      selectionToRemove.schemaName,
+      selectionToRemove.tableName,
+      false,
+      selectionToRemove.sourceType
+    );
+
+    setRemoveSelectionDialogOpen(false);
+    setSelectionToRemove(null);
   };
 
   const handleFileDeleted = async (fileId: string) => {
@@ -622,15 +657,15 @@ export default function QueryDetail({
                                   )}
                                 </button>
                                 <button
-                                  onClick={async () => {
-                                    await handleSelectionChange(
+                                  onClick={() =>
+                                    handleRemoveSelectionClick(
                                       selection.connection_id,
                                       selection.schema_name,
                                       selection.table_name,
-                                      false,
-                                      selection.source_type
-                                    );
-                                  }}
+                                      selection.source_type,
+                                      label
+                                    )
+                                  }
                                   className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
                                   aria-label={`Remove ${label}`}
                                   title="Remove table"
@@ -647,7 +682,6 @@ export default function QueryDetail({
                       <DataSourcesPanel
                         selections={selections}
                         onSelectionChange={handleSelectionChange}
-                        onFileAdded={handleFileAdded}
                         onFileDeleted={handleFileDeleted}
                       />
                     </div>
@@ -716,7 +750,7 @@ export default function QueryDetail({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Query Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -730,6 +764,24 @@ export default function QueryDetail({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteQuery} disabled={isQueryLoading}>
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Table Selection Confirmation Dialog */}
+      <AlertDialog open={removeSelectionDialogOpen} onOpenChange={setRemoveSelectionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Table</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove "{selectionToRemove?.label}" from this query?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRemoveSelection} disabled={isQueryLoading}>
+              Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

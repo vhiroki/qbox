@@ -15,14 +15,12 @@ interface DataSourcesPanelProps {
     checked: boolean,
     sourceType: string
   ) => Promise<void>;
-  onFileAdded?: (fileId: string, fileName: string) => Promise<void>;
   onFileDeleted?: (fileId: string) => Promise<void>;
 }
 
 export default function DataSourcesPanel({
   selections,
   onSelectionChange,
-  onFileAdded,
   onFileDeleted,
 }: DataSourcesPanelProps) {
   const [activeTab, setActiveTab] = useState("connections");
@@ -65,7 +63,10 @@ export default function DataSourcesPanel({
           <div className="pr-4">
             <FileManager
               selectedFiles={fileSelections.map((s) => s.connection_id)}
-              onFileAdded={onFileAdded}
+              onSelectionChange={async (fileId, fileName, checked) => {
+                // Files use the file name for both schema_name and table_name
+                await onSelectionChange(fileId, fileName, fileName, checked, "file");
+              }}
               onFileDeleted={onFileDeleted}
             />
           </div>

@@ -351,3 +351,4 @@ const selections = querySelections.get(queryId) || [];
 - ❌ Storing credentials in code or version control
 - ❌ Dark/light theme toggles (dark theme only)
 - ❌ Custom CSS when TailwindCSS utilities exist
+- ❌ Creating documentation files (*.md, README, etc.) unless explicitly requested

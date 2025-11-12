@@ -61,7 +61,7 @@ class QueryRepository:
             """
             )
 
-            # Query chat history table (new)
+            # Query chat history table
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS query_chat_history (
@@ -75,6 +75,20 @@ class QueryRepository:
             """
             )
 
+            # Query SQL history table
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS query_sql_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query_id TEXT NOT NULL,
+                    sql_text TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
+                )
+            """
+            )
+
+            # Create indexes
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_query_selections
@@ -89,19 +103,6 @@ class QueryRepository:
             """
             )
 
-            # Query SQL history table (new)
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS query_sql_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    query_id TEXT NOT NULL,
-                    sql_text TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
-                )
-            """
-            )
-
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_query_sql_history
@@ -109,59 +110,8 @@ class QueryRepository:
             """
             )
 
-            # Migrate old tables if they exist
-            self._migrate_from_workspaces(conn)
-
-            # Add source_type column to existing query_selections if it doesn't exist
-            self._add_source_type_column(conn)
-
             conn.commit()
 
-    def _migrate_from_workspaces(self, conn):
-        """Migrate data from old tables to new query tables."""
-        # Check if old tables exist
-        cursor = conn.execute(
-            """
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name IN ('workspaces', 'workspace_selections')
-            """
-        )
-        old_tables = [row[0] for row in cursor.fetchall()]
-
-        if "workspaces" in old_tables:
-            # Migrate workspaces to queries
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO queries (id, name, sql_text, created_at, updated_at)
-                SELECT id, name, '', created_at, updated_at FROM workspaces
-                """
-            )
-
-        if "workspace_selections" in old_tables:
-            # Migrate workspace_selections to query_selections
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO query_selections 
-                    (query_id, connection_id, schema_name, table_name, created_at)
-                SELECT workspace_id, connection_id, schema_name, table_name, created_at 
-                FROM workspace_selections
-                """
-            )
-
-    def _add_source_type_column(self, conn):
-        """Add source_type column to existing query_selections table if it doesn't exist."""
-        # Check if source_type column exists
-        cursor = conn.execute("PRAGMA table_info(query_selections)")
-        columns = [row[1] for row in cursor.fetchall()]
-        
-        if "source_type" not in columns:
-            # Add the column with default value 'connection'
-            conn.execute(
-                """
-                ALTER TABLE query_selections 
-                ADD COLUMN source_type TEXT DEFAULT 'connection'
-                """
-            )
 
     # Query CRUD operations
 

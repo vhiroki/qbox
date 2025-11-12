@@ -263,11 +263,12 @@ export const api = {
   },
 
   // File endpoints
-  async uploadFile(file: File): Promise<FileUploadResponse> {
+  async uploadFile(file: File, queryId: string): Promise<FileUploadResponse> {
     const formData = new FormData();
     formData.append("file", file);
 
     const response = await axios.post(`${API_BASE_URL}/files/upload`, formData, {
+      params: { query_id: queryId },
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -275,8 +276,10 @@ export const api = {
     return response.data;
   },
 
-  async listFiles(): Promise<FileInfo[]> {
-    const response = await axios.get(`${API_BASE_URL}/files/`);
+  async listFiles(queryId?: string): Promise<FileInfo[]> {
+    const response = await axios.get(`${API_BASE_URL}/files/`, {
+      params: queryId ? { query_id: queryId } : {},
+    });
     return response.data;
   },
 

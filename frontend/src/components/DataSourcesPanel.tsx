@@ -7,6 +7,7 @@ import FileManager from "./FileManager";
 import type { QueryTableSelection } from "@/types";
 
 interface DataSourcesPanelProps {
+  queryId: string; // The query ID to scope files to
   selections: QueryTableSelection[];
   onSelectionChange: (
     connectionId: string,
@@ -19,6 +20,7 @@ interface DataSourcesPanelProps {
 }
 
 export default function DataSourcesPanel({
+  queryId,
   selections,
   onSelectionChange,
   onFileDeleted,
@@ -62,6 +64,7 @@ export default function DataSourcesPanel({
         <ScrollArea className="h-full w-full">
           <div className="pr-4">
             <FileManager
+              queryId={queryId}
               selectedFiles={fileSelections.map((s) => s.connection_id)}
               onSelectionChange={async (fileId, fileName, checked) => {
                 // Files use the file name for both schema_name and table_name

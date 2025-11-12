@@ -37,42 +37,35 @@ class FileRepository:
     def _init_db(self):
         """Initialize the database schema."""
         with self._get_connection() as conn:
-            # Check if files table exists and has the view_name column
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='files'"
-            )
-            table_exists = cursor.fetchone() is not None
-            
-            if table_exists:
-                # Check if view_name column exists
-                cursor = conn.execute("PRAGMA table_info(files)")
-                columns = [row[1] for row in cursor.fetchall()]
-                
-                if 'view_name' not in columns:
-                    # Add view_name column to existing table
-                    conn.execute("ALTER TABLE files ADD COLUMN view_name TEXT")
-            else:
-                # Create new table with view_name column
-                conn.execute(
-                    """
-                    CREATE TABLE files (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        original_filename TEXT NOT NULL,
-                        file_type TEXT NOT NULL,
-                        file_path TEXT NOT NULL,
-                        size_bytes INTEGER,
-                        view_name TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
+            conn.execute(
                 """
+                CREATE TABLE IF NOT EXISTS files (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    original_filename TEXT NOT NULL,
+                    file_type TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    size_bytes INTEGER,
+                    view_name TEXT,
+                    query_id TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
                 )
+            """
+            )
 
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_files_name
                 ON files(name)
+            """
+            )
+            
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_files_query_id
+                ON files(query_id)
             """
             )
 
@@ -81,19 +74,19 @@ class FileRepository:
     # File CRUD operations
 
     def create_file(
-        self, name: str, original_filename: str, file_type: str, file_path: str, size_bytes: int
+        self, name: str, original_filename: str, file_type: str, file_path: str, size_bytes: int, query_id: str
     ) -> dict[str, Any]:
-        """Create a new file record."""
+        """Create a new file record scoped to a query."""
         file_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
 
         with self._get_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO files (id, name, original_filename, file_type, file_path, size_bytes, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO files (id, name, original_filename, file_type, file_path, size_bytes, query_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (file_id, name, original_filename, file_type, file_path, size_bytes, now, now),
+                (file_id, name, original_filename, file_type, file_path, size_bytes, query_id, now, now),
             )
             conn.commit()
 
@@ -104,6 +97,7 @@ class FileRepository:
             "file_type": file_type,
             "file_path": file_path,
             "size_bytes": size_bytes,
+            "query_id": query_id,
             "created_at": now,
             "updated_at": now,
         }
@@ -114,7 +108,7 @@ class FileRepository:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, created_at, updated_at
+                SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, query_id, created_at, updated_at
                 FROM files
                 WHERE id = ?
                 """,
@@ -131,6 +125,7 @@ class FileRepository:
                     "file_path": row["file_path"],
                     "size_bytes": row["size_bytes"],
                     "view_name": row["view_name"],
+                    "query_id": row["query_id"],
                     "created_at": row["created_at"],
                     "updated_at": row["updated_at"],
                 }
@@ -142,7 +137,7 @@ class FileRepository:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, created_at, updated_at
+                SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, query_id, created_at, updated_at
                 FROM files
                 ORDER BY created_at DESC
                 """
@@ -158,6 +153,38 @@ class FileRepository:
                     "file_path": row["file_path"],
                     "size_bytes": row["size_bytes"],
                     "view_name": row["view_name"],
+                    "query_id": row["query_id"],
+                    "created_at": row["created_at"],
+                    "updated_at": row["updated_at"],
+                }
+                for row in rows
+            ]
+    
+    def get_files_by_query(self, query_id: str) -> list[dict[str, Any]]:
+        """Get all files for a specific query, ordered by most recently created."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, query_id, created_at, updated_at
+                FROM files
+                WHERE query_id = ?
+                ORDER BY created_at DESC
+                """,
+                (query_id,)
+            )
+            rows = cursor.fetchall()
+
+            return [
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "original_filename": row["original_filename"],
+                    "file_type": row["file_type"],
+                    "file_path": row["file_path"],
+                    "size_bytes": row["size_bytes"],
+                    "view_name": row["view_name"],
+                    "query_id": row["query_id"],
                     "created_at": row["created_at"],
                     "updated_at": row["updated_at"],
                 }
@@ -189,18 +216,30 @@ class FileRepository:
             return Path(file_info["file_path"])
         return None
 
-    def get_file_by_name(self, name: str) -> Optional[dict[str, Any]]:
-        """Get a file by name."""
+    def get_file_by_name(self, name: str, query_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+        """Get a file by name, optionally scoped to a query."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute(
-                """
-                SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, created_at, updated_at
-                FROM files
-                WHERE name = ?
-                """,
-                (name,),
-            )
+            
+            if query_id:
+                cursor = conn.execute(
+                    """
+                    SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, query_id, created_at, updated_at
+                    FROM files
+                    WHERE name = ? AND query_id = ?
+                    """,
+                    (name, query_id),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT id, name, original_filename, file_type, file_path, size_bytes, view_name, query_id, created_at, updated_at
+                    FROM files
+                    WHERE name = ?
+                    """,
+                    (name,),
+                )
+            
             row = cursor.fetchone()
 
             if row:
@@ -212,6 +251,7 @@ class FileRepository:
                     "file_path": row["file_path"],
                     "size_bytes": row["size_bytes"],
                     "view_name": row["view_name"],
+                    "query_id": row["query_id"],
                     "created_at": row["created_at"],
                     "updated_at": row["updated_at"],
                 }

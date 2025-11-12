@@ -686,6 +686,7 @@ export default function QueryDetail({
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <DataSourcesPanel
+                        queryId={queryId}
                         selections={selections}
                         onSelectionChange={handleSelectionChange}
                         onFileDeleted={handleFileDeleted}
@@ -761,15 +762,32 @@ export default function QueryDetail({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Query</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{query.name}"? This will remove
-              all table selections and chat history. This cannot be undone.
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to delete "{query.name}"?
+              </p>
+              <p className="font-semibold text-destructive">
+                This will permanently delete:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>All table selections ({selections.length} selected)</li>
+                <li>All uploaded files ({selections.filter(s => s.source_type === 'file').length} files)</li>
+                <li>Complete chat history</li>
+                <li>SQL query history</li>
+              </ul>
+              <p className="text-sm font-semibold">
+                This action cannot be undone.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteQuery} disabled={isQueryLoading}>
-              Delete
+            <AlertDialogAction 
+              onClick={handleDeleteQuery} 
+              disabled={isQueryLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Query
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

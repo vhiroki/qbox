@@ -22,7 +22,7 @@ class ConnectionRepository:
     def _init_db(self):
         """Initialize the database schema."""
         with sqlite3.connect(self.db_path) as conn:
-            # Create table without alias initially (for backward compatibility)
+            # Create connections table with all columns
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS connections (
@@ -30,19 +30,14 @@ class ConnectionRepository:
                     name TEXT NOT NULL,
                     type TEXT NOT NULL,
                     config TEXT NOT NULL,
+                    alias TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
             )
             
-            # Migration: Add alias column if it doesn't exist
-            try:
-                conn.execute("ALTER TABLE connections ADD COLUMN alias TEXT")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-            
-            # Create indexes after column exists
+            # Create indexes
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_connections_name 

@@ -3,7 +3,7 @@
 import logging
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
@@ -20,8 +20,8 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
 @router.post("/upload", response_model=FileUploadResponse)
-async def upload_file(file: UploadFile = File(...)):
-    """Upload a CSV or XLSX file."""
+async def upload_file(query_id: str, file: UploadFile = File(...)):
+    """Upload a CSV or XLSX file scoped to a query."""
     try:
         # Validate file extension
         file_ext = Path(file.filename or "").suffix.lower()
@@ -39,16 +39,16 @@ async def upload_file(file: UploadFile = File(...)):
                 detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024 * 1024)} MB",
             )
 
-        # Generate unique name if file already exists
+        # Generate unique name if file already exists within this query
         base_name = Path(file.filename or "file").stem
         file_type = "csv" if file_ext == ".csv" else "xlsx"
         
-        # Check if name already exists
-        existing_file = file_repository.get_file_by_name(base_name)
+        # Check if name already exists in this query
+        existing_file = file_repository.get_file_by_name(base_name, query_id)
         if existing_file:
-            # Generate unique name
+            # Generate unique name within query scope
             counter = 1
-            while file_repository.get_file_by_name(f"{base_name}_{counter}"):
+            while file_repository.get_file_by_name(f"{base_name}_{counter}", query_id):
                 counter += 1
             base_name = f"{base_name}_{counter}"
 
@@ -66,6 +66,7 @@ async def upload_file(file: UploadFile = File(...)):
             file_type=file_type,
             file_path=str(file_path),
             size_bytes=len(content),
+            query_id=query_id,
         )
         
         file_id = file_record["id"]
@@ -104,10 +105,14 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @router.get("/", response_model=list[FileInfo])
-async def list_files():
-    """Get all uploaded files."""
+async def list_files(query_id: Optional[str] = None):
+    """Get uploaded files, optionally filtered by query_id."""
     try:
-        files = file_repository.get_all_files()
+        if query_id:
+            files = file_repository.get_files_by_query(query_id)
+        else:
+            files = file_repository.get_all_files()
+        
         return [
             FileInfo(
                 id=f["id"],

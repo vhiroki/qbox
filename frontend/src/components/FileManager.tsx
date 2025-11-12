@@ -17,6 +17,7 @@ import { api } from "@/services/api";
 import type { FileInfo, FileMetadata } from "@/types";
 
 interface FileManagerProps {
+  queryId: string; // The query ID to scope files to
   selectedFiles: string[]; // List of file IDs that are selected
   onSelectionChange?: (fileId: string, fileName: string, checked: boolean) => Promise<void>; // Called when checkbox is toggled
   onFileDeleted?: (fileId: string) => Promise<void>; // Called when a file is deleted
@@ -26,7 +27,7 @@ interface ExpandedState {
   [key: string]: boolean;
 }
 
-export default function FileManager({ selectedFiles, onSelectionChange, onFileDeleted }: FileManagerProps) {
+export default function FileManager({ queryId, selectedFiles, onSelectionChange, onFileDeleted }: FileManagerProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -39,10 +40,16 @@ export default function FileManager({ selectedFiles, onSelectionChange, onFileDe
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  // Load files on mount
+  // Load files when queryId changes and reset state
   useEffect(() => {
+    // Reset state when switching queries
+    setFileMetadata(new Map());
+    setExpandedSchemas({});
+    setCopiedViewName(null);
+    setError(null);
+    
     loadFiles();
-  }, []);
+  }, [queryId]);
 
   // Auto-load metadata for all files
   useEffect(() => {
@@ -57,7 +64,7 @@ export default function FileManager({ selectedFiles, onSelectionChange, onFileDe
     setIsLoading(true);
     setError(null);
     try {
-      const filesList = await api.listFiles();
+      const filesList = await api.listFiles(queryId);
       setFiles(filesList);
     } catch (err: any) {
       setError(err.message || "Failed to load files");
@@ -85,7 +92,7 @@ export default function FileManager({ selectedFiles, onSelectionChange, onFileDe
           throw new Error(`Unsupported file type: ${file.name}. Only CSV and XLSX files are supported.`);
         }
 
-        const uploadResponse = await api.uploadFile(file);
+        const uploadResponse = await api.uploadFile(file, queryId);
         uploadedFiles.push({ id: uploadResponse.id, name: uploadResponse.name });
       }
 

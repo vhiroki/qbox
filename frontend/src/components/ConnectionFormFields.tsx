@@ -180,13 +180,20 @@ export default function ConnectionFormFields({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="schema">Schema</Label>
+        <Label htmlFor="schemas">
+          Schemas <span className="text-muted-foreground font-normal">(Optional)</span>
+        </Label>
         <Input
-          id="schema"
+          id="schemas"
           type="text"
-          value={formData.schema}
-          onChange={(e) => onFormDataChange({ schema: e.target.value })}
+          value={formData.schemas}
+          onChange={(e) => onFormDataChange({ schemas: e.target.value })}
+          placeholder="e.g., public, analytics"
         />
+        <p className="text-xs text-muted-foreground">
+          Enter schema names separated by commas (e.g., <code className="text-xs">public, analytics</code>).
+          Leave blank to include all schemas.
+        </p>
       </div>
     </>
   );

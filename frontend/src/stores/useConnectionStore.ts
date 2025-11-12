@@ -9,6 +9,7 @@ interface ConnectionState {
   connectionMetadata: Map<string, ConnectionMetadata>; // connectionId -> metadata
   allMetadataCache: ConnectionMetadata[] | null; // Cache for all metadata
   allMetadataLastFetch: number | null; // Timestamp of last fetch
+  isLoadingAllMetadata: boolean; // Track if currently loading all metadata
   
   // Loading & Error states
   isLoading: boolean;
@@ -40,6 +41,7 @@ export const useConnectionStore = create<ConnectionState>()(
       connectionMetadata: new Map(),
       allMetadataCache: null,
       allMetadataLastFetch: null,
+      isLoadingAllMetadata: false,
       isLoading: false,
       error: null,
       
@@ -173,7 +175,18 @@ export const useConnectionStore = create<ConnectionState>()(
       
       // Load metadata for all connections (with caching)
       loadAllMetadata: async (forceRefresh = false) => {
-        const { allMetadataCache, allMetadataLastFetch } = get();
+        const { allMetadataCache, allMetadataLastFetch, isLoadingAllMetadata } = get();
+        
+        // If already loading, wait a bit and return cached data or retry
+        if (isLoadingAllMetadata && !forceRefresh) {
+          // Return cached data if available, or wait for the current request
+          if (allMetadataCache) {
+            return allMetadataCache;
+          }
+          // Wait a bit and retry (the other request should complete soon)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return get().allMetadataCache || [];
+        }
         
         // Return cached if available and less than 5 minutes old
         const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -184,7 +197,7 @@ export const useConnectionStore = create<ConnectionState>()(
           }
         }
         
-        set({ error: null });
+        set({ error: null, isLoadingAllMetadata: true });
         try {
           const allMetadata = await api.getAllMetadata();
           
@@ -198,11 +211,12 @@ export const useConnectionStore = create<ConnectionState>()(
             allMetadataCache: allMetadata,
             allMetadataLastFetch: Date.now(),
             connectionMetadata: new Map(connectionMetadata),
+            isLoadingAllMetadata: false,
           });
           
           return allMetadata;
         } catch (error: any) {
-          set({ error: error.response?.data?.detail || 'Failed to load metadata' });
+          set({ error: error.response?.data?.detail || 'Failed to load metadata', isLoadingAllMetadata: false });
           throw error;
         }
       },

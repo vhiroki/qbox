@@ -113,14 +113,28 @@ class DuckDBManager:
             pass  # Ignore if doesn't exist
 
         # Attach PostgreSQL database
-        attach_query = f"""
-            ATTACH 'host={config.host}
-            port={config.port}
-            dbname={config.database}
-            user={config.username}
-            password={config.password}'
-            AS {alias} (TYPE POSTGRES, SCHEMA '{config.schema_name}')
-        """
+        # Note: SCHEMA parameter in ATTACH is optional
+        # If multiple schemas are specified, we omit it and filter in metadata service
+        if config.schema_names and len(config.schema_names) == 1:
+            # Single schema: use SCHEMA parameter for potential optimization
+            attach_query = f"""
+                ATTACH 'host={config.host}
+                port={config.port}
+                dbname={config.database}
+                user={config.username}
+                password={config.password}'
+                AS {alias} (TYPE POSTGRES, SCHEMA '{config.schema_names[0]}')
+            """
+        else:
+            # No schemas or multiple schemas: omit SCHEMA parameter to get all
+            attach_query = f"""
+                ATTACH 'host={config.host}
+                port={config.port}
+                dbname={config.database}
+                user={config.username}
+                password={config.password}'
+                AS {alias} (TYPE POSTGRES)
+            """
 
         try:
             conn.execute(attach_query)

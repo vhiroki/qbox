@@ -11,7 +11,7 @@ export interface PostgresConfig {
   database: string;
   username: string;
   password: string;
-  schema?: string;
+  schemas?: string; // Comma-separated list of schemas, or empty for all schemas
 }
 
 export interface ConnectionStatus {

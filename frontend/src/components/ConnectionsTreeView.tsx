@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Database, ChevronRight, ChevronDown, Table as TableIcon, Loader2, RefreshCw, Filter, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -51,9 +51,19 @@ export default function ConnectionsTreeView({
   const [tableFilter, setTableFilter] = useState("");
   const [showOnlySelected, setShowOnlySelected] = useState(false);
 
+  // Prevent duplicate fetches during React Strict Mode double-invoke
+  const isFetchingRef = useRef(false);
+  const hasFetchedRef = useRef(false);
+
   // Load all connections metadata on mount (uses cache if available)
   useEffect(() => {
     const fetchMetadata = async () => {
+      // Skip if already fetched or currently fetching (React Strict Mode protection)
+      if (hasFetchedRef.current || isFetchingRef.current) {
+        return;
+      }
+
+      isFetchingRef.current = true;
       setIsLoading(true);
       setError(null);
       try {
@@ -72,35 +82,48 @@ export default function ConnectionsTreeView({
           }
         }
         setConnectionAliases(aliasMap);
+        hasFetchedRef.current = true;
       } catch (err: any) {
         setError(err.message || "Failed to load connections");
       } finally {
         setIsLoading(false);
+        isFetchingRef.current = false;
       }
     };
 
     fetchMetadata();
-  }, [loadAllMetadata]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only load on mount - loadAllMetadata is stable from Zustand
 
   // Auto-expand connections that have selected tables
   useEffect(() => {
     if (allMetadata.length > 0 && selections.length > 0) {
-      const newExpanded: ExpandedState = { ...expanded };
+      setExpanded((prevExpanded) => {
+        const newExpanded: ExpandedState = { ...prevExpanded };
+        let hasChanges = false;
 
-      selections.forEach((selection) => {
-        if (selection.source_type === "connection") {
-          const connectionKey = `connection:${selection.connection_id}`;
-          const schemaKey = `schema:${selection.connection_id}:${selection.schema_name}`;
+        selections.forEach((selection) => {
+          if (selection.source_type === "connection") {
+            const connectionKey = `connection:${selection.connection_id}`;
+            const schemaKey = `schema:${selection.connection_id}:${selection.schema_name}`;
 
-          // Expand connection and schema if they have selected tables
-          newExpanded[connectionKey] = true;
-          newExpanded[schemaKey] = true;
-        }
+            // Expand connection and schema if they have selected tables
+            if (!newExpanded[connectionKey]) {
+              newExpanded[connectionKey] = true;
+              hasChanges = true;
+            }
+            if (!newExpanded[schemaKey]) {
+              newExpanded[schemaKey] = true;
+              hasChanges = true;
+            }
+          }
+        });
+
+        // Only update state if there are actual changes
+        return hasChanges ? newExpanded : prevExpanded;
       });
-
-      setExpanded(newExpanded);
     }
-  }, [allMetadata, selections.length]);
+  }, [allMetadata.length, selections.length]); // Only depend on lengths, not entire arrays
 
   const toggleExpand = async (key: string, connectionId?: string, schemaName?: string, tableName?: string) => {
     const willBeExpanded = !expanded[key];

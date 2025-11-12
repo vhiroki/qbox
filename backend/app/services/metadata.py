@@ -47,7 +47,7 @@ class MetadataService:
             )
 
             # Get schema information
-            schemas = await self._get_postgres_schemas(alias, config.schema_name)
+            schemas = await self._get_postgres_schemas(alias, config.schema_names)
 
             return ConnectionMetadata(
                 connection_id=connection_id,
@@ -62,21 +62,29 @@ class MetadataService:
             raise
 
     async def _get_postgres_schemas(
-        self, alias: str, schema_filter: Optional[str] = None
+        self, alias: str, schema_filters: Optional[list[str]] = None
     ) -> list[SchemaMetadata]:
-        """Get schemas and tables from PostgreSQL."""
+        """Get schemas and tables from PostgreSQL.
+        
+        Args:
+            alias: DuckDB database alias
+            schema_filters: List of schema names to filter by. If None or empty, gets all schemas.
+        """
         conn = self.duckdb_manager.connect()
 
         # Use DuckDB's system tables to get schemas for this specific database
-        if schema_filter:
+        if schema_filters and len(schema_filters) > 0:
+            # Filter by specific schemas
+            schema_list = "', '".join(schema_filters)
             schema_query = f"""
                 SELECT DISTINCT schema_name
                 FROM duckdb_schemas()
                 WHERE database_name = '{alias}'
-                AND schema_name = '{schema_filter}'
+                AND schema_name IN ('{schema_list}')
                 AND schema_name NOT IN ('information_schema', 'pg_catalog')
             """
         else:
+            # Get all schemas
             schema_query = f"""
                 SELECT DISTINCT schema_name
                 FROM duckdb_schemas()

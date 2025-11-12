@@ -61,14 +61,26 @@ class PostgresDataSource(DataSource):
             self.duckdb_conn.execute("LOAD postgres")
 
             # Attach PostgreSQL database
-            attach_query = f"""
-                ATTACH 'host={self.postgres_config.host}
-                port={self.postgres_config.port}
-                dbname={self.postgres_config.database}
-                user={self.postgres_config.username}
-                password={self.postgres_config.password}'
-                AS pg (TYPE POSTGRES, SCHEMA '{self.postgres_config.schema_name}')
-            """
+            if self.postgres_config.schema_names and len(self.postgres_config.schema_names) == 1:
+                # Single schema: use SCHEMA parameter
+                attach_query = f"""
+                    ATTACH 'host={self.postgres_config.host}
+                    port={self.postgres_config.port}
+                    dbname={self.postgres_config.database}
+                    user={self.postgres_config.username}
+                    password={self.postgres_config.password}'
+                    AS pg (TYPE POSTGRES, SCHEMA '{self.postgres_config.schema_names[0]}')
+                """
+            else:
+                # No schemas or multiple schemas: omit SCHEMA parameter
+                attach_query = f"""
+                    ATTACH 'host={self.postgres_config.host}
+                    port={self.postgres_config.port}
+                    dbname={self.postgres_config.database}
+                    user={self.postgres_config.username}
+                    password={self.postgres_config.password}'
+                    AS pg (TYPE POSTGRES)
+                """
             self.duckdb_conn.execute(attach_query)
 
             return True

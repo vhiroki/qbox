@@ -122,13 +122,24 @@ export default function ConnectionManager() {
       setEditConnectionName(fullConfig.name);
       // Show the alias field (custom or auto-generated indicator)
       setEditConnectionAlias(fullConfig.alias || '(auto-generated)');
+      // Handle schemas: can be array (new format) or string (legacy format)
+      let schemasValue = '';
+      if (Array.isArray(fullConfig.config.schemas)) {
+        schemasValue = fullConfig.config.schemas.join(', ');
+      } else if (fullConfig.config.schemas) {
+        schemasValue = fullConfig.config.schemas;
+      } else if (fullConfig.config.schema) {
+        // Legacy single schema field
+        schemasValue = fullConfig.config.schema;
+      }
+      
       setEditFormData({
         host: fullConfig.config.host || 'localhost',
         port: fullConfig.config.port || 5432,
         database: fullConfig.config.database || '',
         username: fullConfig.config.username || '',
         password: '', // Don't populate password
-        schema: fullConfig.config.schema || 'public',
+        schemas: schemasValue,
       });
       setEditError(null);
       setEditDialogOpen(true);

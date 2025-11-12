@@ -20,7 +20,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
     database: '',
     username: '',
     password: '',
-    schema: 'public',
+    schemas: '',
   });
   const [connectionName, setConnectionName] = useState('');
   const [connectionAlias, setConnectionAlias] = useState('');
@@ -104,7 +104,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
           database: '',
           username: '',
           password: '',
-          schema: 'public',
+          schemas: '',
         });
         setSelectedSavedConnection('');
       }

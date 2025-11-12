@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DataSourceType(str, Enum):
@@ -31,7 +31,44 @@ class PostgresConnectionConfig(BaseModel):
     database: str
     username: str
     password: str
-    schema_name: str = Field(default="public", alias="schema")
+    schema_names: Optional[list[str]] = Field(default=None, alias="schemas")
+    
+    @model_validator(mode="before")
+    @classmethod
+    def convert_schemas_to_list(cls, data: Any) -> Any:
+        """Convert schema/schemas field to list format.
+        
+        Handles:
+        - Legacy 'schema' field (single string)
+        - 'schemas' as comma-separated string
+        - 'schemas' as list (already correct format)
+        """
+        if isinstance(data, dict):
+            # Handle legacy 'schema' field
+            if "schema" in data and "schemas" not in data:
+                schema_value = data.pop("schema")
+                if schema_value and isinstance(schema_value, str) and schema_value.strip():
+                    if "," in schema_value:
+                        data["schemas"] = [s.strip() for s in schema_value.split(",") if s.strip()]
+                    else:
+                        data["schemas"] = [schema_value.strip()]
+                else:
+                    data["schemas"] = None
+            
+            # Handle 'schemas' as string (convert to list)
+            elif "schemas" in data and isinstance(data["schemas"], str):
+                schema_value = data["schemas"]
+                if schema_value and schema_value.strip():
+                    if "," in schema_value:
+                        data["schemas"] = [s.strip() for s in schema_value.split(",") if s.strip()]
+                    else:
+                        data["schemas"] = [schema_value.strip()]
+                else:
+                    data["schemas"] = None
+            
+            # 'schemas' as list or None is already in correct format
+        
+        return data
 
 
 class ConnectionStatus(BaseModel):

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Upload, FileText, Trash2, Loader2, ChevronDown, ChevronRight, Columns3 } from "lucide-react";
+import { Upload, FileText, Trash2, Loader2, ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api } from "@/services/api";
@@ -24,6 +24,7 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
   const [fileMetadata, setFileMetadata] = useState<Map<string, FileMetadata>>(new Map());
   const [expandedSchemas, setExpandedSchemas] = useState<ExpandedState>({});
   const [loadingMetadata, setLoadingMetadata] = useState<Set<string>>(new Set());
+  const [copiedViewName, setCopiedViewName] = useState<string | null>(null);
 
   // Load files on mount
   useEffect(() => {
@@ -169,6 +170,18 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
     }));
   };
 
+  const handleCopyViewName = async (fileId: string, viewName: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    try {
+      await navigator.clipboard.writeText(viewName);
+      setCopiedViewName(fileId);
+      // Reset after 2 seconds
+      setTimeout(() => setCopiedViewName(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -269,6 +282,19 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
               >
                 {/* File Header */}
                 <div className="p-3 flex items-center gap-3">
+                  {metadata && (
+                    <button
+                      onClick={() => toggleSchemaExpansion(file.id)}
+                      className="flex-shrink-0 hover:bg-muted p-1 rounded transition-colors"
+                      title="Toggle schema details"
+                    >
+                      {isSchemaExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </button>
+                  )}
                   <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   
                   <div className="flex-1 min-w-0">
@@ -297,32 +323,26 @@ export default function FileManager({ selectedFiles, onFileAdded, onFileDeleted 
                       )}
                     </div>
                     {metadata && (
-                      <div className="text-xs">
+                      <div className="text-xs flex items-center gap-1">
                         <span className="text-muted-foreground">Query as: </span>
                         <code className="font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
                           {metadata.view_name}
                         </code>
+                        <button
+                          onClick={(e) => handleCopyViewName(file.id, metadata.view_name, e)}
+                          className="hover:bg-muted p-0.5 rounded transition-all flex-shrink-0"
+                          aria-label={`Copy ${metadata.view_name}`}
+                          title="Copy view name"
+                        >
+                          {copiedViewName === file.id ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3 w-3 text-muted-foreground" />
+                          )}
+                        </button>
                       </div>
                     )}
                   </div>
-
-                  {metadata && (
-                    <Button
-                      variant={isSchemaExpanded ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => toggleSchemaExpansion(file.id)}
-                      className="h-7 px-2 text-xs gap-1 whitespace-nowrap"
-                      title="Toggle schema details"
-                    >
-                      {isSchemaExpanded ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                      <Columns3 className="h-3.5 w-3.5" />
-                      <span>Schema</span>
-                    </Button>
-                  )}
 
                   <Button
                     variant="ghost"

@@ -95,8 +95,16 @@ class MetadataService:
 
         return schemas
 
-    async def _get_postgres_tables(self, alias: str, schema_name: str) -> list[TableMetadata]:
-        """Get tables and columns for a specific schema."""
+    async def _get_postgres_tables(
+        self, alias: str, schema_name: str, include_details: bool = False
+    ) -> list[TableMetadata]:
+        """Get tables for a specific schema.
+        
+        Args:
+            alias: DuckDB database alias
+            schema_name: Schema name
+            include_details: If True, includes columns and row counts. If False, only table names.
+        """
         conn = self.duckdb_manager.connect()
 
         # Use DuckDB's system tables to get tables for this specific database and schema
@@ -113,25 +121,37 @@ class MetadataService:
 
         tables = []
         for table_name in table_names:
-            columns = await self._get_postgres_columns(alias, schema_name, table_name)
+            if include_details:
+                # Load full details (columns + row count)
+                columns = await self._get_postgres_columns(alias, schema_name, table_name)
 
-            # Get row count
-            try:
-                count_query = f"SELECT COUNT(*) FROM {alias}." f"{schema_name}.{table_name}"
-                count_result = conn.execute(count_query)
-                row_count = count_result.fetchone()[0]
-            except Exception as e:
-                logger.warning(f"Could not get row count for " f"{schema_name}.{table_name}: {e}")
-                row_count = None
+                # Get row count
+                try:
+                    count_query = f"SELECT COUNT(*) FROM {alias}." f"{schema_name}.{table_name}"
+                    count_result = conn.execute(count_query)
+                    row_count = count_result.fetchone()[0]
+                except Exception as e:
+                    logger.warning(f"Could not get row count for " f"{schema_name}.{table_name}: {e}")
+                    row_count = None
 
-            tables.append(
-                TableMetadata(
-                    name=table_name,
-                    schema_name=schema_name,
-                    columns=columns,
-                    row_count=row_count,
+                tables.append(
+                    TableMetadata(
+                        name=table_name,
+                        schema_name=schema_name,
+                        columns=columns,
+                        row_count=row_count,
+                    )
                 )
-            )
+            else:
+                # Lightweight: only table name
+                tables.append(
+                    TableMetadata(
+                        name=table_name,
+                        schema_name=schema_name,
+                        columns=None,  # Will be loaded on-demand
+                        row_count=None,
+                    )
+                )
 
         return tables
 
@@ -171,6 +191,58 @@ class MetadataService:
             )
 
         return columns
+
+    async def get_table_details(
+        self,
+        connection_id: str,
+        connection_name: str,
+        source_type: DataSourceType,
+        config: dict[str, Any],
+        schema_name: str,
+        table_name: str,
+    ) -> TableMetadata:
+        """Get detailed metadata for a specific table.
+
+        Args:
+            connection_id: Connection identifier
+            connection_name: Connection name
+            source_type: Type of data source
+            config: Connection configuration
+            schema_name: Schema name
+            table_name: Table name
+
+        Returns:
+            Detailed table metadata with columns and row count
+        """
+        if source_type == DataSourceType.POSTGRES:
+            postgres_config = PostgresConnectionConfig(**config)
+            
+            # Attach the database
+            alias = self.duckdb_manager.attach_postgres(
+                connection_id, connection_name, postgres_config, custom_alias=None
+            )
+            
+            # Get columns
+            columns = await self._get_postgres_columns(alias, schema_name, table_name)
+            
+            # Get row count
+            conn = self.duckdb_manager.connect()
+            try:
+                count_query = f"SELECT COUNT(*) FROM {alias}.{schema_name}.{table_name}"
+                count_result = conn.execute(count_query)
+                row_count = count_result.fetchone()[0]
+            except Exception as e:
+                logger.warning(f"Could not get row count for {schema_name}.{table_name}: {e}")
+                row_count = None
+            
+            return TableMetadata(
+                name=table_name,
+                schema_name=schema_name,
+                columns=columns,
+                row_count=row_count,
+            )
+        else:
+            raise NotImplementedError(f"Table details not implemented for {source_type}")
 
     async def refresh_metadata(
         self,

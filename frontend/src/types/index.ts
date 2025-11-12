@@ -57,7 +57,7 @@ export interface ColumnMetadata {
 export interface TableMetadata {
   name: string;
   schema_name?: string;
-  columns: ColumnMetadata[];
+  columns?: ColumnMetadata[];  // Optional for lazy loading
   row_count?: number;
   description?: string;
 }

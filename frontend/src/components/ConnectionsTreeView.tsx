@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Database, ChevronRight, ChevronDown, Table as TableIcon, Loader2, RefreshCw, Filter, Eye, EyeOff } from "lucide-react";
+import { Database, ChevronRight, ChevronDown, Table as TableIcon, Loader2, RefreshCw, Filter, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useConnectionStore } from "@/stores/useConnectionStore";
+import { api } from "@/services/api";
 import type { ConnectionMetadata, SchemaMetadata, TableMetadata, QueryTableSelection } from "@/types";
 
 interface ConnectionsTreeViewProps {
@@ -29,7 +30,6 @@ export default function ConnectionsTreeView({
 }: ConnectionsTreeViewProps) {
   // Use Zustand store for cached metadata
   const loadAllMetadata = useConnectionStore((state) => state.loadAllMetadata);
-  const storeError = useConnectionStore((state) => state.error);
 
   const [allMetadata, setAllMetadata] = useState<ConnectionMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +37,15 @@ export default function ConnectionsTreeView({
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [togglingTable, setTogglingTable] = useState<string | null>(null);
+
+  // Track which tables are loading their details
+  const [loadingTableDetails, setLoadingTableDetails] = useState<Set<string>>(new Set());
+
+  // Track which table was copied (for showing checkmark feedback)
+  const [copiedTable, setCopiedTable] = useState<string | null>(null);
+
+  // Store connection aliases for full qualified names
+  const [connectionAliases, setConnectionAliases] = useState<Map<string, string>>(new Map());
 
   // Filter and display options
   const [tableFilter, setTableFilter] = useState("");
@@ -50,15 +59,28 @@ export default function ConnectionsTreeView({
       try {
         const metadata = await loadAllMetadata();
         setAllMetadata(metadata);
+
+        // Load connection aliases
+        const aliasMap = new Map<string, string>();
+        for (const conn of metadata) {
+          try {
+            const connectionInfo = await api.getSavedConnection(conn.connection_id);
+            aliasMap.set(conn.connection_id, connectionInfo.alias || connectionInfo.name);
+          } catch (err) {
+            // Fallback to connection name if we can't fetch the saved connection
+            aliasMap.set(conn.connection_id, conn.connection_name);
+          }
+        }
+        setConnectionAliases(aliasMap);
       } catch (err: any) {
-        setError(storeError || err.message || "Failed to load connections");
+        setError(err.message || "Failed to load connections");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchMetadata();
-  }, [loadAllMetadata, storeError]);
+  }, [loadAllMetadata]);
 
   // Auto-expand connections that have selected tables
   useEffect(() => {
@@ -80,8 +102,77 @@ export default function ConnectionsTreeView({
     }
   }, [allMetadata, selections.length]);
 
-  const toggleExpand = (key: string) => {
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleExpand = async (key: string, connectionId?: string, schemaName?: string, tableName?: string) => {
+    const willBeExpanded = !expanded[key];
+    setExpanded((prev) => ({ ...prev, [key]: willBeExpanded }));
+
+    // If this is a table columns expansion and we're expanding (not collapsing)
+    if (willBeExpanded && key.startsWith("columns:") && connectionId && schemaName && tableName) {
+      await loadTableDetails(connectionId, schemaName, tableName);
+    }
+  };
+
+  const loadTableDetails = async (connectionId: string, schemaName: string, tableName: string) => {
+    const tableKey = getTableKey(connectionId, schemaName, tableName);
+
+    // Check if table already has details loaded
+    const connection = allMetadata.find((c) => c.connection_id === connectionId);
+    const schema = connection?.schemas.find((s) => s.name === schemaName);
+    const table = schema?.tables.find((t) => t.name === tableName);
+
+    // If table already has columns loaded, skip
+    if (table?.columns && table.columns.length > 0) {
+      return;
+    }
+
+    // If already loading, skip
+    if (loadingTableDetails.has(tableKey)) {
+      return;
+    }
+
+    // Mark as loading
+    setLoadingTableDetails((prev) => new Set(prev).add(tableKey));
+
+    try {
+      const tableDetails = await api.getTableDetails(connectionId, schemaName, tableName);
+
+      // Update the metadata with the loaded details
+      setAllMetadata((prevMetadata) => {
+        return prevMetadata.map((conn) => {
+          if (conn.connection_id !== connectionId) return conn;
+
+          return {
+            ...conn,
+            schemas: conn.schemas.map((sch) => {
+              if (sch.name !== schemaName) return sch;
+
+              return {
+                ...sch,
+                tables: sch.tables.map((tbl) => {
+                  if (tbl.name !== tableName) return tbl;
+
+                  return {
+                    ...tbl,
+                    columns: tableDetails.columns,
+                    row_count: tableDetails.row_count,
+                  };
+                }),
+              };
+            }),
+          };
+        });
+      });
+    } catch (err: any) {
+      console.error(`Failed to load table details for ${schemaName}.${tableName}:`, err);
+      // Optionally show an error toast here
+    } finally {
+      // Remove from loading set
+      setLoadingTableDetails((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(tableKey);
+        return newSet;
+      });
+    }
   };
 
   const handleRefresh = async () => {
@@ -91,7 +182,7 @@ export default function ConnectionsTreeView({
       const metadata = await loadAllMetadata(true); // Force refresh
       setAllMetadata(metadata);
     } catch (err: any) {
-      setError(storeError || err.message || "Failed to refresh connections");
+      setError(err.message || "Failed to refresh connections");
     } finally {
       setIsRefreshing(false);
     }
@@ -135,6 +226,27 @@ export default function ConnectionsTreeView({
 
   const getTableKey = (connectionId: string, schemaName: string, tableName: string) => {
     return `${connectionId}:${schemaName}:${tableName}`;
+  };
+
+  const handleCopyTableName = async (connectionId: string, schemaName: string, tableName: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    // Get the connection alias
+    const alias = connectionAliases.get(connectionId) || connectionId;
+
+    // Build the full qualified name: alias.schema.table
+    const fullQualifiedName = `${alias}.${schemaName}.${tableName}`;
+
+    const tableKey = getTableKey(connectionId, schemaName, tableName);
+
+    try {
+      await navigator.clipboard.writeText(fullQualifiedName);
+      setCopiedTable(tableKey);
+      // Reset after 2 seconds
+      setTimeout(() => setCopiedTable(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
   };
 
   // Filter tables by name
@@ -338,7 +450,7 @@ export default function ConnectionsTreeView({
                                   return (
                                     <div key={table.name} className="space-y-0.5">
                                       {/* Table Level */}
-                                      <div className="flex items-center gap-2 px-2 py-1 hover:bg-muted/50 rounded-md transition-colors">
+                                      <div className="flex items-center gap-2 px-2 py-1 hover:bg-muted/50 rounded-md transition-colors group">
                                         <Checkbox
                                           checked={isSelected}
                                           disabled={isToggling}
@@ -353,7 +465,7 @@ export default function ConnectionsTreeView({
                                           className="flex-shrink-0"
                                         />
                                         <button
-                                          onClick={() => toggleExpand(columnKey)}
+                                          onClick={() => toggleExpand(columnKey, connection.connection_id, schema.name, table.name)}
                                           className="flex items-center gap-2 flex-1 min-w-0"
                                         >
                                           {areColumnsExpanded ? (
@@ -363,33 +475,58 @@ export default function ConnectionsTreeView({
                                           )}
                                           <TableIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                           <span className="text-xs truncate">{table.name}</span>
+                                          <button
+                                            onClick={(e) => handleCopyTableName(connection.connection_id, schema.name, table.name, e)}
+                                            className="opacity-0 group-hover:opacity-100 rounded-full hover:bg-muted p-0.5 transition-all flex-shrink-0 ml-1"
+                                            aria-label={`Copy ${table.name}`}
+                                            title="Copy full qualified name"
+                                          >
+                                            {copiedTable === tableKey ? (
+                                              <Check className="h-3 w-3 text-green-500" />
+                                            ) : (
+                                              <Copy className="h-3 w-3 text-muted-foreground" />
+                                            )}
+                                          </button>
                                         </button>
-                                        {table.row_count != null && (
+                                        {loadingTableDetails.has(tableKey) && areColumnsExpanded ? (
+                                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />
+                                        ) : table.row_count != null ? (
                                           <span className="text-xs text-muted-foreground flex-shrink-0">
-                                            {table.row_count.toLocaleString()}
+                                            {table.row_count.toLocaleString()} rows
                                           </span>
-                                        )}
+                                        ) : null}
                                       </div>
 
                                       {/* Columns (collapsed by default) */}
                                       {areColumnsExpanded && (
                                         <div className="ml-9 space-y-0.5 pb-1">
-                                          {table.columns.map((column) => (
-                                            <div
-                                              key={column.name}
-                                              className="flex items-start gap-2 px-2 py-0.5 text-xs text-muted-foreground"
-                                            >
-                                              <span className="flex-shrink-0 font-medium">{column.name}</span>
-                                              <span className="text-xs font-mono opacity-60 break-all flex-1">
-                                                {column.type}
-                                              </span>
-                                              {column.is_primary_key && (
-                                                <span className="text-xs bg-primary/10 text-primary px-1 py-0.5 rounded flex-shrink-0">
-                                                  PK
-                                                </span>
-                                              )}
+                                          {loadingTableDetails.has(tableKey) ? (
+                                            <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                              Loading columns...
                                             </div>
-                                          ))}
+                                          ) : table.columns && table.columns.length > 0 ? (
+                                            table.columns.map((column) => (
+                                              <div
+                                                key={column.name}
+                                                className="flex items-start gap-2 px-2 py-0.5 text-xs text-muted-foreground"
+                                              >
+                                                <span className="flex-shrink-0 font-medium">{column.name}</span>
+                                                <span className="text-xs font-mono opacity-60 break-all flex-1">
+                                                  {column.type}
+                                                </span>
+                                                {column.is_primary_key && (
+                                                  <span className="text-xs bg-primary/10 text-primary px-1 py-0.5 rounded flex-shrink-0">
+                                                    PK
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))
+                                          ) : (
+                                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                                              No columns available
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>

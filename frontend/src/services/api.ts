@@ -6,6 +6,7 @@ import type {
   SavedConnection,
   TableSchema,
   ConnectionMetadata,
+  TableMetadata,
   Query,
   QueryCreate,
   QueryTableSelection,
@@ -100,6 +101,17 @@ export const api = {
   async refreshMetadata(connectionId: string): Promise<ConnectionMetadata> {
     const response = await axios.post(
       `${API_BASE_URL}/metadata/${connectionId}/refresh`
+    );
+    return response.data;
+  },
+
+  async getTableDetails(
+    connectionId: string,
+    schemaName: string,
+    tableName: string
+  ): Promise<TableMetadata> {
+    const response = await axios.get(
+      `${API_BASE_URL}/metadata/${connectionId}/table/${schemaName}/${tableName}`
     );
     return response.data;
   },

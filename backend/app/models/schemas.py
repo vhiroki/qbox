@@ -74,7 +74,7 @@ class TableMetadata(BaseModel):
 
     name: str
     schema_name: Optional[str] = None
-    columns: list[ColumnMetadata]
+    columns: Optional[list[ColumnMetadata]] = None  # Optional for lazy loading
     row_count: Optional[int] = None
     description: Optional[str] = None
 

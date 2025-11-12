@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown, Pencil, Play, History } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check } from "lucide-react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -104,11 +105,83 @@ export default function QueryDetail({
   // Derived state
   const query = queries.find((q) => q.id === queryId);
   const selections = querySelections.get(queryId) || [];
+  
+  // Store file info for displaying view names
+  const [fileInfoMap, setFileInfoMap] = useState<Map<string, { name: string; viewName: string }>>(new Map());
+  
+  // Store connection info for displaying full qualified names
+  const [connectionInfoMap, setConnectionInfoMap] = useState<Map<string, { name: string; alias: string }>>(new Map());
+  
+  // Track which badge was copied (for showing checkmark feedback)
+  const [copiedBadge, setCopiedBadge] = useState<string | null>(null);
 
   useEffect(() => {
     selectQuery(queryId);
     loadQuerySelections(queryId);
   }, [queryId, selectQuery, loadQuerySelections]);
+
+  // Load file info for file selections to get view names
+  useEffect(() => {
+    const loadFileInfo = async () => {
+      const fileSelections = selections.filter((s) => s.source_type === "file");
+      if (fileSelections.length === 0) {
+        setFileInfoMap(new Map());
+        return;
+      }
+
+      const newFileInfoMap = new Map<string, { name: string; viewName: string }>();
+      
+      for (const selection of fileSelections) {
+        try {
+          const fileInfo = await api.getFile(selection.connection_id);
+          // Fetch the metadata to get view_name
+          const fileMetadata = await api.getFileMetadata(selection.connection_id);
+          newFileInfoMap.set(selection.connection_id, {
+            name: fileInfo.name,
+            viewName: fileMetadata.view_name,
+          });
+        } catch (err) {
+          console.error(`Failed to load file info for ${selection.connection_id}:`, err);
+        }
+      }
+      
+      setFileInfoMap(newFileInfoMap);
+    };
+
+    loadFileInfo();
+  }, [selections]);
+
+  // Load connection info for database selections to get aliases
+  useEffect(() => {
+    const loadConnectionInfo = async () => {
+      const connectionSelections = selections.filter((s) => s.source_type === "connection");
+      if (connectionSelections.length === 0) {
+        setConnectionInfoMap(new Map());
+        return;
+      }
+
+      const newConnectionInfoMap = new Map<string, { name: string; alias: string }>();
+      
+      // Get unique connection IDs
+      const uniqueConnectionIds = [...new Set(connectionSelections.map((s) => s.connection_id))];
+      
+      for (const connectionId of uniqueConnectionIds) {
+        try {
+          const connectionInfo = await api.getSavedConnection(connectionId);
+          newConnectionInfoMap.set(connectionId, {
+            name: connectionInfo.name,
+            alias: connectionInfo.alias || connectionInfo.name,
+          });
+        } catch (err) {
+          console.error(`Failed to load connection info for ${connectionId}:`, err);
+        }
+      }
+      
+      setConnectionInfoMap(newConnectionInfoMap);
+    };
+
+    loadConnectionInfo();
+  }, [selections]);
 
   useEffect(() => {
     if (query) {
@@ -132,6 +205,17 @@ export default function QueryDetail({
 
     return () => clearTimeout(timeoutId);
   }, [sqlText, query, updateQuerySQL]);
+
+  const handleCopyToClipboard = async (label: string, badgeKey: string) => {
+    try {
+      await navigator.clipboard.writeText(label);
+      setCopiedBadge(badgeKey);
+      // Reset after 2 seconds
+      setTimeout(() => setCopiedBadge(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+  };
 
   const handleSelectionChange = async (
     connectionId: string,
@@ -496,10 +580,68 @@ export default function QueryDetail({
                 {/* Tables Tab - Tree View */}
                 <TabsContent value="tables" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
                   <div className="h-full flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                      <h3 className="text-sm font-medium text-muted-foreground">
-                        {selections.length} {selections.length === 1 ? "table" : "tables"} selected
-                      </h3>
+                    <div className="mb-3 flex-shrink-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                          {selections.length} {selections.length === 1 ? "table" : "tables"} selected
+                        </h3>
+                      </div>
+                      {selections.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selections.map((selection) => {
+                            let label: string;
+                            if (selection.source_type === "file") {
+                              const fileInfo = fileInfoMap.get(selection.connection_id);
+                              label = fileInfo?.viewName || selection.table_name;
+                            } else {
+                              const connectionInfo = connectionInfoMap.get(selection.connection_id);
+                              const alias = connectionInfo?.alias || selection.connection_id;
+                              label = `${alias}.${selection.schema_name}.${selection.table_name}`;
+                            }
+                            
+                            const badgeKey = `${selection.source_type}-${selection.connection_id}-${selection.schema_name}-${selection.table_name}`;
+                            const isCopied = copiedBadge === badgeKey;
+                            
+                            return (
+                              <Badge
+                                key={badgeKey}
+                                variant="secondary"
+                                className="pl-2 pr-1 py-0.5 text-xs gap-1"
+                              >
+                                <span className="truncate max-w-[400px]">{label}</span>
+                                <button
+                                  onClick={() => handleCopyToClipboard(label, badgeKey)}
+                                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
+                                  aria-label={`Copy ${label}`}
+                                  title="Copy to clipboard"
+                                >
+                                  {isCopied ? (
+                                    <Check className="h-3 w-3 text-green-500" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    await handleSelectionChange(
+                                      selection.connection_id,
+                                      selection.schema_name,
+                                      selection.table_name,
+                                      false,
+                                      selection.source_type
+                                    );
+                                  }}
+                                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
+                                  aria-label={`Remove ${label}`}
+                                  title="Remove table"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <DataSourcesPanel

@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import ConnectionMetadata
+from app.models.schemas import ConnectionMetadata, TableMetadata
 from app.services.connection_repository import connection_repository
 from app.services.metadata import get_metadata_service
 
@@ -102,3 +102,42 @@ async def refresh_connection_metadata(connection_id: str):
     """
     # Reuse the get endpoint logic (they're the same for now)
     return await get_connection_metadata(connection_id)
+
+
+@router.get("/{connection_id}/table/{schema_name}/{table_name}", response_model=TableMetadata)
+async def get_table_details(connection_id: str, schema_name: str, table_name: str):
+    """Get detailed metadata for a specific table (columns and row count).
+
+    Args:
+        connection_id: The connection identifier
+        schema_name: The schema name
+        table_name: The table name
+
+    Returns:
+        Detailed table metadata with columns and row count
+    """
+    # Get connection config from repository
+    connection_config = connection_repository.get(connection_id)
+    if not connection_config:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    try:
+        metadata_service = get_metadata_service()
+        table_details = await metadata_service.get_table_details(
+            connection_id=connection_id,
+            connection_name=connection_config.name,
+            source_type=connection_config.type,
+            config=connection_config.config,
+            schema_name=schema_name,
+            table_name=table_name,
+        )
+        return table_details
+
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to get table details for {schema_name}.{table_name}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve table details: {str(e)}",
+        )

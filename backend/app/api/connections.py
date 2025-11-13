@@ -46,7 +46,7 @@ async def get_saved_connection(connection_id: str):
 @router.put("/saved/{connection_id}")
 async def update_saved_connection(connection_id: str, config: ConnectionConfig):
     """Update a saved connection configuration."""
-    result = connection_manager.update_saved_connection(connection_id, config)
+    result = await connection_manager.update_saved_connection(connection_id, config)
     success, message = result
 
     if not success:

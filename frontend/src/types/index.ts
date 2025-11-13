@@ -1,6 +1,8 @@
+export type ConnectionType = "postgres" | "s3" | "mysql" | "oracle" | "dynamodb" | "csv" | "excel";
+
 export interface ConnectionConfig {
   name: string;
-  type: "postgres" | "s3" | "csv" | "excel";
+  type: ConnectionType;
   config: Record<string, any>;
   alias?: string;
 }
@@ -12,6 +14,15 @@ export interface PostgresConfig {
   username: string;
   password: string;
   schemas?: string; // Comma-separated list of schemas, or empty for all schemas
+}
+
+export interface S3Config {
+  bucket: string;
+  credential_type: "default" | "manual";
+  aws_access_key_id?: string;
+  aws_secret_access_key?: string;
+  aws_session_token?: string;
+  region?: string;
 }
 
 export interface ConnectionStatus {

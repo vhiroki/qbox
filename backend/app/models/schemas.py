@@ -8,8 +8,11 @@ class DataSourceType(str, Enum):
     """Supported data source types."""
 
     POSTGRES = "postgres"
-    # Future data sources
     S3 = "s3"
+    MYSQL = "mysql"
+    ORACLE = "oracle"
+    DYNAMODB = "dynamodb"
+    # File-based sources
     CSV = "csv"
     EXCEL = "excel"
 
@@ -69,6 +72,31 @@ class PostgresConnectionConfig(BaseModel):
             # 'schemas' as list or None is already in correct format
         
         return data
+
+
+class S3ConnectionConfig(BaseModel):
+    """AWS S3 connection configuration."""
+
+    bucket: str
+    credential_type: str = Field(
+        default="default",
+        description="Either 'default' for AWS credential provider chain or 'manual' for explicit credentials"
+    )
+    # Manual credentials (only required if credential_type == 'manual')
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_session_token: Optional[str] = None
+    region: Optional[str] = Field(default="us-east-1", description="AWS region")
+    
+    @model_validator(mode="after")
+    def validate_credentials(self) -> "S3ConnectionConfig":
+        """Validate that manual credentials are provided when credential_type is 'manual'."""
+        if self.credential_type == "manual":
+            if not self.aws_access_key_id or not self.aws_secret_access_key:
+                raise ValueError(
+                    "aws_access_key_id and aws_secret_access_key are required when credential_type is 'manual'"
+                )
+        return self
 
 
 class ConnectionStatus(BaseModel):

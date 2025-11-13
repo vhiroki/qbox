@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
-import type { SavedConnection, PostgresConfig, ConnectionConfig } from '../types';
+import type { SavedConnection, PostgresConfig, S3Config, ConnectionConfig, ConnectionType } from '../types';
 import { api } from '../services/api';
 import { useConnectionStore } from '../stores';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -44,7 +52,8 @@ export default function ConnectionManager() {
 
   // Create dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createFormData, setCreateFormData] = useState<PostgresConfig>({
+  const [createConnectionType, setCreateConnectionType] = useState<ConnectionType>('postgres');
+  const [createFormData, setCreateFormData] = useState<PostgresConfig | S3Config>({
     host: 'localhost',
     port: 5432,
     database: '',
@@ -60,7 +69,7 @@ export default function ConnectionManager() {
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<SavedConnection | null>(null);
-  const [editFormData, setEditFormData] = useState<PostgresConfig>({
+  const [editFormData, setEditFormData] = useState<PostgresConfig | S3Config>({
     host: 'localhost',
     port: 5432,
     database: '',
@@ -76,13 +85,46 @@ export default function ConnectionManager() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingConnection, setDeletingConnection] = useState<SavedConnection | null>(null);
 
+  // Filter state
+  const [typeFilter, setTypeFilter] = useState<ConnectionType | "all">("all");
+
   useEffect(() => {
     loadConnections();
   }, [loadConnections]);
 
+  // Helper function to get connection type prefix
+  const getTypePrefix = (type: string): string => {
+    const prefixMap: Record<string, string> = {
+      postgres: "pg",
+      s3: "s3",
+      mysql: "mysql",
+      oracle: "oracle",
+      dynamodb: "dynamodb",
+    };
+    return prefixMap[type] || "db";
+  };
+
+  // Helper function to get connection type badge variant
+  const getTypeBadgeVariant = (type: string): "default" | "secondary" | "destructive" | "outline" => {
+    const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      postgres: "default",
+      s3: "secondary",
+      mysql: "outline",
+      oracle: "outline",
+      dynamodb: "outline",
+    };
+    return variantMap[type] || "outline";
+  };
+
+  // Filter connections by type
+  const filteredConnections = typeFilter === "all"
+    ? connections
+    : connections.filter(conn => conn.type === typeFilter);
+
   const handleCreate = () => {
     setCreateConnectionName('');
     setCreateConnectionAlias('');
+    setCreateConnectionType('postgres');
     setCreateFormData({
       host: 'localhost',
       port: 5432,
@@ -95,12 +137,35 @@ export default function ConnectionManager() {
     setCreateDialogOpen(true);
   };
 
+  const handleConnectionTypeChange = (type: ConnectionType) => {
+    setCreateConnectionType(type);
+    setCreateError(null);
+    
+    // Reset form data based on type
+    if (type === 'postgres') {
+      setCreateFormData({
+        host: 'localhost',
+        port: 5432,
+        database: '',
+        username: '',
+        password: '',
+        schema: 'public',
+      });
+    } else if (type === 's3') {
+      setCreateFormData({
+        bucket: '',
+        credential_type: 'default',
+        region: 'us-east-1',
+      });
+    }
+  };
+
   const handleCreateSubmit = async () => {
     setCreateError(null);
     try {
       const config: ConnectionConfig = {
         name: createConnectionName,
-        type: 'postgres',
+        type: createConnectionType,
         config: createFormData,
         alias: createConnectionAlias || undefined,
       };
@@ -122,25 +187,39 @@ export default function ConnectionManager() {
       setEditConnectionName(fullConfig.name);
       // Show the alias field (custom or auto-generated indicator)
       setEditConnectionAlias(fullConfig.alias || '(auto-generated)');
-      // Handle schemas: can be array (new format) or string (legacy format)
-      let schemasValue = '';
-      if (Array.isArray(fullConfig.config.schemas)) {
-        schemasValue = fullConfig.config.schemas.join(', ');
-      } else if (fullConfig.config.schemas) {
-        schemasValue = fullConfig.config.schemas;
-      } else if (fullConfig.config.schema) {
-        // Legacy single schema field
-        schemasValue = fullConfig.config.schema;
+      
+      // Set form data based on connection type
+      if (fullConfig.type === 'postgres') {
+        // Handle schemas: can be array (new format) or string (legacy format)
+        let schemasValue = '';
+        if (Array.isArray(fullConfig.config.schemas)) {
+          schemasValue = fullConfig.config.schemas.join(', ');
+        } else if (fullConfig.config.schemas) {
+          schemasValue = fullConfig.config.schemas;
+        } else if (fullConfig.config.schema) {
+          // Legacy single schema field
+          schemasValue = fullConfig.config.schema;
+        }
+        
+        setEditFormData({
+          host: fullConfig.config.host || 'localhost',
+          port: fullConfig.config.port || 5432,
+          database: fullConfig.config.database || '',
+          username: fullConfig.config.username || '',
+          password: '', // Don't populate password
+          schemas: schemasValue,
+        });
+      } else if (fullConfig.type === 's3') {
+        setEditFormData({
+          bucket: fullConfig.config.bucket || '',
+          credential_type: fullConfig.config.credential_type || 'default',
+          aws_access_key_id: '', // Don't populate credentials
+          aws_secret_access_key: '', // Don't populate credentials
+          aws_session_token: '', // Don't populate credentials
+          region: fullConfig.config.region || 'us-east-1',
+        });
       }
       
-      setEditFormData({
-        host: fullConfig.config.host || 'localhost',
-        port: fullConfig.config.port || 5432,
-        database: fullConfig.config.database || '',
-        username: fullConfig.config.username || '',
-        password: '', // Don't populate password
-        schemas: schemasValue,
-      });
       setEditError(null);
       setEditDialogOpen(true);
     } catch (err: any) {
@@ -156,7 +235,7 @@ export default function ConnectionManager() {
     try {
       const updateConfig: ConnectionConfig = {
         name: editConnectionName,
-        type: 'postgres',
+        type: editingConnection.type as ConnectionType,
         config: editFormData,
         alias: editConnectionAlias || undefined,
       };
@@ -212,6 +291,33 @@ export default function ConnectionManager() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Type filter */}
+          {connections.length > 0 && (
+            <div className="mb-4 flex items-center gap-2">
+              <label htmlFor="type-filter" className="text-sm font-medium">
+                Filter by type:
+              </label>
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ConnectionType | "all")}>
+                <SelectTrigger id="type-filter" className="w-[180px]">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="postgres">PostgreSQL</SelectItem>
+                  <SelectItem value="s3">AWS S3</SelectItem>
+                  <SelectItem value="mysql">MySQL</SelectItem>
+                  <SelectItem value="oracle">Oracle</SelectItem>
+                  <SelectItem value="dynamodb">DynamoDB</SelectItem>
+                </SelectContent>
+              </Select>
+              {typeFilter !== "all" && (
+                <span className="text-sm text-muted-foreground">
+                  ({filteredConnections.length} of {connections.length})
+                </span>
+              )}
+            </div>
+          )}
+
           {isLoading && connections.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Loading connections...</div>
           ) : connections.length === 0 ? (
@@ -220,6 +326,10 @@ export default function ConnectionManager() {
               <Button onClick={handleCreate}>
                 Create Your First Connection
               </Button>
+            </div>
+          ) : filteredConnections.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No connections of type "{typeFilter}"
             </div>
           ) : (
             <Table>
@@ -235,14 +345,18 @@ export default function ConnectionManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {connections.map((connection) => (
+                {filteredConnections.map((connection) => (
                   <TableRow key={connection.id}>
                     <TableCell className="font-medium">{connection.name}</TableCell>
-                    <TableCell className="capitalize">{connection.type}</TableCell>
+                    <TableCell>
+                      <Badge variant={getTypeBadgeVariant(connection.type)}>
+                        {connection.type}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {connection.alias ? (
                         <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                          pg_{connection.alias}
+                          {getTypePrefix(connection.type)}_{connection.alias}
                         </code>
                       ) : (
                         <span className="text-muted-foreground italic">auto</span>
@@ -291,12 +405,13 @@ export default function ConnectionManager() {
           <DialogHeader>
             <DialogTitle>Edit Connection</DialogTitle>
             <DialogDescription>
-              Update the connection details. Leave password blank to keep the existing password.
+              Update the connection details. Leave sensitive fields blank to keep existing values.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <ConnectionFormFields
+              connectionType={editingConnection?.type as ConnectionType}
               connectionName={editConnectionName}
               connectionAlias={editConnectionAlias}
               formData={editFormData}
@@ -305,6 +420,7 @@ export default function ConnectionManager() {
               onFormDataChange={(updates) => setEditFormData({ ...editFormData, ...updates })}
               showPasswordPlaceholder={true}
               aliasReadOnly={true}
+              typeReadOnly={true}
             />
 
             {editError && (
@@ -331,15 +447,17 @@ export default function ConnectionManager() {
           <DialogHeader>
             <DialogTitle>Create New Connection</DialogTitle>
             <DialogDescription>
-              Configure a new PostgreSQL database connection.
+              Configure a new data source connection.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <ConnectionFormFields
+              connectionType={createConnectionType}
               connectionName={createConnectionName}
               connectionAlias={createConnectionAlias}
               formData={createFormData}
+              onTypeChange={handleConnectionTypeChange}
               onNameChange={setCreateConnectionName}
               onAliasChange={setCreateConnectionAlias}
               onFormDataChange={(updates) => setCreateFormData({ ...createFormData, ...updates })}

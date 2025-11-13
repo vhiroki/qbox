@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 import duckdb
 
-from app.models.schemas import PostgresConnectionConfig
+from app.models.schemas import PostgresConnectionConfig, S3ConnectionConfig, DataSourceType
 
 logger = logging.getLogger(__name__)
 
@@ -84,16 +84,27 @@ class DuckDBManager:
             except Exception as e:
                 logger.warning(f"Could not load extension {ext}: {e}")
 
-    def _sanitize_alias(self, name: str, connection_id: str) -> str:
-        """Create a valid SQL identifier from connection name.
+    def _sanitize_alias(self, name: str, connection_id: str, connection_type: DataSourceType) -> str:
+        """Create a valid SQL identifier from connection name with type-based prefix.
         
         Args:
             name: The connection name
             connection_id: The connection ID (used for uniqueness suffix)
+            connection_type: The type of connection (determines prefix)
             
         Returns:
-            A valid SQL identifier like 'pg_production_db'
+            A valid SQL identifier like 'pg_production_db' or 's3_data_bucket'
         """
+        # Map connection types to prefixes
+        prefix_map = {
+            DataSourceType.POSTGRES: "pg",
+            DataSourceType.S3: "s3",
+            DataSourceType.MYSQL: "mysql",
+            DataSourceType.ORACLE: "oracle",
+            DataSourceType.DYNAMODB: "dynamodb",
+        }
+        prefix = prefix_map.get(connection_type, "db")
+        
         # Convert to lowercase and replace spaces/special chars with underscores
         sanitized = re.sub(r'[^a-z0-9]+', '_', name.lower())
         
@@ -108,8 +119,8 @@ class DuckDBManager:
         # This prevents collisions if two connections have similar names
         suffix = connection_id.replace('-', '')[:8]
         
-        # Combine with pg_ prefix
-        alias = f"pg_{sanitized}_{suffix}"
+        # Combine with type-specific prefix
+        alias = f"{prefix}_{sanitized}_{suffix}"
         
         return alias
 
@@ -167,7 +178,7 @@ class DuckDBManager:
         if custom_alias:
             alias = f"pg_{custom_alias}"
         else:
-            alias = self._sanitize_alias(connection_name, connection_id)
+            alias = self._sanitize_alias(connection_name, connection_id, DataSourceType.POSTGRES)
 
         # Detach if already exists (in case of reattach or stale state)
         try:
@@ -210,17 +221,115 @@ class DuckDBManager:
             logger.error(f"Failed to attach PostgreSQL: {e}")
             raise
 
-    def detach_by_connection_id(self, connection_id: str) -> None:
-        """Detach a connection by its connection_id.
+    def configure_s3_secret(
+        self,
+        connection_id: str,
+        connection_name: str,
+        config: S3ConnectionConfig,
+        custom_alias: Optional[str] = None,
+        force_recreate: bool = False,
+    ) -> str:
+        """Configure S3 credentials as a DuckDB secret.
+
+        Args:
+            connection_id: Unique identifier for this connection
+            connection_name: Human-readable name for the connection
+            config: S3 configuration
+            custom_alias: Optional custom alias (if set by user)
+                         Falls back to auto-generated from connection_name
+            force_recreate: If True, drops and recreates the secret even if it exists
+
+        Returns:
+            The secret name that was created
+        """
+        # Check if already configured (unless forced to recreate)
+        if not force_recreate and connection_id in self._attached_connections:
+            cached_secret = self._attached_connections[connection_id]
+            logger.debug(f"S3 secret for connection {connection_id} already exists: '{cached_secret}'")
+            return cached_secret
+        
+        conn = self.connect()
+        # Use custom alias if provided, otherwise generate from connection name
+        if custom_alias:
+            secret_name = f"s3_{custom_alias}"
+        else:
+            secret_name = self._sanitize_alias(connection_name, connection_id, DataSourceType.S3)
+
+        # Drop secret if it exists (in case of recreate)
+        try:
+            conn.execute(f"DROP SECRET IF EXISTS {secret_name}")
+            logger.debug(f"Dropped existing secret: {secret_name}")
+        except Exception:
+            pass  # Ignore errors
+
+        # Create S3 secret based on credential type
+        try:
+            if config.credential_type == "manual":
+                # Create secret with explicit credentials
+                create_secret_query = f"""
+                    CREATE SECRET {secret_name} (
+                        TYPE S3,
+                        KEY_ID '{config.aws_access_key_id}',
+                        SECRET '{config.aws_secret_access_key}',
+                        REGION '{config.region or 'us-east-1'}'
+                    )
+                """
+                # Add session token if provided
+                if config.aws_session_token:
+                    create_secret_query = f"""
+                        CREATE SECRET {secret_name} (
+                            TYPE S3,
+                            KEY_ID '{config.aws_access_key_id}',
+                            SECRET '{config.aws_secret_access_key}',
+                            SESSION_TOKEN '{config.aws_session_token}',
+                            REGION '{config.region or 'us-east-1'}'
+                        )
+                    """
+                logger.debug(f"Creating S3 secret with manual credentials: {secret_name}")
+            else:
+                # Use default credential provider chain
+                create_secret_query = f"""
+                    CREATE SECRET {secret_name} (
+                        TYPE S3,
+                        PROVIDER CREDENTIAL_CHAIN,
+                        REGION '{config.region or 'us-east-1'}'
+                    )
+                """
+                logger.debug(f"Creating S3 secret with credential chain: {secret_name}")
+            
+            conn.execute(create_secret_query)
+            # Cache the secret name
+            self._attached_connections[connection_id] = secret_name
+            logger.info(f"Created S3 secret: '{secret_name}' (cached)")
+            return secret_name
+        except Exception as e:
+            logger.error(f"Failed to create S3 secret: {e}")
+            raise
+
+    def detach_by_connection_id(self, connection_id: str, connection_type: DataSourceType) -> None:
+        """Detach/cleanup a connection by its connection_id.
         
         Args:
             connection_id: Unique identifier for the connection
+            connection_type: Type of connection (determines cleanup method)
         """
-        if connection_id in self._attached_connections:
-            alias = self._attached_connections[connection_id]
-            self.detach_source(alias)
+        if connection_id not in self._attached_connections:
+            logger.debug(f"Connection {connection_id} not attached/configured, nothing to cleanup")
+            return
+        
+        identifier = self._attached_connections[connection_id]
+        
+        # Handle different connection types
+        if connection_type == DataSourceType.POSTGRES:
+            # PostgreSQL connections are attached, so we detach them
+            self.detach_source(identifier)
+        elif connection_type == DataSourceType.S3:
+            # S3 connections use secrets, so we drop the secret
+            self.drop_secret(identifier)
         else:
-            logger.debug(f"Connection {connection_id} not attached, nothing to detach")
+            logger.warning(f"Unknown connection type {connection_type} for cleanup")
+            # Try to detach as a fallback
+            self.detach_source(identifier)
     
     def detach_source(self, alias: str) -> None:
         """Detach a data source from DuckDB by alias and remove from cache."""
@@ -240,6 +349,25 @@ class DuckDBManager:
             logger.info(f"Detached source: {alias}")
         except Exception as e:
             logger.warning(f"Could not detach {alias}: {e}")
+    
+    def drop_secret(self, secret_name: str) -> None:
+        """Drop a DuckDB secret and remove from cache."""
+        if not self.conn:
+            return
+
+        try:
+            self.conn.execute(f"DROP SECRET IF EXISTS {secret_name}")
+            # Remove from cache
+            connection_id_to_remove = None
+            for conn_id, cached_secret in self._attached_connections.items():
+                if cached_secret == secret_name:
+                    connection_id_to_remove = conn_id
+                    break
+            if connection_id_to_remove:
+                del self._attached_connections[connection_id_to_remove]
+            logger.info(f"Dropped secret: {secret_name}")
+        except Exception as e:
+            logger.warning(f"Could not drop secret {secret_name}: {e}")
 
     def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any]]]:
         """Execute a SQL query on the DuckDB instance.

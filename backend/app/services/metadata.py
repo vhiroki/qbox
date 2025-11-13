@@ -1,18 +1,15 @@
 """Metadata collection service for data sources."""
 
 import logging
-from datetime import datetime
 from typing import Any, Optional
 
 from app.models.schemas import (
     ColumnMetadata,
     ConnectionMetadataLite,
     DataSourceType,
-    PostgresConnectionConfig,
     TableMetadata,
 )
 from app.services.duckdb_manager import get_duckdb_manager
-from app.services.metadata_collectors import PostgresMetadataCollector
 
 logger = logging.getLogger(__name__)
 
@@ -22,37 +19,6 @@ class MetadataService:
 
     def __init__(self):
         self.duckdb_manager = get_duckdb_manager()
-
-    async def collect_postgres_metadata(
-        self,
-        connection_id: str,
-        connection_name: str,
-        config: PostgresConnectionConfig,
-    ) -> ConnectionMetadataLite:
-        """Collect lightweight metadata from a PostgreSQL database using native connection.
-
-        Args:
-            connection_id: Unique connection identifier
-            connection_name: Human-readable connection name
-            config: PostgreSQL connection configuration
-
-        Returns:
-            Lightweight metadata for the connection (table names only)
-        """
-        try:
-            # Use native PostgreSQL collector (no DuckDB attachment needed for metadata)
-            collector = PostgresMetadataCollector(config)
-            metadata = await collector.collect_metadata(connection_id, connection_name)
-            
-            # Set timestamp
-            metadata.last_updated = datetime.utcnow().isoformat()
-            
-            return metadata
-
-        except Exception as e:
-            logger.error(f"Failed to collect PostgreSQL metadata: {e}")
-            raise
-
 
     async def get_table_details(
         self,
@@ -76,14 +42,31 @@ class MetadataService:
         Returns:
             Detailed table metadata with columns and row count
         """
-        if source_type == DataSourceType.POSTGRES:
-            postgres_config = PostgresConnectionConfig(**config)
-            
-            # Use native PostgreSQL collector (no DuckDB needed for metadata)
-            collector = PostgresMetadataCollector(postgres_config)
-            return await collector.get_table_details(schema_name, table_name)
-        else:
+        from app.connections import ConnectionRegistry
+        
+        # Get the connection class from registry
+        connection_class = ConnectionRegistry.get(source_type)
+        if not connection_class:
             raise NotImplementedError(f"Table details not implemented for {source_type}")
+        
+        # Create a temporary connection instance to get table details
+        connection = connection_class(
+            connection_id=connection_id,
+            connection_name=connection_name,
+            config=config
+        )
+        
+        # Get table details from the connection
+        table_dict = await connection.get_table_details(schema_name, table_name)
+        
+        # Convert to TableMetadata
+        from app.models.schemas import ColumnMetadata
+        return TableMetadata(
+            name=table_dict["name"],
+            schema_name=table_dict["schema_name"],
+            columns=[ColumnMetadata(**col) for col in table_dict["columns"]],
+            row_count=table_dict.get("row_count"),
+        )
 
     async def refresh_metadata(
         self,
@@ -103,13 +86,22 @@ class MetadataService:
         Returns:
             Updated lightweight metadata (table names only)
         """
-        if source_type == DataSourceType.POSTGRES:
-            postgres_config = PostgresConnectionConfig(**config)
-            return await self.collect_postgres_metadata(
-                connection_id, connection_name, postgres_config
-            )
-        else:
-            raise NotImplementedError(f"Metadata collection not implemented for " f"{source_type}")
+        from app.connections import ConnectionRegistry
+        
+        # Get the connection class from registry
+        connection_class = ConnectionRegistry.get(source_type)
+        if not connection_class:
+            raise NotImplementedError(f"Metadata collection not implemented for {source_type}")
+        
+        # Create a temporary connection instance to collect metadata
+        connection = connection_class(
+            connection_id=connection_id,
+            connection_name=connection_name,
+            config=config
+        )
+        
+        # Delegate to connection-specific metadata collection
+        return await connection.collect_metadata()
 
 
 # Global metadata service instance
@@ -178,20 +170,26 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
         # Attach to DuckDB for query execution (this is needed for running queries)
         # The attachment is now cached, so this is a cheap operation after the first time
         try:
-            # Parse connection config
-            from app.models.schemas import PostgresConnectionConfig
-            # connection_config is a ConnectionConfig object, access .config attribute
-            postgres_config = PostgresConnectionConfig(**connection_config.config)
+            # Get connection class from registry
+            from app.connections import ConnectionRegistry
             
-            # Attach the connection to DuckDB (needed for query execution)
-            # Use custom alias from connection_config if available
-            alias = duckdb_manager.attach_postgres(
-                connection_id, connection_name, postgres_config, 
-                custom_alias=connection_config.alias
+            connection_class = ConnectionRegistry.get(connection_config.type)
+            if not connection_class:
+                logger.warning(f"Unsupported connection type {connection_config.type}, skipping")
+                continue
+            
+            # Create connection instance for metadata collection
+            connection = connection_class(
+                connection_id=connection_id,
+                connection_name=connection_name,
+                config=connection_config.config
             )
             
-            # Create native collector for metadata (faster than querying DuckDB)
-            collector = PostgresMetadataCollector(postgres_config)
+            # Attach to DuckDB using connection-specific logic
+            alias = connection.attach_to_duckdb(
+                duckdb_manager=duckdb_manager,
+                custom_alias=connection_config.alias
+            )
             
         except Exception as e:
             logger.error(f"Failed to prepare connection {connection_id}: {e}")
@@ -204,8 +202,8 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
             table_name = selection.table_name
 
             try:
-                # Get metadata using native collector (no DuckDB queries needed)
-                table_details = await collector.get_table_details(schema_name, table_name)
+                # Get metadata using connection's get_table_details method
+                table_dict = await connection.get_table_details(schema_name, table_name)
 
                 query_metadata.append(
                     {
@@ -215,16 +213,8 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                         "alias": alias,  # Include DuckDB alias for SQL generation
                         "schema_name": schema_name,
                         "table_name": table_name,
-                        "columns": [
-                            {
-                                "name": col.name,
-                                "type": col.type,
-                                "nullable": col.nullable,
-                                "is_primary_key": col.is_primary_key,
-                            }
-                            for col in table_details.columns
-                        ],
-                        "row_count": table_details.row_count,
+                        "columns": table_dict["columns"],
+                        "row_count": table_dict.get("row_count"),
                     }
                 )
 

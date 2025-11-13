@@ -1,9 +1,15 @@
 """AWS S3 connection module."""
 
-from typing import Any
+from datetime import datetime
+from typing import Any, Optional
 
 from app.connections import BaseConnection, ConnectionRegistry
-from app.models.schemas import DataSourceType, S3ConnectionConfig, TableSchema
+from app.models.schemas import (
+    ConnectionMetadataLite,
+    DataSourceType,
+    S3ConnectionConfig,
+    TableSchema,
+)
 from app.services.duckdb_manager import get_duckdb_manager
 
 
@@ -69,8 +75,86 @@ class S3Connection(BaseConnection):
         """
         return []
 
+    async def get_metadata_lite(self) -> list[dict[str, str]]:
+        """
+        Get lightweight metadata from S3.
+        
+        Note: S3 doesn't have a traditional schema like databases.
+        Returns empty list.
+        """
+        return []
+
+    async def collect_metadata(self) -> ConnectionMetadataLite:
+        """
+        Collect full lightweight metadata structure from S3.
+        
+        Note: S3 doesn't have a traditional schema like databases.
+        Returns empty metadata structure.
+        """
+        return ConnectionMetadataLite(
+            connection_id=self.connection_id,
+            connection_name=self.connection_name,
+            source_type=DataSourceType.S3,
+            schemas=[],
+            last_updated=datetime.utcnow().isoformat(),
+        )
+
+    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+        """
+        Attach S3 connection to DuckDB for query execution.
+        
+        Note: S3 connections use secrets which are configured during connection creation.
+        This method returns the existing secret name/alias.
+        """
+        alias = duckdb_manager.get_attached_alias(self.connection_id)
+        if not alias:
+            raise RuntimeError(f"S3 connection {self.connection_id} not configured in DuckDB")
+        return alias
+
+    async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
+        """
+        Get detailed metadata for a specific S3 file.
+        
+        Note: S3 doesn't have traditional tables.
+        Raises NotImplementedError.
+        """
+        raise NotImplementedError("S3 doesn't support table details")
+
     async def cleanup(self, duckdb_manager) -> None:
         """Cleanup S3 secret from DuckDB."""
         # For S3, we drop the secret from the persistent DuckDB instance
-        duckdb_manager.detach_by_connection_id(self.connection_id, DataSourceType.S3)
+        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        if identifier:
+            duckdb_manager.drop_secret(identifier)
+            duckdb_manager.remove_connection_from_cache(self.connection_id)
+
+    def preserve_sensitive_fields(self, new_config: dict[str, Any], existing_config: dict[str, Any]) -> dict[str, Any]:
+        """Preserve AWS credentials if they're empty in the update."""
+        # AWS Access Key ID
+        if "aws_access_key_id" in new_config and not new_config["aws_access_key_id"]:
+            if "aws_access_key_id" in existing_config:
+                new_config["aws_access_key_id"] = existing_config["aws_access_key_id"]
+        
+        # AWS Secret Access Key
+        if "aws_secret_access_key" in new_config and not new_config["aws_secret_access_key"]:
+            if "aws_secret_access_key" in existing_config:
+                new_config["aws_secret_access_key"] = existing_config["aws_secret_access_key"]
+        
+        # AWS Session Token (optional)
+        if "aws_session_token" in new_config and not new_config["aws_session_token"]:
+            if "aws_session_token" in existing_config:
+                new_config["aws_session_token"] = existing_config["aws_session_token"]
+        
+        return new_config
+
+    def mask_sensitive_fields(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Mask AWS credentials for safe display."""
+        safe_config = config.copy()
+        if "aws_access_key_id" in safe_config:
+            safe_config["aws_access_key_id"] = ""
+        if "aws_secret_access_key" in safe_config:
+            safe_config["aws_secret_access_key"] = ""
+        if "aws_session_token" in safe_config:
+            safe_config["aws_session_token"] = ""
+        return safe_config
 

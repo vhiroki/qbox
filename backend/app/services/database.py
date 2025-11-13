@@ -140,7 +140,7 @@ class ConnectionManager:
             delete_saved: Whether to also delete the saved configuration
         
         Returns:
-            True if the connection was found and disconnected
+            True if the connection was found (in memory or saved) and disconnected
         """
         datasource = self.connections.get(connection_id)
         if datasource:
@@ -148,6 +148,9 @@ class ConnectionManager:
             del self.connections[connection_id]
 
         if delete_saved:
+            # Check if connection exists in saved configurations
+            connection_exists = connection_repository.exists(connection_id)
+            
             # Cleanup connection resources
             if datasource:
                 duckdb_manager = get_duckdb_manager()
@@ -158,6 +161,9 @@ class ConnectionManager:
             
             # Delete the connection configuration
             connection_repository.delete(connection_id)
+            
+            # Return success if connection was in memory or in saved configs
+            return datasource is not None or connection_exists
 
         return datasource is not None
 
@@ -177,21 +183,17 @@ class ConnectionManager:
         if not config:
             return None
 
-        # Return config without sensitive data
+        # Mask sensitive fields using connection type-specific logic
         safe_config = config.config.copy()
-        
-        # Mask sensitive fields based on connection type
-        if config.type == DataSourceType.POSTGRES:
-            if "password" in safe_config:
-                safe_config["password"] = ""  # Don't expose password
-        elif config.type == DataSourceType.S3:
-            # Mask AWS credentials
-            if "aws_access_key_id" in safe_config:
-                safe_config["aws_access_key_id"] = ""
-            if "aws_secret_access_key" in safe_config:
-                safe_config["aws_secret_access_key"] = ""
-            if "aws_session_token" in safe_config:
-                safe_config["aws_session_token"] = ""
+        connection_class = ConnectionRegistry.get(config.type)
+        if connection_class:
+            # Create a temporary instance to access the mask_sensitive_fields method
+            temp_instance = connection_class(
+                connection_id=connection_id,
+                connection_name=config.name,
+                config=safe_config
+            )
+            safe_config = temp_instance.mask_sensitive_fields(safe_config)
 
         return {
             "id": connection_id,
@@ -209,23 +211,16 @@ class ConnectionManager:
         if not existing:
             return False, "Connection not found"
 
-        # Preserve sensitive fields if they're empty in the update
-        if config.type == DataSourceType.POSTGRES:
-            # If password is empty in the update, keep the existing one
-            if "password" in config.config and not config.config["password"]:
-                if "password" in existing.config:
-                    config.config["password"] = existing.config["password"]
-        elif config.type == DataSourceType.S3:
-            # Preserve AWS credentials if empty in the update
-            if "aws_access_key_id" in config.config and not config.config["aws_access_key_id"]:
-                if "aws_access_key_id" in existing.config:
-                    config.config["aws_access_key_id"] = existing.config["aws_access_key_id"]
-            if "aws_secret_access_key" in config.config and not config.config["aws_secret_access_key"]:
-                if "aws_secret_access_key" in existing.config:
-                    config.config["aws_secret_access_key"] = existing.config["aws_secret_access_key"]
-            if "aws_session_token" in config.config and not config.config["aws_session_token"]:
-                if "aws_session_token" in existing.config:
-                    config.config["aws_session_token"] = existing.config["aws_session_token"]
+        # Preserve sensitive fields using connection type-specific logic
+        connection_class = ConnectionRegistry.get(config.type)
+        if connection_class:
+            # Create a temporary instance to access the preserve_sensitive_fields method
+            temp_instance = connection_class(
+                connection_id=connection_id,
+                connection_name=config.name,
+                config=config.config
+            )
+            config.config = temp_instance.preserve_sensitive_fields(config.config, existing.config)
 
         # Save the updated config
         try:

@@ -1,11 +1,18 @@
 """PostgreSQL connection module."""
 
+from datetime import datetime
 from typing import Any, Optional
 
 import duckdb
 
 from app.connections import BaseConnection, ConnectionRegistry
-from app.models.schemas import DataSourceType, PostgresConnectionConfig, TableSchema
+from app.models.schemas import (
+    ConnectionMetadataLite,
+    DataSourceType,
+    PostgresConnectionConfig,
+    TableSchema,
+)
+from app.services.metadata_collectors import PostgresMetadataCollector
 
 
 @ConnectionRegistry.register(DataSourceType.POSTGRES)
@@ -134,8 +141,80 @@ class PostgresConnection(BaseConnection):
 
         return schemas
 
+    async def get_metadata_lite(self) -> list[dict[str, str]]:
+        """Get lightweight metadata (table/schema names only) from PostgreSQL."""
+        collector = PostgresMetadataCollector(self.postgres_config)
+        metadata = await collector.collect_metadata(self.connection_id, self.connection_name)
+        
+        # Flatten to list of {schema_name, table_name} dicts
+        result = []
+        for schema in metadata.schemas:
+            for table in schema.tables:
+                result.append({
+                    "schema_name": schema.name,
+                    "table_name": table.name
+                })
+        return result
+
+    async def collect_metadata(self) -> ConnectionMetadataLite:
+        """Collect full lightweight metadata structure from PostgreSQL."""
+        collector = PostgresMetadataCollector(self.postgres_config)
+        metadata = await collector.collect_metadata(self.connection_id, self.connection_name)
+        
+        # Set timestamp
+        metadata.last_updated = datetime.utcnow().isoformat()
+        
+        return metadata
+
+    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+        """Attach PostgreSQL connection to DuckDB for query execution."""
+        return duckdb_manager.attach_postgres(
+            connection_id=self.connection_id,
+            connection_name=self.connection_name,
+            config=self.postgres_config,
+            custom_alias=custom_alias,
+        )
+
+    async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
+        """Get detailed metadata for a specific table."""
+        collector = PostgresMetadataCollector(self.postgres_config)
+        table_metadata = await collector.get_table_details(schema_name, table_name)
+        
+        # Convert to dict
+        return {
+            "name": table_metadata.name,
+            "schema_name": table_metadata.schema_name,
+            "columns": [
+                {
+                    "name": col.name,
+                    "type": col.type,
+                    "nullable": col.nullable,
+                    "is_primary_key": col.is_primary_key,
+                }
+                for col in table_metadata.columns
+            ],
+            "row_count": table_metadata.row_count,
+        }
+
     async def cleanup(self, duckdb_manager) -> None:
         """Cleanup PostgreSQL connection from DuckDB."""
         # For PostgreSQL, we detach from the persistent DuckDB instance
-        duckdb_manager.detach_by_connection_id(self.connection_id, DataSourceType.POSTGRES)
+        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        if identifier:
+            duckdb_manager.detach_source(identifier)
+            duckdb_manager.remove_connection_from_cache(self.connection_id)
+
+    def preserve_sensitive_fields(self, new_config: dict[str, Any], existing_config: dict[str, Any]) -> dict[str, Any]:
+        """Preserve password if it's empty in the update."""
+        if "password" in new_config and not new_config["password"]:
+            if "password" in existing_config:
+                new_config["password"] = existing_config["password"]
+        return new_config
+
+    def mask_sensitive_fields(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Mask password for safe display."""
+        safe_config = config.copy()
+        if "password" in safe_config:
+            safe_config["password"] = ""
+        return safe_config
 

@@ -59,6 +59,54 @@ class BaseConnection(ABC):
         pass
 
     @abstractmethod
+    async def get_metadata_lite(self) -> list[dict[str, str]]:
+        """
+        Get lightweight metadata (table/schema names only) from the data source.
+        
+        Returns:
+            List of dictionaries with schema_name and table_name keys
+        """
+        pass
+
+    @abstractmethod
+    async def collect_metadata(self) -> Any:
+        """
+        Collect full lightweight metadata structure for the data source.
+        
+        Returns:
+            ConnectionMetadataLite object with schemas and tables
+        """
+        pass
+
+    @abstractmethod
+    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+        """
+        Attach this connection to DuckDB for query execution.
+        
+        Args:
+            duckdb_manager: DuckDB manager instance
+            custom_alias: Optional custom alias to use instead of auto-generated one
+            
+        Returns:
+            The alias/identifier used in DuckDB for this connection
+        """
+        pass
+
+    @abstractmethod
+    async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
+        """
+        Get detailed metadata for a specific table.
+        
+        Args:
+            schema_name: Schema name
+            table_name: Table name
+            
+        Returns:
+            Dictionary with table metadata including columns and row count
+        """
+        pass
+
+    @abstractmethod
     async def cleanup(self, duckdb_manager) -> None:
         """
         Cleanup resources when connection is deleted.
@@ -67,6 +115,33 @@ class BaseConnection(ABC):
             duckdb_manager: DuckDB manager instance for cleanup operations
         """
         pass
+
+    def preserve_sensitive_fields(self, new_config: dict[str, Any], existing_config: dict[str, Any]) -> dict[str, Any]:
+        """
+        Preserve sensitive fields from existing config if they're empty in the new config.
+        
+        Args:
+            new_config: New configuration with potentially empty sensitive fields
+            existing_config: Existing configuration with actual sensitive values
+            
+        Returns:
+            Updated config with sensitive fields preserved where appropriate
+        """
+        # Default implementation: no sensitive fields to preserve
+        return new_config
+
+    def mask_sensitive_fields(self, config: dict[str, Any]) -> dict[str, Any]:
+        """
+        Mask sensitive fields in configuration for safe display.
+        
+        Args:
+            config: Configuration with sensitive values
+            
+        Returns:
+            Configuration with sensitive fields masked (empty strings)
+        """
+        # Default implementation: no sensitive fields to mask
+        return config
 
 
 class ConnectionRegistry:

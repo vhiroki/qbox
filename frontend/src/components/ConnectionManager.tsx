@@ -185,8 +185,8 @@ export default function ConnectionManager() {
       
       setEditingConnection(connection);
       setEditConnectionName(fullConfig.name);
-      // Show the alias field (custom or auto-generated indicator)
-      setEditConnectionAlias(fullConfig.alias || '(auto-generated)');
+      // Show the actual alias (should always exist after creation)
+      setEditConnectionAlias(fullConfig.alias || '');
       
       // Set form data based on connection type
       if (fullConfig.type === 'postgres') {

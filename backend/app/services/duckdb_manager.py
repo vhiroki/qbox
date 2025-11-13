@@ -145,6 +145,18 @@ class DuckDBManager:
             The alias if attached, None otherwise
         """
         return self._attached_connections.get(connection_id)
+    
+    def remove_connection_from_cache(self, connection_id: str) -> None:
+        """Remove a connection from the internal cache.
+        
+        This should be called by connection cleanup methods after they've
+        performed their cleanup operations (detach/drop secret).
+        
+        Args:
+            connection_id: Connection identifier to remove from cache
+        """
+        if connection_id in self._attached_connections:
+            del self._attached_connections[connection_id]
 
     def attach_postgres(
         self,
@@ -309,27 +321,20 @@ class DuckDBManager:
     def detach_by_connection_id(self, connection_id: str, connection_type: DataSourceType) -> None:
         """Detach/cleanup a connection by its connection_id.
         
+        DEPRECATED: This method is deprecated. Connection types should call
+        cleanup methods directly (detach_source/drop_secret) and then call
+        remove_connection_from_cache.
+        
         Args:
             connection_id: Unique identifier for the connection
-            connection_type: Type of connection (determines cleanup method)
+            connection_type: Type of connection (ignored, for backward compatibility)
         """
-        if connection_id not in self._attached_connections:
-            logger.debug(f"Connection {connection_id} not attached/configured, nothing to cleanup")
-            return
-        
-        identifier = self._attached_connections[connection_id]
-        
-        # Handle different connection types
-        if connection_type == DataSourceType.POSTGRES:
-            # PostgreSQL connections are attached, so we detach them
-            self.detach_source(identifier)
-        elif connection_type == DataSourceType.S3:
-            # S3 connections use secrets, so we drop the secret
-            self.drop_secret(identifier)
-        else:
-            logger.warning(f"Unknown connection type {connection_type} for cleanup")
-            # Try to detach as a fallback
-            self.detach_source(identifier)
+        logger.warning(
+            "detach_by_connection_id is deprecated. "
+            "Connection types should handle cleanup directly."
+        )
+        if connection_id in self._attached_connections:
+            del self._attached_connections[connection_id]
     
     def detach_source(self, alias: str) -> None:
         """Detach a data source from DuckDB by alias and remove from cache."""

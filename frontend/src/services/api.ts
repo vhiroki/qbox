@@ -296,4 +296,78 @@ export const api = {
   async deleteFile(fileId: string): Promise<void> {
     await axios.delete(`${API_BASE_URL}/files/${fileId}`);
   },
+
+  // S3 endpoints
+  async listS3Files(
+    connectionId: string,
+    prefix: string = "",
+    maxResults: number = 100,
+    continuationToken?: string,
+    flat: boolean = false
+  ): Promise<{
+    folders: Array<{ name: string; path: string; type: string }>;
+    files: Array<{
+      name: string;
+      path: string;
+      type: string;
+      size: number;
+      last_modified: string;
+      extension: string;
+      is_structured: boolean;
+    }>;
+    next_token?: string;
+    truncated: boolean;
+    count: number;
+  }> {
+    const response = await axios.get(`${API_BASE_URL}/s3/${connectionId}/list`, {
+      params: {
+        prefix,
+        max_results: maxResults,
+        continuation_token: continuationToken,
+        flat,
+      },
+    });
+    return response.data;
+  },
+
+  async getS3FileMetadata(
+    connectionId: string,
+    filePath: string
+  ): Promise<{
+    columns: Array<{ name: string; type: string; nullable: boolean }>;
+    row_count?: number;
+    file_type: string;
+    file_path: string;
+    s3_path: string;
+  }> {
+    const response = await axios.get(
+      `${API_BASE_URL}/s3/${connectionId}/metadata`,
+      {
+        params: { file_path: filePath },
+      }
+    );
+    return response.data;
+  },
+
+  async createS3FileView(
+    connectionId: string,
+    filePath: string,
+    viewName?: string
+  ): Promise<{
+    success: boolean;
+    view_name: string;
+    message: string;
+  }> {
+    const response = await axios.post(
+      `${API_BASE_URL}/s3/${connectionId}/view`,
+      null,
+      {
+        params: {
+          file_path: filePath,
+          view_name: viewName,
+        },
+      }
+    );
+    return response.data;
+  },
 };

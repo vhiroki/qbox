@@ -129,6 +129,41 @@ async def add_query_selection(query_id: str, selection: QueryTableSelectionReque
         raise HTTPException(status_code=404, detail="Query not found")
 
     try:
+        # If it's an S3 file, create a DuckDB view for it
+        if selection.source_type == "s3":
+            from app.services.s3_service import get_s3_service
+            from app.models.schemas import S3ConnectionConfig
+
+            # First, ensure the S3 secret is configured in DuckDB
+            # Get connection config
+            conn_config = connection_repository.get(selection.connection_id)
+            if not conn_config:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Connection {selection.connection_id} not found",
+                )
+
+            # Configure S3 secret if not already done
+            duckdb = get_duckdb_manager()
+            if not duckdb.is_attached(selection.connection_id):
+                s3_config = S3ConnectionConfig(**conn_config.config)
+                duckdb.configure_s3_secret(
+                    selection.connection_id,
+                    conn_config.name,
+                    s3_config,
+                    custom_alias=conn_config.alias,
+                )
+                logger.info(f"Configured S3 secret for connection {selection.connection_id}")
+
+            # Now create the file view
+            s3_service = get_s3_service()
+            # file_path is stored in table_name for S3 files
+            view_name = await s3_service.create_file_view(
+                connection_id=selection.connection_id,
+                file_path=selection.table_name
+            )
+            logger.info(f"Created S3 view '{view_name}' for file {selection.table_name}")
+        
         query_repository.add_table_selection(
             query_id,
             selection.connection_id,
@@ -150,6 +185,18 @@ async def remove_query_selection(query_id: str, selection: QueryTableSelectionRe
         raise HTTPException(status_code=404, detail="Query not found")
 
     try:
+        # If it's an S3 file, drop the DuckDB view
+        if selection.source_type == "s3":
+            from app.services.s3_service import get_s3_service
+            
+            s3_service = get_s3_service()
+            view_name = s3_service.get_file_view_name(
+                connection_id=selection.connection_id,
+                file_path=selection.table_name
+            )
+            await s3_service.drop_file_view(view_name)
+            logger.info(f"Dropped S3 view '{view_name}' for file {selection.table_name}")
+        
         success = query_repository.remove_table_selection(
             query_id,
             selection.connection_id,
@@ -197,8 +244,8 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
         # Attach all required connections (skip files as they're already registered as views)
         attached_connections = set()
         for selection in selections:
-            # Skip files - they're already registered as views in DuckDB
-            if selection.source_type == "file":
+            # Skip files and S3 - they're already registered as views in DuckDB
+            if selection.source_type in ["file", "s3"]:
                 continue
                 
             if selection.connection_id not in attached_connections:
@@ -294,8 +341,8 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
         # Attach all required connections (skip files as they're already registered as views)
         attached_connections = set()
         for selection in selections:
-            # Skip files - they're already registered as views in DuckDB
-            if selection.source_type == "file":
+            # Skip files and S3 - they're already registered as views in DuckDB
+            if selection.source_type in ["file", "s3"]:
                 continue
                 
             if selection.connection_id not in attached_connections:

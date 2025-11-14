@@ -200,7 +200,9 @@ INSTRUCTIONS:
 2. Use proper DuckDB syntax and functions
 3. Reference data sources correctly:
    - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
-   - For files: use ONLY the view name directly (e.g., file_sales or file_duplicatedstudentids)
+   - For CSV/Excel files: use ONLY the view name listed after "File:" (e.g., file_sales or file_duplicatedstudentids)
+   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., s3_filename)
+   - IMPORTANT: The "Original File" line is just for reference - DO NOT use it in SQL queries
 4. Be precise with column names and data types
 5. Add appropriate WHERE clauses, JOINs, GROUP BY, and ORDER BY as needed
 6. Optimize for readability and performance
@@ -256,7 +258,9 @@ INSTRUCTIONS:
 4. Use proper DuckDB syntax and functions
 5. Reference data sources correctly:
    - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
-   - For files: use ONLY the view name directly (e.g., file_sales or file_duplicatedstudentids)
+   - For CSV/Excel files: use ONLY the view name listed after "File:" (e.g., file_sales or file_duplicatedstudentids)
+   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., s3_filename)
+   - IMPORTANT: The "Original File" line is just for reference - DO NOT use it in SQL queries
 6. Preserve the user's manual edits unless they ask you to change them
 7. Return the COMPLETE updated SQL query, not just the changes
 
@@ -344,6 +348,27 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                 
                 table_info = f"\nFile: {view_name}"
                 table_info += f"\nOriginal File: {file_name}.{file_type}"
+                table_info += f"\nRow Count: {row_count}"
+                table_info += "\nColumns:"
+                
+                for col in columns:
+                    col_name = col.get("name", "")
+                    col_type = col.get("type", "")
+                    nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
+                    table_info += f"\n  - {col_name}: {col_type} {nullable}"
+                
+                context_parts.append(table_info)
+            elif source_type == "s3":
+                # Format S3 file metadata
+                view_name = table_meta.get("view_name", "unknown")
+                file_name = table_meta.get("file_name", "unknown")
+                file_path = table_meta.get("file_path", "unknown")
+                connection_name = table_meta.get("connection_name", "unknown")
+                
+                table_info = f"\nS3 File: {view_name}"
+                table_info += f"\nOriginal File: {file_name}"
+                table_info += f"\nS3 Path: {file_path}"
+                table_info += f"\nS3 Connection: {connection_name}"
                 table_info += f"\nRow Count: {row_count}"
                 table_info += "\nColumns:"
                 

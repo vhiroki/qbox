@@ -149,6 +149,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
     # Separate selections by source type
     connection_selections = [s for s in selections if s.source_type == "connection"]
     file_selections = [s for s in selections if s.source_type == "file"]
+    s3_selections = [s for s in selections if s.source_type == "s3"]
 
     # Process connection selections
     # Group selections by connection
@@ -266,6 +267,58 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
             
         except Exception as e:
             logger.error(f"Failed to get metadata for file {file_id}: {e}")
+            continue
+
+    # Process S3 file selections
+    for selection in s3_selections:
+        connection_id = selection.connection_id  # S3 connection ID
+        file_path = selection.table_name  # For S3, file path is stored in table_name
+        
+        try:
+            # Get connection config
+            connection_config = connection_repository.get(connection_id)
+            if not connection_config:
+                logger.warning(f"S3 Connection {connection_id} not found, skipping")
+                continue
+            
+            connection_name = connection_config.name
+            
+            # Get S3 service to retrieve view name
+            from app.services.s3_service import get_s3_service
+            
+            s3_service = get_s3_service()
+            view_name = s3_service.get_file_view_name(connection_id, file_path)
+            
+            # Get file metadata from DuckDB using the view name
+            file_metadata = duckdb_manager.get_file_metadata_by_view_name(view_name)
+            
+            # Extract file name from path
+            file_name = file_path.split('/')[-1]
+            
+            query_metadata.append(
+                {
+                    "source_type": "s3",
+                    "connection_id": connection_id,
+                    "connection_name": connection_name,
+                    "file_path": file_path,
+                    "file_name": file_name,
+                    "view_name": view_name,  # For SQL generation
+                    "table_name": file_name,  # Use file name as table name for display
+                    "columns": [
+                        {
+                            "name": col.name,
+                            "type": col.type,
+                            "nullable": col.nullable,
+                            "is_primary_key": col.is_primary_key,
+                        }
+                        for col in file_metadata["columns"]
+                    ],
+                    "row_count": file_metadata.get("row_count"),
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to get metadata for S3 file {file_path}: {e}")
             continue
 
     return query_metadata

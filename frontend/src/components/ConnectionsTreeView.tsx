@@ -68,11 +68,13 @@ export default function ConnectionsTreeView({
       setError(null);
       try {
         const metadata = await loadAllMetadata();
-        setAllMetadata(metadata);
+        // Filter out S3 connections - they should only appear in the S3 tab
+        const databaseMetadata = metadata.filter((conn) => conn.source_type !== "s3");
+        setAllMetadata(databaseMetadata);
 
-        // Load connection aliases
+        // Load connection aliases (only for database connections)
         const aliasMap = new Map<string, string>();
-        for (const conn of metadata) {
+        for (const conn of databaseMetadata) {
           try {
             const connectionInfo = await api.getSavedConnection(conn.connection_id);
             aliasMap.set(conn.connection_id, connectionInfo.alias || connectionInfo.name);
@@ -203,7 +205,9 @@ export default function ConnectionsTreeView({
     setError(null);
     try {
       const metadata = await loadAllMetadata(true); // Force refresh
-      setAllMetadata(metadata);
+      // Filter out S3 connections - they should only appear in the S3 tab
+      const databaseMetadata = metadata.filter((conn) => conn.source_type !== "s3");
+      setAllMetadata(databaseMetadata);
     } catch (err: any) {
       setError(err.message || "Failed to refresh connections");
     } finally {

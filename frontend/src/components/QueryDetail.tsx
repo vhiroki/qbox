@@ -48,6 +48,25 @@ interface QueryDetailProps {
   onQueryDeleted: () => void;
 }
 
+/**
+ * Generate a view name for an S3 file (matches backend logic in s3_service.py).
+ * Format: s3_{sanitized_file_name}
+ */
+function getS3ViewName(filePath: string): string {
+  // Get file name without extension
+  let fileName = filePath.split('/').pop() || filePath;
+  if (fileName.includes('.')) {
+    const parts = fileName.split('.');
+    parts.pop(); // Remove extension
+    fileName = parts.join('.');
+  }
+
+  // Sanitize file name (keep only alphanumeric and underscores)
+  const fileNameSafe = fileName.replace(/[^a-zA-Z0-9_]/g, '_');
+
+  return `s3_${fileNameSafe}`;
+}
+
 export default function QueryDetail({
   queryId,
   onQueryDeleted,
@@ -634,6 +653,9 @@ export default function QueryDetail({
                             if (selection.source_type === "file") {
                               const fileInfo = fileInfoMap.get(selection.connection_id);
                               label = fileInfo?.viewName || selection.table_name;
+                            } else if (selection.source_type === "s3") {
+                              // Use S3 view name instead of full path
+                              label = getS3ViewName(selection.table_name);
                             } else {
                               const connectionInfo = connectionInfoMap.get(selection.connection_id);
                               const alias = connectionInfo?.alias || selection.connection_id;

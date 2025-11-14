@@ -258,11 +258,14 @@ export default function ConnectionsTreeView({
   const handleCopyTableName = async (connectionId: string, schemaName: string, tableName: string, event: React.MouseEvent) => {
     event.stopPropagation();
 
-    // Get the connection alias
+    // Get the connection alias (or use connection_id as fallback)
     const alias = connectionAliases.get(connectionId) || connectionId;
 
-    // Build the full qualified name: alias.schema.table
-    const fullQualifiedName = `${alias}.${schemaName}.${tableName}`;
+    // Build DuckDB alias: pg_{sanitized_alias} where hyphens are replaced with underscores
+    const duckdbAlias = `pg_${alias.replace(/-/g, '_')}`;
+
+    // Build the full qualified name: pg_alias.schema.table
+    const fullQualifiedName = `${duckdbAlias}.${schemaName}.${tableName}`;
 
     const tableKey = getTableKey(connectionId, schemaName, tableName);
 

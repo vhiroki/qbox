@@ -658,9 +658,11 @@ export default function QueryDetail({
                               // Use S3 view name instead of full path
                               label = getS3ViewName(selection.table_name);
                             } else {
+                              // Database connection - use DuckDB alias format: pg_{sanitized_alias}
                               const connectionInfo = connectionInfoMap.get(selection.connection_id);
                               const alias = connectionInfo?.alias || selection.connection_id;
-                              label = `${alias}.${selection.schema_name}.${selection.table_name}`;
+                              const duckdbAlias = `pg_${alias.replace(/-/g, '_')}`;
+                              label = `${duckdbAlias}.${selection.schema_name}.${selection.table_name}`;
                             }
                             
                             const badgeKey = `${selection.source_type}-${selection.connection_id}-${selection.schema_name}-${selection.table_name}`;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +104,7 @@ export default function QueryDetail({
   const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(false);
 
   // Monaco Editor ref for keyboard shortcuts
   const editorRef = useRef<any>(null);
@@ -556,10 +557,10 @@ export default function QueryDetail({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-hidden p-4 relative">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left Panel - Tabs for SQL and Tables */}
-          <ResizablePanel defaultSize={65} minSize={40}>
+          <ResizablePanel defaultSize={isChatPanelCollapsed ? 100 : 65} minSize={40}>
             <div className="h-full pr-3">
               <Tabs defaultValue="sql" className="h-full flex flex-col">
                 <TabsList className="w-full justify-start mb-4 flex-shrink-0">
@@ -720,20 +721,38 @@ export default function QueryDetail({
             </div>
           </ResizablePanel>
 
-          <ResizableHandle withHandle />
+          {!isChatPanelCollapsed && (
+            <>
+              <ResizableHandle withHandle />
 
-          {/* Right Panel - Chat */}
-          <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-            <div className="h-full pl-3">
-              <ChatInterface
-                query={query}
-                onSQLChange={(sql) => {
-                  setSqlText(sql);
-                }}
-              />
-            </div>
-          </ResizablePanel>
+              {/* Right Panel - Chat */}
+              <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                <div className="h-full pl-3">
+                  <ChatInterface
+                    query={query}
+                    onSQLChange={(sql) => {
+                      setSqlText(sql);
+                    }}
+                    onCollapse={() => setIsChatPanelCollapsed(true)}
+                  />
+                </div>
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
+
+        {/* Floating expand button when chat is collapsed */}
+        {isChatPanelCollapsed && (
+          <Button
+            onClick={() => setIsChatPanelCollapsed(false)}
+            size="sm"
+            className="absolute top-4 right-4 z-10 shadow-lg"
+            title="Expand chat panel"
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Chat with AI
+          </Button>
+        )}
       </div>
 
       {/* Rename Dialog */}

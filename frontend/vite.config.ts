@@ -9,6 +9,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "./", // Use relative paths for Electron
+  publicDir: "public", // Ensure public folder is copied to output
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -16,6 +17,7 @@ export default defineConfig({
   },
   build: {
     // Let Electron Forge Vite plugin control output directory
+    copyPublicDir: true, // Explicitly copy public directory
     rollupOptions: {
       output: {
         manualChunks: undefined,

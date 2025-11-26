@@ -98,13 +98,16 @@ async function startBackend(): Promise<void> {
  */
 async function waitForBackendHealth(): Promise<void> {
   const startTime = Date.now();
-  const url = `http://${config.backend.host}:${config.backend.port}${config.backend.healthCheckEndpoint}`;
+  const healthUrl = `http://${config.backend.host}:${config.backend.port}${config.backend.healthCheckEndpoint}`;
+  const apiUrl = `http://${config.backend.host}:${config.backend.port}/api/queries/`;
 
+  // First, wait for basic health check
   while (Date.now() - startTime < config.backend.healthCheckTimeout) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(healthUrl);
       if (response.ok) {
-        return;
+        console.log('Backend health check passed, verifying API readiness...');
+        break;
       }
     } catch (error) {
       // Backend not ready yet, continue waiting
@@ -112,7 +115,27 @@ async function waitForBackendHealth(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, config.backend.healthCheckInterval));
   }
 
-  throw new Error('Backend health check timeout');
+  // Then verify the API is actually ready by testing a real endpoint
+  // This ensures all services (database, etc.) are initialized
+  let apiReady = false;
+  const apiCheckStart = Date.now();
+  while (Date.now() - apiCheckStart < 10000) { // 10 second timeout for API check
+    try {
+      const response = await fetch(apiUrl);
+      if (response.ok || response.status === 200) {
+        apiReady = true;
+        console.log('Backend API is ready');
+        break;
+      }
+    } catch (error) {
+      // API not ready yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  if (!apiReady) {
+    console.warn('Backend API check timed out, proceeding anyway...');
+  }
 }
 
 /**
@@ -219,7 +242,7 @@ function cleanupAutoUpdater(): void {
 }
 
 /**
- * Create the main application window
+ * Create the main application window with loading screen
  */
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -241,7 +264,29 @@ function createWindow(): void {
     mainWindow?.show();
   });
 
-  // Load the app
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+/**
+ * Load the loading screen
+ */
+function loadLoadingScreen(): void {
+  if (!mainWindow) return;
+  
+  // Load the loading screen from the renderer directory
+  // In production, public files are copied to the renderer output
+  const loadingPath = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/loading.html`);
+  mainWindow.loadFile(loadingPath);
+}
+
+/**
+ * Load the main application
+ */
+function loadMainApp(): void {
+  if (!mainWindow) return;
+  
   // Note: When using Electron Forge with Vite plugin, we need to use special variables
   // MAIN_WINDOW_VITE_DEV_SERVER_URL is injected by the plugin in development
   // MAIN_WINDOW_VITE_NAME is used to resolve the built files in production
@@ -255,10 +300,6 @@ function createWindow(): void {
     // The plugin handles the path resolution automatically
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
 }
 
 /**
@@ -266,13 +307,21 @@ function createWindow(): void {
  */
 async function initialize(): Promise<void> {
   try {
-    // Start backend first
-    await startBackend();
-    
-    // Create window
+    // Create window immediately and show loading screen
     createWindow();
     
-    // Setup auto-updater after window is created
+    // In production, show loading screen while backend starts
+    if (!config.isDevelopment) {
+      loadLoadingScreen();
+    }
+    
+    // Start backend (this waits for it to be ready)
+    await startBackend();
+    
+    // Backend is ready, load the main app
+    loadMainApp();
+    
+    // Setup auto-updater after app is loaded
     setupAutoUpdater();
   } catch (error) {
     console.error('Failed to initialize app:', error);
@@ -302,6 +351,8 @@ app.on('activate', () => {
   // On macOS, re-create window when dock icon is clicked and no windows are open
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+    // Backend should already be running, so load the main app directly
+    loadMainApp();
   }
 });
 

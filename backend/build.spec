@@ -6,6 +6,7 @@ Builds a standalone executable that includes Python and all dependencies
 
 import sys
 import os
+import certifi
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 block_cipher = None
@@ -14,6 +15,11 @@ block_cipher = None
 datas = []
 binaries = []
 hiddenimports = []
+
+# Include certifi's CA bundle for SSL certificate verification
+# This is critical for httpx/openai API calls in bundled apps
+certifi_ca_bundle = certifi.where()
+datas += [(certifi_ca_bundle, 'certifi')]
 
 # DuckDB needs special handling
 duckdb_datas, duckdb_binaries, duckdb_hidden = collect_all('duckdb')
@@ -60,6 +66,11 @@ hiddenimports += tiktoken_ext_hidden
 hiddenimports += collect_submodules('boto3')
 hiddenimports += collect_submodules('botocore')
 
+# HTTP client and SSL for API calls
+hiddenimports += collect_submodules('httpx')
+hiddenimports += collect_submodules('httpcore')
+hiddenimports += collect_submodules('certifi')
+
 # Other dependencies
 hiddenimports += [
     'uvicorn.logging',
@@ -75,6 +86,7 @@ hiddenimports += [
     'sqlite3',
     'json',
     'multipart',
+    'ssl',
 ]
 
 a = Analysis(

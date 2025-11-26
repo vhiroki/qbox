@@ -254,9 +254,6 @@ function createWindow(): void {
     // In production, load from built files
     // The plugin handles the path resolution automatically
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
-    
-    // Keep DevTools available in production (as requested)
-    mainWindow.webContents.openDevTools();
   }
 
   mainWindow.on('closed', () => {

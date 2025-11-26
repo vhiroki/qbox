@@ -4,17 +4,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-QBox is a local data query application that helps build and manage SQL queries across multiple data sources. It features PostgreSQL connections, AI-powered chat for SQL building, table selection with metadata, and query execution using DuckDB.
+QBox is an Electron desktop application for building and managing SQL queries across multiple data sources. It features PostgreSQL connections, AI-powered chat for SQL building, table selection with metadata, and query execution using DuckDB. The app runs locally with a bundled Python backend - no external servers required.
+
+**Full documentation**: See [README.md](README.md)
 
 **Tech Stack:**
-- Backend: Python 3.13+, FastAPI, DuckDB, SQLite, uvicorn, uv
-- Frontend: React 18, TypeScript, Vite, TailwindCSS, shadcn/ui, Zustand, pnpm
+- **Desktop**: Electron 39+ with Electron Forge, auto-update support, bundled backend
+- **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite, uvicorn, uv
+- **Frontend**: React 18, TypeScript 5+, Vite, TailwindCSS 4, shadcn/ui, Zustand
+- **Build**: PyInstaller for backend bundling, Electron Forge for packaging
+- **Platform**: macOS (Intel + Apple Silicon), Windows (x64), Linux (x64)
 
 ## Common Commands
 
 ### Development
 
-**Backend:**
+**Electron App (Primary Workflow):**
+```bash
+# First time setup
+./setup.sh
+
+# Development
+# Terminal 1: Backend
+./run-backend.sh
+
+# Terminal 2: Electron
+cd frontend
+npm run electron:dev
+```
+
+**Backend Only:**
 ```bash
 cd backend
 uv pip install -e .                    # Install dependencies
@@ -24,10 +43,17 @@ uvicorn app.main:app --reload --port 8080  # Run server
 **Frontend:**
 ```bash
 cd frontend
-pnpm install                           # Install dependencies
-pnpm dev                              # Run dev server (port 5173)
-pnpm build                            # Build for production
-pnpm lint                             # Run linter
+npm install                           # Install dependencies
+npm run electron:dev                  # Start Electron app (dev mode)
+npm run electron:build                # Package Electron app
+npm run electron:make                 # Create installers
+npm run build                         # Build React app only
+npm run lint                          # Run linter
+```
+
+**Build Distribution:**
+```bash
+./build-electron.sh --make            # Build installers for all platforms
 ```
 
 **Testing:**
@@ -53,11 +79,13 @@ cd frontend
 pnpm lint                             # Run ESLint
 ```
 
-### Ports
+### Ports (Development Mode)
 
 - Backend API: http://localhost:8080
-- Frontend: http://localhost:5173
+- Frontend Dev Server: http://localhost:5173 (Electron loads from here in dev mode)
 - API Docs: http://localhost:8080/docs
+
+**Note**: In production, the Electron app bundles both frontend (built static files) and backend (PyInstaller executable). No web server needed.
 
 ### Troubleshooting
 
@@ -105,7 +133,7 @@ lsof -ti:5173 | xargs kill -9  # Frontend
   - `settings` table: Application settings
 - `~/.qbox/qbox.duckdb` - Persistent DuckDB instance with attached data sources
 
-### Frontend Structure (React + TypeScript)
+### Frontend Structure (React + TypeScript + Electron)
 
 **Key Directories:**
 - `frontend/src/components/` - React components
@@ -123,6 +151,12 @@ lsof -ti:5173 | xargs kill -9  # Frontend
   - `useUIStore.ts` - UI state (modals, toasts, loading)
 - `frontend/src/services/api.ts` - Backend API client (Axios)
 - `frontend/src/types/` - TypeScript type definitions
+- `frontend/electron/` - Electron main process
+  - `main.ts` - Main process (manages window, spawns backend, handles lifecycle)
+  - `preload.ts` - Preload script (secure IPC bridge)
+  - `config.ts` - Electron configuration (ports, paths, auto-update)
+- `frontend/forge.config.ts` - Electron Forge build configuration
+- `frontend/vite.config.ts` - Vite bundler configuration
 
 ### Core Architectural Patterns
 
@@ -189,7 +223,7 @@ When adding tables to a query, the UI shows all data sources in a unified tree v
 - Descriptive variable names
 - Docstrings for public functions
 
-### TypeScript/React
+### TypeScript/React/Electron
 
 - Functional components with hooks only (no classes)
 - Strict TypeScript mode
@@ -198,6 +232,8 @@ When adding tables to a query, the UI shows all data sources in a unified tree v
 - Async/await for API calls
 - Try/catch with user-friendly error messages
 - Export types separately from components
+- Electron main process uses Node.js APIs (child_process, fs, path)
+- Renderer process communicates via REST API only (no direct IPC needed currently)
 
 ### Prefer
 
@@ -211,6 +247,7 @@ When adding tables to a query, the UI shows all data sources in a unified tree v
 ✅ TailwindCSS utilities over custom CSS
 ✅ shadcn/ui components
 ✅ Zustand stores for shared state
+✅ Electron-first development (use `run-backend.sh` + `npm run electron:dev`)
 
 ### Avoid
 
@@ -255,12 +292,35 @@ When adding tables to a query, the UI shows all data sources in a unified tree v
 - Debounce user input in search/filter fields
 - Metadata queries use efficient DuckDB system functions
 
-## Electron-Ready Design
+## Electron Desktop Architecture
 
-The application is designed to be packaged as an Electron desktop app:
-- Backend and frontend communicate only via REST API
+QBox is a native Electron desktop application:
+
+**Development Mode:**
+- Backend runs separately via `./run-backend.sh` (for hot reload)
+- Frontend loads from Vite dev server (http://localhost:5173)
+- Electron window opened via `npm run electron:dev`
+- DevTools enabled by default
+
+**Production Mode:**
+- Backend bundled as standalone executable with PyInstaller
+- Frontend built as static files with Vite
+- Electron spawns backend as child process on startup
+- Health check ensures backend is ready before showing UI
+- Single instance lock prevents multiple app instances
+
+**Key Design Principles:**
+- Backend and frontend communicate only via REST API (localhost:8080)
 - Use localhost URLs (avoid hardcoded IPs)
-- Cross-platform file paths
-- Avoid browser-specific APIs
-- State in backend where possible
-- Backend will run as child process in Electron
+- Cross-platform file paths (works on macOS, Windows, Linux)
+- Avoid browser-specific APIs (must work in Electron renderer)
+- State persists in backend SQLite database
+- Backend lifecycle managed by Electron main process
+- Auto-update support via electron-updater
+
+**Building:**
+- `./setup.sh` - One-time setup (installs all dependencies)
+- `./build-electron.sh --make` - Build complete distributable with installers
+- Backend built with PyInstaller (platform-specific)
+- Frontend built with Vite + Electron Forge
+- Output: DMG (macOS), EXE installer (Windows), DEB/RPM (Linux)

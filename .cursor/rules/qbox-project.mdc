@@ -7,7 +7,7 @@ alwaysApply: true
 # QBox Project Context
 
 ## Project Overview
-QBox is a query-based data management application for building and managing SQL queries across multiple sources. Users can create queries, connect to PostgreSQL databases, select tables, use AI-powered chat to build SQL interactively, and view comprehensive metadata. The app runs locally with Python FastAPI backend and React TypeScript frontend, designed for future Electron packaging.
+QBox is an Electron desktop application for building and managing SQL queries across multiple sources. Users can create queries, connect to PostgreSQL databases, select tables, use AI-powered chat to build SQL interactively, and view comprehensive metadata. The app runs completely locally with a bundled Python FastAPI backend and React TypeScript frontend - no external servers required.
 
 ## Core Architecture
 
@@ -29,18 +29,23 @@ QBox is a query-based data management application for building and managing SQL 
 - Desktop UX focus (keyboard shortcuts, native interactions)
 - Two-page structure: Queries (main view) and Connections (management)
 
-### Electron-Ready Design
-- Backend and frontend communicate only via REST API
-- Use localhost URLs (avoid hardcoded IPs)
-- Cross-platform file paths
-- Avoid browser-specific APIs
-- State in backend where possible
-- Backend runs as child process in Electron
+### Electron Desktop Architecture
+- **Development**: Backend runs separately (`./run-backend.sh`), frontend from Vite dev server
+- **Production**: Backend bundled with PyInstaller, spawned as child process by Electron main
+- Backend and frontend communicate only via REST API (localhost:8080)
+- Use localhost URLs (never hardcoded IPs)
+- Cross-platform file paths (macOS, Windows, Linux)
+- Avoid browser-specific APIs (must work in Electron renderer)
+- State persists in backend SQLite database
+- Single instance lock prevents multiple app instances
+- Auto-update support via electron-updater
 
 ## Technology Stack
 
+**Desktop**: Electron 39+, Electron Forge, electron-updater, PyInstaller
 **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite, uvicorn, uv
-**Frontend**: React 18, TypeScript 5+, Vite, TailwindCSS, shadcn/ui, Axios, pnpm
+**Frontend**: React 18, TypeScript 5+, Vite, TailwindCSS 4, shadcn/ui, Axios, Zustand
+**Package Managers**: uv (Python), npm or pnpm (Node)
 
 ## Code Style
 
@@ -53,12 +58,14 @@ QBox is a query-based data management application for building and managing SQL 
 - Descriptive variable names
 - Docstrings for public functions
 
-### TypeScript/React
+### TypeScript/React/Electron
 - Functional components with explicit types
 - No `any` type (use proper types or `unknown`)
 - Async/await for API calls
 - Try/catch with user-friendly error messages
 - Export types separately
+- Electron main process: Use Node.js APIs (child_process, fs, path)
+- Renderer process: Communicate via REST API only (no direct IPC)
 
 ## Project Structure
 
@@ -69,12 +76,16 @@ QBox is a query-based data management application for building and managing SQL 
 - `config/`: Settings and configuration
 
 **Frontend**:
-- `components/`: React components (small and focused)
+- `src/components/`: React components (small and focused)
   - `ui/`: shadcn/ui base components
-- `services/`: API client
-- `types/`: TypeScript definitions
-- `hooks/`: Custom React hooks
-- `utils/`: Helper functions
+- `src/services/`: API client
+- `src/types/`: TypeScript definitions
+- `src/stores/`: Zustand state management
+- `electron/`: Electron main process
+  - `main.ts`: Main process (window, backend lifecycle, auto-update)
+  - `preload.ts`: Preload script (secure IPC bridge)
+  - `config.ts`: Electron configuration
+- `forge.config.ts`: Electron Forge build configuration
 
 ## Query Architecture
 
@@ -179,6 +190,20 @@ Tables:
 - Appropriate HTTP status codes
 - Log technical details server-side
 
+## Development Workflow
+
+```bash
+# First time setup
+./setup.sh
+
+# Development (two terminals)
+./run-backend.sh                  # Terminal 1: Backend with hot reload
+cd frontend && npm run electron:dev  # Terminal 2: Electron app
+
+# Building
+./build-electron.sh --make        # Build complete distributable with installers
+```
+
 ## Prefer
 
 ✅ Async/await over callbacks
@@ -190,12 +215,13 @@ Tables:
 ✅ Functional React components with hooks
 ✅ TailwindCSS utilities over custom CSS
 ✅ shadcn/ui components
+✅ Electron-first development (use `./run-backend.sh` + `npm run electron:dev`)
 
 ## Avoid
 
-❌ Global state (use React state or backend persistence)
+❌ Global state (use Zustand stores or backend persistence)
 ❌ Blocking I/O operations
-❌ Hardcoded values
+❌ Hardcoded values (especially ports, IPs, file paths)
 ❌ Complex class hierarchies
 ❌ Browser-specific code (won't work in Electron)
 ❌ Direct DOM manipulation
@@ -204,3 +230,4 @@ Tables:
 ❌ Dark/light theme toggles (dark theme only)
 ❌ Custom CSS when TailwindCSS utilities exist
 ❌ Creating documentation files (*.md, README, etc.) unless explicitly requested
+❌ Web server assumptions (this is a desktop app, not a web app)

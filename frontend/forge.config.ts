@@ -1,0 +1,116 @@
+import type { ForgeConfig } from '@electron-forge/shared-types';
+import { VitePlugin } from '@electron-forge/plugin-vite';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerDMG } from '@electron-forge/maker-dmg';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
+import path from 'path';
+
+const config: ForgeConfig = {
+  packagerConfig: {
+    name: 'QBox',
+    executableName: 'qbox',
+    appBundleId: 'com.qbox.app',
+    appCategoryType: 'public.app-category.developer-tools',
+    icon: path.resolve(__dirname, 'assets', 'icons', 'icon'),
+    asar: true,
+    extraResource: [
+      // Backend executable will be placed here by the build script
+      path.resolve(__dirname, '..', 'backend', 'dist'),
+    ],
+    osxSign: {
+      // Code signing configuration for macOS (optional)
+      // identity: 'Developer ID Application: Your Name (TEAM_ID)',
+    },
+    osxNotarize: {
+      // Notarization for macOS (optional, requires Apple Developer account)
+      // tool: 'notarytool',
+      // appleId: process.env.APPLE_ID || '',
+      // appleIdPassword: process.env.APPLE_PASSWORD || '',
+      // teamId: process.env.APPLE_TEAM_ID || '',
+    },
+  },
+  rebuildConfig: {},
+  makers: [
+    // Windows installer
+    new MakerSquirrel({
+      name: 'qbox',
+      authors: 'QBox Team',
+      description: 'AI-powered data query application',
+      iconUrl: 'https://example.com/icon.ico', // Update with your icon URL
+      setupIcon: path.resolve(__dirname, 'assets', 'icons', 'icon.ico'),
+      loadingGif: undefined,
+      noMsi: true,
+    }),
+    // macOS DMG
+    new MakerDMG({
+      name: 'QBox',
+      icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'),
+      background: undefined, // Optional: path to background image
+      format: 'ULFO',
+    }),
+    // Linux Debian package
+    new MakerDeb({
+      options: {
+        name: 'qbox',
+        productName: 'QBox',
+        genericName: 'Data Query Tool',
+        description: 'AI-powered data query application',
+        categories: ['Development', 'Database'],
+        icon: path.resolve(__dirname, 'assets', 'icons', 'icon.png'),
+        maintainer: 'QBox Team',
+        homepage: 'https://github.com/yourusername/qbox', // Update with your repo
+      },
+    }),
+    // Linux RPM package
+    new MakerRpm({
+      options: {
+        name: 'qbox',
+        productName: 'QBox',
+        genericName: 'Data Query Tool',
+        description: 'AI-powered data query application',
+        categories: ['Development', 'Database'],
+        icon: path.resolve(__dirname, 'assets', 'icons', 'icon.png'),
+        homepage: 'https://github.com/yourusername/qbox', // Update with your repo
+      },
+    }),
+  ],
+  plugins: [
+    new VitePlugin({
+      // Vite config for main process
+      build: [
+        {
+          entry: 'electron/main.ts',
+          config: 'vite.main.config.ts',
+        },
+        {
+          entry: 'electron/preload.ts',
+          config: 'vite.preload.config.ts',
+        },
+      ],
+      // Vite config for renderer process
+      renderer: [
+        {
+          name: 'main_window',
+          config: 'vite.config.ts',
+        },
+      ],
+    }),
+  ],
+  hooks: {
+    postMake: async (forgeConfig, makeResults) => {
+      console.log('✅ Make completed successfully!');
+      console.log('\nGenerated artifacts:');
+      makeResults.forEach((result) => {
+        console.log(`\n📦 Platform: ${result.platform}/${result.arch}`);
+        result.artifacts.forEach((artifact) => {
+          console.log(`   - ${artifact}`);
+        });
+      });
+      return makeResults;
+    },
+  },
+};
+
+export default config;
+

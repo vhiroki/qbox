@@ -1,254 +1,451 @@
 # QBox
 
-QBox is a local data query application that helps you build and manage SQL queries across multiple data sources. Create queries, connect to PostgreSQL databases, select tables to work with, and use AI-powered chat to interactively build your SQL.
+AI-powered data query desktop application for building and managing SQL queries across multiple data sources.
 
-## Features
+## Overview
 
-- 💬 **AI-Powered Query Building**: Chat with AI to iteratively build and refine SQL queries
-- 📊 **Query Management**: Create and manage multiple queries for different analysis tasks
-- 🐘 **PostgreSQL Support**: Connect to multiple PostgreSQL databases simultaneously
-- 🦆 **DuckDB Query Engine**: Fast, embedded analytical database for cross-source queries
-- 🗂️ **Metadata Management**: Automatic schema discovery and metadata collection
-- 💾 **Persistent Queries**: Your queries, table selections, and chat history are saved across sessions
-- 🌐 **Modern Web Interface**: Clean, dark-themed UI built with React and TypeScript
-- 🔌 **Extensible Architecture**: Ready for future data sources (S3, CSV, Excel)
+QBox is an Electron desktop application that lets you:
+- Connect to PostgreSQL databases and browse schemas with full metadata
+- Build SQL queries interactively with AI assistance via chat
+- Execute queries across multiple data sources using DuckDB
+- Manage data sources including databases, local files, and S3 buckets
+- Track query history and iterate with AI-powered refinements
 
-## Tech Stack
+## Architecture
 
-- **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, shadcn/ui, Zustand
-- **Data Storage**: SQLite (connections and query persistence), DuckDB (query execution)
-- **State Management**: Zustand (centralized frontend state)
-- **Package Management**: uv (Python), pnpm (Node.js)
-
-## Prerequisites
-
-- Python 3.13 or higher
-- Node.js 18 or higher
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
-- [pnpm](https://pnpm.io/) - Fast Node.js package manager
-- PostgreSQL database(s) to connect to
+- **Desktop**: Electron with bundled Python backend
+- **Frontend**: React 18 + TypeScript + TailwindCSS + shadcn/ui
+- **Backend**: Python FastAPI + DuckDB + SQLite
+- **AI**: OpenAI integration for interactive SQL building
+- **Data**: DuckDB for analytics, SQLite for persistence
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
 
-Install uv (if not already installed):
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+- **Node.js** 18+ and npm (or pnpm)
+- **Python** 3.11+
+- **macOS, Linux, or Windows**
 
-Install pnpm (if not already installed):
-```bash
-npm install -g pnpm
-```
-
-### 2. Environment Setup
-
-No environment variables are required for basic operation. The application stores connection information and query data in local SQLite databases at `~/.qbox/`.
-
-### 3. Install Backend Dependencies
+### Setup and Run
 
 ```bash
-cd backend
-uv pip install -e .
-```
+# 1. One-time setup
+./setup.sh
 
-### 4. Install Frontend Dependencies
+# 2. Start backend (Terminal 1)
+./run-backend.sh
 
-```bash
+# 3. Start Electron app (Terminal 2)
 cd frontend
-pnpm install
+npm run electron:dev
 ```
 
-### 5. Run the Application
+**First Launch**: Configure your OpenAI API key in Settings → it's saved securely in the local database.
 
-Start the backend server (from the `backend` directory):
+That's it! The app opens in an Electron window with DevTools enabled for development.
+
+### What `setup.sh` Does
+
+- Creates Python virtual environment (uses `uv` if available, falls back to `pip`)
+- Installs all backend dependencies (FastAPI, DuckDB, etc.)
+- Installs PyInstaller for building distributables
+- Installs frontend dependencies (uses `pnpm` if available, falls back to `npm`)
+- Creates `.env` template if needed
+
+## Building for Distribution
+
+### Quick Build
+
 ```bash
-uvicorn app.main:app --reload --port 8080
+# Build everything and create installers
+./build-electron.sh --make
 ```
 
-In a new terminal, start the frontend dev server (from the `frontend` directory):
+This builds the Python backend with PyInstaller, builds the React frontend with Vite, and creates platform-specific installers.
+
+### Manual Build Steps
+
 ```bash
-pnpm dev
-```
-
-The application will be available at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8080
-- API Documentation: http://localhost:8080/docs
-
-## How to Use
-
-### 1. Create a Query
-
-1. On the **Queries** page (default view), click **Create Query**
-2. Enter a name for your query (e.g., "Sales Analysis")
-3. Click **Create**
-4. Your new query appears in the left panel
-
-### 2. Create a Connection
-
-1. Navigate to the **Connections** page using the top navigation
-2. Click **Create New Connection**
-3. Fill in your PostgreSQL connection details:
-   - Connection Name (e.g., "Production DB")
-   - Host, Port, Database
-   - Username and Password
-   - Schema (default: "public")
-4. Click **Create Connection**
-
-### 3. Select Tables for Your Query
-
-1. Go back to the **Queries** page and select your query
-2. Switch to the **Tables** tab
-3. Browse the tree view showing all your connections → schemas → tables
-4. Check/uncheck tables to add or remove them from your query (saves automatically)
-5. Use the **filter** to search for specific tables by name
-6. Toggle **"Show Only Selected"** to focus on your chosen tables
-7. Click the **refresh button** to update connection metadata
-
-### 4. Build SQL with AI Chat
-
-1. In the query detail area, switch to the **SQL Query** tab
-2. The SQL editor shows your current query (initially empty)
-3. Type a message to the AI like "Write a SELECT query to get all active users"
-4. The AI will generate SQL and update the editor
-5. Continue chatting to refine: "Add a WHERE clause for created_at > '2024-01-01'"
-6. Each message iteratively improves the SQL based on your selected tables
-
-### 5. View Table Metadata
-
-1. In the **Tables** tab, expand any table in the tree view
-2. Click the arrow next to a table to see:
-   - Column names and data types
-   - Nullable fields
-   - Primary keys (if available)
-   - Row counts displayed inline
-
-### 6. Manage Queries
-
-- **Switch Queries**: Click on any query in the left panel
-- **Edit SQL Directly**: You can manually edit the SQL in the editor
-- **Run Queries**: Execute SQL and view paginated results
-- **Export Results**: Download query results as CSV
-- **Clear Chat**: Remove chat history while keeping the SQL
-- **Delete Query**: Click the trash icon in the query header (removes query, selections, and chat history)
-
-## Development
-
-### Running in Development Mode
-
-**VS Code (Recommended):**
-1. Start frontend: Command Palette (`Cmd+Shift+P`) → `Tasks: Run Task` → "Start Frontend Dev Server"
-2. Start backend with debugging: Press `F5` to launch "Python: FastAPI Backend"
-3. Or run both without debug: `Tasks: Run Task` → "Start Both Servers (No Debug)"
-
-**Terminal:**
-```bash
-# Terminal 1 - Backend
+# 1. Build backend executable
 cd backend
-uvicorn app.main:app --reload --port 8080
+source .venv/bin/activate
+python build.py
 
-# Terminal 2 - Frontend
-cd frontend
-pnpm dev
+# 2. Build and package Electron app
+cd ../frontend
+npm run electron:make
 ```
 
-### Adding Dependencies
+### Output
 
-**Python packages:**
-```bash
-# Edit backend/pyproject.toml, then:
-cd backend
-uv pip install -e .
+Installers are created in `frontend/out/make/`:
+- **macOS**: DMG installer (`*.dmg`)
+- **Windows**: Squirrel installer (`Setup.exe`)
+- **Linux**: DEB and RPM packages (`*.deb`, `*.rpm`)
+
+Packaged apps (without installer) are in `frontend/out/qbox-{platform}-{arch}/`.
+
+### Platform Notes
+
+**Important**: Build on the target platform. PyInstaller doesn't support cross-compilation:
+- **macOS**: Build on macOS (Intel or Apple Silicon)
+- **Windows**: Build on Windows
+- **Linux**: Build on Linux
+
+## Project Structure
+
+```
+qbox/
+├── backend/                  # Python FastAPI backend
+│   ├── app/
+│   │   ├── api/             # API route handlers (thin HTTP layer)
+│   │   ├── services/        # Business logic (core functionality)
+│   │   ├── models/          # Pydantic schemas
+│   │   └── config/          # Settings and configuration
+│   ├── build.py             # PyInstaller build script
+│   └── build.spec           # PyInstaller configuration
+├── frontend/                 # React + Electron frontend
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── services/        # API client (api.ts)
+│   │   ├── stores/          # Zustand state management
+│   │   └── types/           # TypeScript definitions
+│   ├── electron/
+│   │   ├── main.ts          # Main Electron process
+│   │   ├── preload.ts       # Preload script (secure IPC)
+│   │   └── config.ts        # Electron configuration
+│   ├── assets/icons/        # Application icons
+│   ├── forge.config.ts      # Electron Forge configuration
+│   └── vite.config.ts       # Vite build configuration
+├── setup.sh                 # One-time development setup
+├── run-backend.sh           # Start backend for development
+├── build-electron.sh        # Build complete distributable
+└── validate-electron-setup.sh  # Validate development setup
 ```
 
-**npm packages:**
-```bash
-cd frontend
-pnpm add package-name
-```
+## Key Features
 
-### Architecture
+### Database Connections
+- PostgreSQL connections with full schema introspection
+- Real-time metadata caching (5-minute TTL)
+- Browse tables, columns, types, and constraints
+- Connection status monitoring
+- Extensible architecture for additional database types
 
-**Backend (`backend/app/`):**
-- `api/` - FastAPI route handlers (connections, queries, metadata)
-- `services/` - Business logic (DuckDB manager, repositories, metadata collection, AI service)
-- `models/` - Pydantic schemas
-- `config/` - Application settings
+### AI-Powered Query Building
+- Interactive chat interface for SQL generation
+- Iterative query refinement with AI assistance
+- Context-aware suggestions based on selected tables
+- SQL history tracking per query
+- Multi-table joins across different data sources
 
-**Frontend (`frontend/src/`):**
-- `components/` - React components
-  - `QueryList.tsx` - Left panel: list of all queries
-  - `QueryDetail.tsx` - Right panel: query details with tabs (SQL Query and Tables)
-  - `ChatInterface.tsx` - AI chat for interactive SQL editing
-  - `DataSourcesTreeView.tsx` - Tree view with checkboxes for real-time table selection
-  - `ConnectionManager.tsx` - Connection CRUD interface
-- `stores/` - Zustand state management stores
-  - `useQueryStore.ts` - Query state and operations
-  - `useConnectionStore.ts` - Connection state and metadata cache (5-minute TTL)
-  - `useUIStore.ts` - UI state (modals, toasts, loading)
-- `services/api.ts` - Backend API client
-- `types/` - TypeScript definitions
+### Data Sources
+- **PostgreSQL**: Full schema browsing and querying
+- **Local Files**: CSV, Parquet, JSON
+- **S3 Buckets**: Cloud storage integration
+- **Extensible**: Architecture supports adding more source types
 
-**Key Concepts:**
-- **Query**: A named SQL query with selected tables (can include tables from multiple connections)
-- **Connection**: Saved database configuration (PostgreSQL)
-- **Data Sources**: Extensible concept supporting different source types (currently 'connection', planned: 'file', 's3')
-- **Chat History**: Conversational context for iterative SQL editing with AI
-- **DuckDB Manager**: Persistent instance that attaches to multiple PostgreSQL databases using system functions
-- **Metadata**: Auto-collected schema info (tables, columns, types, row counts) with 5-minute cache
-- **State Management**: Zustand stores provide centralized state with automatic reactivity and Redux DevTools integration
+### DuckDB Integration
+- In-process analytics engine
+- Cross-source queries (join PostgreSQL with CSV, etc.)
+- Persistent storage at `~/.qbox/qbox.duckdb`
+- Single writer mode to avoid concurrency issues
+- Connections attached with `pg_` prefix aliases
 
-### Troubleshooting
-
-**Port already in use:**
-```bash
-lsof -ti:8080 | xargs kill -9  # Backend
-lsof -ti:5173 | xargs kill -9  # Frontend
-```
-
-**Module not found errors:**
-```bash
-cd backend && uv pip install -e .
-cd frontend && pnpm install
-```
+### User Interface
+- **Dark theme** design for comfortable use
+- **Two-page structure**: Queries (main) and Connections (management)
+- **Query Detail**: Tabs for SQL editing and table selection
+- **Tree View**: Browse all data sources with metadata
+- **Real-time filtering**: Search tables, show only selected
+- **Desktop UX**: Keyboard shortcuts, native interactions
 
 ## Data Storage
 
-QBox stores data locally in `~/.qbox/`:
-- `connections.db` - SQLite database with:
-  - Connection configurations (id, name, type, config, alias)
-  - Queries (id, name, sql_text, timestamps)
-  - Query selections (query_id, connection_id, schema_name, table_name, source_type)
-  - Chat history (query_id, role, message)
-  - SQL history (query_id, sql_text, timestamps)
-- `qbox.duckdb` - Persistent DuckDB instance with attached data sources
+QBox stores all data locally in `~/.qbox/`:
+- **`qbox.duckdb`**: DuckDB database (query results, attached connections)
+- **`connections.db`**: SQLite database (connections, queries, selections, chat history)
 
-## Roadmap
+Schema:
+- `connections`: Saved database connections
+- `queries`: Query definitions with SQL text
+- `query_selections`: Table selections per query
+- `query_chat_history`: AI chat messages per query
 
-**Completed:**
-- ✅ PostgreSQL connection management
-- ✅ Query management (create, list, delete, rename)
-- ✅ Tree view interface for browsing and selecting tables
-- ✅ Real-time table selection with checkboxes
-- ✅ Table filtering and "show selected only" toggle
-- ✅ AI-powered chat interface for interactive SQL editing
-- ✅ Chat history persistence per query
-- ✅ SQL version history (last 50 versions per query)
-- ✅ Automatic metadata discovery with caching (5-minute TTL)
-- ✅ Query execution with pagination
-- ✅ CSV export of query results
-- ✅ View detailed table metadata (columns, types, row counts)
+## Development
 
-**Planned:**
-- [ ] Advanced query result visualization
-- [ ] CSV file data source support
-- [ ] Excel file data source support
-- [ ] S3 bucket data source support
-- [ ] Electron desktop application packaging
+### Available Commands
+
+```bash
+# Setup
+./setup.sh                      # One-time setup (all dependencies)
+./validate-electron-setup.sh    # Check setup status
+
+# Development
+./run-backend.sh                # Start backend server
+npm run electron:dev            # Start Electron app (from frontend/)
+
+# Building
+./build-electron.sh             # Package app only
+./build-electron.sh --make      # Create installers
+python backend/build.py         # Build backend executable only
+npm run electron:build          # Package Electron only (from frontend/)
+npm run electron:make           # Create installers only (from frontend/)
+
+# Frontend only
+npm run build                   # Build React app
+npm run lint                    # Run ESLint
+```
+
+### Development Mode
+
+In development mode:
+- Backend runs via `./run-backend.sh` with hot reload (`--reload` flag)
+- Frontend loads from Vite dev server (http://localhost:5173)
+- Backend API available at http://localhost:8080
+- DevTools open by default for debugging
+- Changes to React code hot reload automatically
+- Changes to Python code trigger backend restart
+
+### Backend Development
+
+The backend uses:
+- **FastAPI** for REST API
+- **DuckDB** for query execution and analytics
+- **SQLite** for persistent storage
+- **Pydantic** for validation and serialization
+- **Repository pattern** for data access
+- **uvicorn** with single worker (DuckDB constraint)
+
+Code style:
+- PEP 8 compliant (Black + Ruff)
+- Type hints required for all functions
+- Async/await for I/O operations
+- Small, single-purpose functions
+
+### Frontend Development
+
+The frontend uses:
+- **React 18** functional components with hooks (no classes)
+- **TypeScript** strict mode (no `any` types)
+- **Zustand** for state management
+- **TailwindCSS** + **shadcn/ui** for styling
+- **Monaco Editor** for SQL editing
+
+Component structure:
+- Small, focused components
+- Explicit TypeScript types for all props
+- Try/catch with user-friendly error messages
+- API calls through `services/api.ts`
+
+## Configuration
+
+### OpenAI API Key
+
+Configure your OpenAI API key through the app:
+1. Open the app
+2. Go to Settings menu
+3. Enter your OpenAI API key
+4. Key is saved in `~/.qbox/connections.db`
+
+No `.env` file needed for the API key - it's managed through the UI.
+
+### Backend Environment (Optional)
+
+Create `backend/.env` for custom backend settings:
+
+```bash
+# Optional backend configuration
+CORS_ORIGINS=http://localhost:5173,http://localhost:8080
+LOG_LEVEL=INFO
+```
+
+### Application Icons
+
+Custom icons go in `frontend/assets/icons/`:
+- `icon.icns` - macOS (512x512)
+- `icon.ico` - Windows (256x256 with multiple sizes)
+- `icon.png` - Linux (512x512)
+
+Default Electron icons are used if custom icons aren't provided. See `frontend/assets/icons/README.md` for details.
+
+## Auto-Updates
+
+The app includes auto-update functionality (production builds only):
+- Checks for updates on launch and every 6 hours
+- Shows notification when update is available
+- Downloads in background
+- Prompts to restart when ready
+- Configure update server in `frontend/electron/config.ts`
+
+Default: Uses GitHub releases. Configure `UPDATE_SERVER_URL` environment variable for custom servers.
+
+## Building Production Apps
+
+### Code Signing (Recommended)
+
+For distribution outside of your organization:
+
+**macOS:**
+- Requires Apple Developer account
+- Code signing prevents "unidentified developer" warnings
+- Notarization required for Gatekeeper
+- Configure in `frontend/forge.config.ts` (`osxSign`, `osxNotarize`)
+
+**Windows:**
+- Code signing certificate from trusted CA
+- Improves SmartScreen reputation
+- Use `electron-builder` or `signtool`
+
+### Distribution Checklist
+
+Before distributing:
+- [ ] Replace placeholder icons with your logo
+- [ ] Update app metadata in `frontend/forge.config.ts`
+- [ ] Configure code signing (macOS/Windows)
+- [ ] Set up auto-update server or GitHub releases
+- [ ] Test on all target platforms
+- [ ] Test auto-update flow
+- [ ] Create installers with `./build-electron.sh --make`
+- [ ] Test installers on clean systems
+- [ ] Add license file if needed
+
+## Troubleshooting
+
+### Setup Issues
+
+**Virtual environment not found:**
+```bash
+./setup.sh  # Run setup script
+```
+
+**Dependencies missing:**
+```bash
+cd backend
+source .venv/bin/activate
+pip install -e .
+pip install pyinstaller
+```
+
+**Frontend dependencies missing:**
+```bash
+cd frontend
+npm install
+```
+
+### Runtime Issues
+
+**Backend won't start:**
+- Check port 8080 is free: `lsof -ti:8080`
+- Verify venv is activated: `which python` (should show `.venv`)
+- Check logs in the terminal running `run-backend.sh`
+- Ensure all dependencies installed: `pip list`
+
+**Electron won't start:**
+- Ensure backend is running: `curl http://localhost:8080/health`
+- Check DevTools console (View → Toggle Developer Tools)
+- Verify frontend dependencies: `cd frontend && npm install`
+- Run validation: `./validate-electron-setup.sh`
+
+**Backend health check timeout:**
+- Backend takes 5-10 seconds to start first time (DuckDB initialization)
+- Check backend terminal for errors
+- Increase timeout in `frontend/electron/config.ts` if needed
+
+### Build Issues
+
+**PyInstaller fails:**
+- Ensure PyInstaller installed: `pip list | grep pyinstaller`
+- Check for missing hidden imports in `backend/build.spec`
+- Update PyInstaller: `pip install --upgrade pyinstaller`
+- Some packages may not support all platforms
+
+**Electron build fails:**
+- Verify frontend builds: `cd frontend && npm run build`
+- Check for TypeScript errors: `npm run lint`
+- Clean and retry: `rm -rf frontend/out frontend/dist backend/dist`
+- Ensure all dependencies installed: `npm install`
+
+**DuckDB issues:**
+- DuckDB files stored at `~/.qbox/qbox.duckdb`
+- If corrupted, delete and restart app
+- Ensure only one instance running (single instance lock enforced)
+- DuckDB requires single writer (uvicorn runs with `--workers 1`)
+
+## Performance
+
+- **First launch**: 5-10 seconds (DuckDB initialization)
+- **Subsequent launches**: 2-5 seconds
+- **App size**: 150-250 MB (varies by platform, includes Python runtime)
+- **Memory usage**: 200-400 MB (frontend + backend + Electron)
+- **Metadata caching**: 5-minute TTL reduces redundant queries
+
+## Tech Stack Details
+
+### Backend
+- Python 3.13+
+- FastAPI for REST API
+- DuckDB 0.9+ for analytics
+- SQLite for persistence
+- uvicorn with standard extras
+- Pydantic for validation
+- SQLAlchemy for database abstraction
+- psycopg for PostgreSQL
+- boto3 for S3 integration
+
+### Frontend
+- React 18
+- TypeScript 5+
+- Vite for bundling
+- TailwindCSS 4 for styling
+- shadcn/ui components
+- Zustand for state management
+- Monaco Editor for SQL
+- Axios for HTTP
+
+### Desktop
+- Electron 39+
+- Electron Forge for building
+- electron-updater for auto-updates
+- PyInstaller for backend bundling
+
+## Project Philosophy
+
+### Architecture Principles
+- **Backend-driven state**: Minimize frontend state, persist in backend
+- **Repository pattern**: Clean separation of data access
+- **Type safety**: Full TypeScript and Python type hints
+- **Electron-first**: Designed for desktop from the start
+- **Cross-platform**: Works on macOS, Windows, Linux
+
+### Code Style
+- **Python**: PEP 8, Black formatting, Ruff linting, type hints required
+- **TypeScript**: Strict mode, no `any`, explicit types
+- **React**: Functional components with hooks only
+- **API**: RESTful design, proper HTTP status codes
+- **Error handling**: User-friendly messages, technical logs server-side
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Test in development mode
+5. Test the packaged app
+6. Submit a pull request
 
 ## License
 
-MIT
+[Your License Here]
+
+## Support
+
+For issues and questions:
+- Run `./validate-electron-setup.sh` to diagnose setup issues
+- Check the troubleshooting section above
+- Open an issue on GitHub
+
+---
+
+Built with ❤️ using Electron, React, Python, and DuckDB.

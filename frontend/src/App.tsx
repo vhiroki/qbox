@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FileCode } from 'lucide-react';
 import ConnectionManager from './components/ConnectionManager';
 import QueryList from './components/QueryList';
@@ -85,10 +85,12 @@ function AppContent() {
 }
 
 function App() {
+  // Use HashRouter for Electron compatibility (file:// protocol)
+  // URLs will be like: file://...index.html#/ and file://...index.html#/query/123
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AppContent />
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

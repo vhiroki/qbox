@@ -103,8 +103,8 @@ fi
 
 echo ""
 
-# Step 3: Build frontend
-echo "🔨 Step 3/4: Building frontend..."
+# Step 3: Build frontend (skip - Electron Forge will handle this)
+echo "🔨 Step 3/4: Preparing frontend..."
 cd "$FRONTEND_DIR"
 
 # Install dependencies if needed
@@ -113,11 +113,7 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# Build the frontend
-echo "🔨 Building React app with Vite..."
-npm run build
-
-echo "✅ Frontend built successfully"
+echo "✅ Frontend dependencies ready"
 echo ""
 
 # Step 4: Package with Electron Forge

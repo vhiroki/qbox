@@ -8,7 +8,7 @@ export default defineConfig({
     mainFields: ['module', 'jsnext:main', 'jsnext'],
   },
   build: {
-    outDir: 'dist',
+    outDir: '.vite/build',
     lib: {
       entry: path.resolve(__dirname, 'electron/main.ts'),
       formats: ['cjs'],
@@ -26,7 +26,7 @@ export default defineConfig({
         'stream',
         'util',
         'assert',
-        'electron-squirrel-startup',
+        // Note: electron-squirrel-startup is NOT external - it needs to be bundled
       ],
     },
     minify: false,

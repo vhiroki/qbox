@@ -26,7 +26,9 @@ import type {
   FileMetadata,
 } from "../types";
 
-const API_BASE_URL = "/api";
+// In Electron (file:// protocol), relative URLs don't work
+// Use full URL to the backend server
+const API_BASE_URL = "http://localhost:8080/api";
 
 export const api = {
   // Connection endpoints

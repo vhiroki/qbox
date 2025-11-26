@@ -33,9 +33,28 @@ hiddenimports += collect_submodules('starlette')
 hiddenimports += collect_submodules('pydantic')
 hiddenimports += collect_submodules('pydantic_core')
 
-# LiteLLM and OpenAI
-hiddenimports += collect_submodules('litellm')
-hiddenimports += collect_submodules('openai')
+# LiteLLM and OpenAI - need data files for tokenizers
+litellm_datas, litellm_binaries, litellm_hidden = collect_all('litellm')
+datas += litellm_datas
+binaries += litellm_binaries
+hiddenimports += litellm_hidden
+
+openai_datas, openai_binaries, openai_hidden = collect_all('openai')
+datas += openai_datas
+binaries += openai_binaries
+hiddenimports += openai_hidden
+
+# Tiktoken needs data files for encodings
+tiktoken_datas, tiktoken_binaries, tiktoken_hidden = collect_all('tiktoken')
+datas += tiktoken_datas
+binaries += tiktoken_binaries
+hiddenimports += tiktoken_hidden
+
+# Also collect tiktoken_ext which contains the actual encoding definitions
+tiktoken_ext_datas, tiktoken_ext_binaries, tiktoken_ext_hidden = collect_all('tiktoken_ext')
+datas += tiktoken_ext_datas
+binaries += tiktoken_ext_binaries
+hiddenimports += tiktoken_ext_hidden
 
 # Boto3 for S3 support
 hiddenimports += collect_submodules('boto3')

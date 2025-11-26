@@ -8,7 +8,7 @@ export default defineConfig({
     mainFields: ['module', 'jsnext:main', 'jsnext'],
   },
   build: {
-    outDir: 'dist',
+    outDir: '.vite/build',
     lib: {
       entry: path.resolve(__dirname, 'electron/preload.ts'),
       formats: ['cjs'],

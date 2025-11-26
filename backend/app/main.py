@@ -85,3 +85,25 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# Entry point for PyInstaller executable
+if __name__ == "__main__":
+    import os
+    import uvicorn
+    
+    # Get port from environment variable (set by Electron) or default to 8080
+    port = int(os.environ.get("PORT", 8080))
+    host = os.environ.get("HOST", "127.0.0.1")
+    
+    print(f"🚀 Starting QBox Backend on {host}:{port}")
+    
+    # Run uvicorn server
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        # Single worker to avoid DuckDB concurrency issues
+        workers=1,
+    )

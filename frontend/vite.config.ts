@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // https://vitejs.dev/config/
+// Note: When used with Electron Forge Vite plugin, the build output directory
+// is controlled by the plugin - don't override it here
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "./", // Use relative paths for Electron
@@ -13,8 +15,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "dist/renderer",
-    emptyOutDir: true,
+    // Let Electron Forge Vite plugin control output directory
     rollupOptions: {
       output: {
         manualChunks: undefined,

@@ -12,68 +12,68 @@ const config: ForgeConfig = {
     executableName: 'qbox',
     appBundleId: 'com.qbox.app',
     appCategoryType: 'public.app-category.developer-tools',
-    icon: path.resolve(__dirname, 'assets', 'icons', 'icon'),
+    // icon: path.resolve(__dirname, 'assets', 'icons', 'icon'), // TODO: Add icons
     asar: true,
     extraResource: [
       // Backend executable will be placed here by the build script
       path.resolve(__dirname, '..', 'backend', 'dist'),
     ],
-    osxSign: {
-      // Code signing configuration for macOS (optional)
-      // identity: 'Developer ID Application: Your Name (TEAM_ID)',
-    },
-    osxNotarize: {
-      // Notarization for macOS (optional, requires Apple Developer account)
-      // tool: 'notarytool',
-      // appleId: process.env.APPLE_ID || '',
-      // appleIdPassword: process.env.APPLE_PASSWORD || '',
-      // teamId: process.env.APPLE_TEAM_ID || '',
-    },
+    // Code signing disabled for development builds
+    // To enable, uncomment and provide proper credentials:
+    // osxSign: {
+    //   identity: 'Developer ID Application: Your Name (TEAM_ID)',
+    // },
+    // osxNotarize: {
+    //   tool: 'notarytool',
+    //   appleId: process.env.APPLE_ID || '',
+    //   appleIdPassword: process.env.APPLE_PASSWORD || '',
+    //   teamId: process.env.APPLE_TEAM_ID || '',
+    // },
   },
   rebuildConfig: {},
   makers: [
-    // Windows installer
-    new MakerSquirrel({
-      name: 'qbox',
-      authors: 'QBox Team',
-      description: 'AI-powered data query application',
-      iconUrl: 'https://example.com/icon.ico', // Update with your icon URL
-      setupIcon: path.resolve(__dirname, 'assets', 'icons', 'icon.ico'),
-      loadingGif: undefined,
-      noMsi: true,
-    }),
+    // Windows installer (disabled - add icons first)
+    // new MakerSquirrel({
+    //   name: 'qbox',
+    //   authors: 'QBox Team',
+    //   description: 'AI-powered data query application',
+    //   iconUrl: 'https://example.com/icon.ico',
+    //   setupIcon: path.resolve(__dirname, 'assets', 'icons', 'icon.ico'),
+    //   loadingGif: undefined,
+    //   noMsi: true,
+    // }),
     // macOS DMG
     new MakerDMG({
       name: 'QBox',
-      icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'),
-      background: undefined, // Optional: path to background image
+      // icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'), // TODO: Add icons
+      background: undefined,
       format: 'ULFO',
     }),
-    // Linux Debian package
-    new MakerDeb({
-      options: {
-        name: 'qbox',
-        productName: 'QBox',
-        genericName: 'Data Query Tool',
-        description: 'AI-powered data query application',
-        categories: ['Development', 'Database'],
-        icon: path.resolve(__dirname, 'assets', 'icons', 'icon.png'),
-        maintainer: 'QBox Team',
-        homepage: 'https://github.com/yourusername/qbox', // Update with your repo
-      },
-    }),
-    // Linux RPM package
-    new MakerRpm({
-      options: {
-        name: 'qbox',
-        productName: 'QBox',
-        genericName: 'Data Query Tool',
-        description: 'AI-powered data query application',
-        categories: ['Development', 'Database'],
-        icon: path.resolve(__dirname, 'assets', 'icons', 'icon.png'),
-        homepage: 'https://github.com/yourusername/qbox', // Update with your repo
-      },
-    }),
+    // Linux Debian package (disabled - add icons first)
+    // new MakerDeb({
+    //   options: {
+    //     name: 'qbox',
+    //     productName: 'QBox',
+    //     genericName: 'Data Query Tool',
+    //     description: 'AI-powered data query application',
+    //     categories: ['Development', 'Database'],
+    //     icon: path.resolve(__dirname, 'assets', 'icons', 'icon.png'),
+    //     maintainer: 'QBox Team',
+    //     homepage: 'https://github.com/yourusername/qbox',
+    //   },
+    // }),
+    // Linux RPM package (disabled - add icons first)
+    // new MakerRpm({
+    //   options: {
+    //     name: 'qbox',
+    //     productName: 'QBox',
+    //     genericName: 'Data Query Tool',
+    //     description: 'AI-powered data query application',
+    //     categories: ['Development', 'Database'],
+    //     icon: path.resolve(__dirname, 'assets', 'icons', 'icon.png'),
+    //     homepage: 'https://github.com/yourusername/qbox',
+    //   },
+    // }),
   ],
   plugins: [
     new VitePlugin({

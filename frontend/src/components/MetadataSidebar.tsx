@@ -217,7 +217,7 @@ function TableNode({ table, expanded, onToggle }: TableNodeProps) {
         )}
       </button>
 
-      {expanded && (
+      {expanded && table.columns && (
         <div className="ml-4 space-y-0.5 mt-1">
           {table.columns.map((column) => (
             <ColumnNode key={column.name} column={column} />

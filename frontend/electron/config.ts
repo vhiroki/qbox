@@ -21,6 +21,7 @@ export const config = {
     }
 
     // In production, get the path from resources
+    // Note: The backend/dist directory is copied as extraResource in forge.config.ts
     const resourcesPath = process.resourcesPath;
     const platform = process.platform;
     
@@ -29,7 +30,7 @@ export const config = {
       execName += '.exe';
     }
     
-    return path.join(resourcesPath, 'backend', execName);
+    return path.join(resourcesPath, 'dist', execName);
   },
 
   // App data directory

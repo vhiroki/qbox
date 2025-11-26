@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { autoUpdater } from 'electron-updater';
 import { config } from './config';
+// @ts-expect-error - electron-squirrel-startup doesn't have type definitions but will be bundled
 import squirrelStartup from 'electron-squirrel-startup';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling
@@ -241,14 +242,18 @@ function createWindow(): void {
   });
 
   // Load the app
-  if (config.isDevelopment) {
+  // Note: When using Electron Forge with Vite plugin, we need to use special variables
+  // MAIN_WINDOW_VITE_DEV_SERVER_URL is injected by the plugin in development
+  // MAIN_WINDOW_VITE_NAME is used to resolve the built files in production
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     // In development, load from Vite dev server
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
     // Open DevTools in development
     mainWindow.webContents.openDevTools();
   } else {
     // In production, load from built files
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    // The plugin handles the path resolution automatically
+    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
     
     // Keep DevTools available in production (as requested)
     mainWindow.webContents.openDevTools();

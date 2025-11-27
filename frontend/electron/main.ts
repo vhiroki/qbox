@@ -159,11 +159,27 @@ function setupAutoUpdater(): void {
   }
 
   // Configure auto-updater
-  if (config.autoUpdate.serverUrl) {
+  // Priority: GitHub > Generic server URL
+  const { github, serverUrl } = config.autoUpdate;
+  
+  if (github.owner && github.repo) {
+    // Use GitHub releases
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: github.owner,
+      repo: github.repo,
+    });
+    console.log(`Auto-updater configured for GitHub: ${github.owner}/${github.repo}`);
+  } else if (serverUrl) {
+    // Fall back to generic server
     autoUpdater.setFeedURL({
       provider: 'generic',
-      url: config.autoUpdate.serverUrl,
+      url: serverUrl,
     });
+    console.log(`Auto-updater configured for generic server: ${serverUrl}`);
+  } else {
+    console.log('Auto-updater not configured: set GITHUB_OWNER/GITHUB_REPO or UPDATE_SERVER_URL');
+    return;
   }
 
   // Auto-updater event handlers

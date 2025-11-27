@@ -13,7 +13,10 @@
     "electron:build": "electron-forge package",
     "electron:make": "electron-forge make",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "release:patch": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

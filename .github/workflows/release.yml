@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'  # Trigger on version tags like v0.1.0, v1.0.0, etc.
+  workflow_dispatch:  # Allow manual triggering from GitHub Actions UI
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0) - leave empty to use package.json version'
+        required: false
+        type: string
 
 # Cancel in-progress runs for the same tag
 concurrency:
@@ -48,14 +54,13 @@ jobs:
       # ========== Backend Build ==========
       - name: Install backend dependencies
         working-directory: backend
-        run: uv sync
+        run: |
+          uv sync
+          uv pip install pyinstaller
 
       - name: Build backend with PyInstaller
         working-directory: backend
-        run: |
-          source .venv/bin/activate
-          pip install pyinstaller
-          python build.py
+        run: uv run python build.py
 
       - name: Verify backend build
         run: ls -la backend/dist/qbox-backend
@@ -126,9 +131,21 @@ jobs:
           echo "Files to release:"
           ls -la release-files/
 
-      - name: Get version from tag
+      - name: Get version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger - use input or read from package.json
+            if [ -n "${{ inputs.version }}" ]; then
+              echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            else
+              VERSION=$(jq -r .version frontend/package.json)
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Tag trigger - extract version from tag
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

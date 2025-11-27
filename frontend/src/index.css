@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   QBox Theme - Amber/Gold on Dark
+   
+   Color Palette:
+   - Background: #0a0a0b (primary), #111113 (secondary), #18181b (tertiary)
+   - Text: #fafafa (primary), #a1a1aa (secondary), #71717a (muted)
+   - Accent: #f59e0b (amber), #fbbf24 (light), #d97706 (dark)
+   - Border: rgba(255, 255, 255, 0.08)
+   
+   Typography:
+   - Sans: Instrument Sans
+   - Mono: JetBrains Mono
+   ========================================================================== */
+
 @layer base {
   :root {
+    /* Typography */
+    --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    
+    /* Sizing */
     --radius: 0.5rem;
-    --background: oklch(1 0 0);
+    
+    /* Light mode colors (unused but defined for completeness) */
+    --background: oklch(0.985 0 0);
     --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
+    --card: oklch(0.985 0 0);
     --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
+    --popover: oklch(0.985 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.769 0.188 70.08);
+    --primary-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
     --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --accent: oklch(0.769 0.188 70.08);
+    --accent-foreground: oklch(0.145 0 0);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --ring: oklch(0.769 0.188 70.08);
     
     /* Reduced spacing scale */
     --spacing-0: 0;
@@ -34,28 +55,64 @@
   }
 
   .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    /* Background hierarchy - deep blacks */
+    --background: #0a0a0b;
+    --foreground: #fafafa;
+    
+    /* Cards and elevated surfaces */
+    --card: #111113;
+    --card-foreground: #fafafa;
+    
+    /* Popovers and dropdowns */
+    --popover: #111113;
+    --popover-foreground: #fafafa;
+    
+    /* Primary action color - Amber */
+    --primary: #f59e0b;
+    --primary-foreground: #0a0a0b;
+    
+    /* Secondary/tertiary surfaces */
+    --secondary: #18181b;
+    --secondary-foreground: #fafafa;
+    
+    /* Muted elements */
+    --muted: #18181b;
+    --muted-foreground: #71717a;
+    
+    /* Accent - same as primary for consistency */
+    --accent: rgba(245, 158, 11, 0.15);
+    --accent-foreground: #f59e0b;
+    
+    /* Destructive actions */
+    --destructive: #ef4444;
+    
+    /* Borders and inputs */
+    --border: rgba(255, 255, 255, 0.08);
+    --input: rgba(255, 255, 255, 0.08);
+    --ring: #f59e0b;
+    
+    /* Extended palette for custom use */
+    --surface-elevated: #141416;
+    --surface-header: #18181b;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --amber-400: #fbbf24;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-glow: rgba(245, 158, 11, 0.15);
+    --border-light: rgba(255, 255, 255, 0.12);
+    
+    /* Code syntax highlighting */
+    --syntax-keyword: #c678dd;
+    --syntax-function: #61afef;
+    --syntax-number: #d19a66;
+    --syntax-string: #98c379;
+    --syntax-comment: #5c6370;
   }
 }
 
 @theme inline {
+  /* Color mappings for Tailwind */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -74,6 +131,130 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  
+  /* Extended colors */
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-header: var(--surface-header);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+  --color-amber-600: var(--amber-600);
+  --color-amber-glow: var(--amber-glow);
+  --color-border-light: var(--border-light);
+  
+  /* Syntax highlighting colors */
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-comment: var(--syntax-comment);
+  
+  /* Typography */
+  --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 }
 
+/* Base typography styles */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.5;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  
+  h1 {
+    font-weight: 700;
+  }
+  
+  /* Monospace elements */
+  code, kbd, pre, samp, .font-mono {
+    font-family: var(--font-mono);
+  }
+  
+  /* Input and textarea inherit sans */
+  input, textarea, select, button {
+    font-family: inherit;
+  }
+}
 
+/* Custom utility classes */
+@layer utilities {
+  /* Amber glow effect for special elements */
+  .glow-amber {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2),
+                0 0 40px rgba(245, 158, 11, 0.1);
+  }
+  
+  /* Subtle amber border glow on focus */
+  .focus-glow:focus {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+  }
+  
+  /* Text gradient for special headings */
+  .text-gradient-amber {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Surface variations */
+  .surface-elevated {
+    background-color: var(--surface-elevated);
+  }
+  
+  .surface-header {
+    background-color: var(--surface-header);
+  }
+  
+  /* Border light variant */
+  .border-light {
+    border-color: var(--border-light);
+  }
+}
+
+/* Scrollbar styling for dark theme */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+  
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Selection styling */
+@layer base {
+  ::selection {
+    background-color: rgba(245, 158, 11, 0.3);
+    color: #fafafa;
+  }
+}

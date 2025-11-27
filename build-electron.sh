@@ -132,9 +132,26 @@ fi
 echo ""
 echo "✅ Build complete!"
 echo ""
+
+# Generate update YAML files for auto-updater (only when making installers)
+if [ "$1" == "--make" ]; then
+    echo "📝 Generating auto-update metadata files..."
+    if [ -f "$SCRIPT_DIR/scripts/generate-update-yml.sh" ]; then
+        "$SCRIPT_DIR/scripts/generate-update-yml.sh"
+    else
+        echo "⚠️  generate-update-yml.sh not found, skipping auto-update metadata"
+    fi
+    echo ""
+fi
+
 echo "📦 Output location:"
 if [ "$1" == "--make" ]; then
     echo "   Installers: $FRONTEND_DIR/out/make/"
+    echo ""
+    echo "📤 To release with auto-update support:"
+    echo "   1. Create a GitHub release with tag v$(grep '"version"' "$FRONTEND_DIR/package.json" | sed 's/.*: "\(.*\)".*/\1/')"
+    echo "   2. Upload all files from: $FRONTEND_DIR/out/make/"
+    echo "   3. Include the .yml files for auto-update to work"
 else
     echo "   Packaged app: $FRONTEND_DIR/out/"
 fi

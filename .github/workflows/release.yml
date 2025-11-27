@@ -1,0 +1,174 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v0.1.0, v1.0.0, etc.
+  workflow_dispatch:  # Allow manual triggering from GitHub Actions UI
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0) - leave empty to use package.json version'
+        required: false
+        type: string
+
+# Cancel in-progress runs for the same tag
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: macos-13  # Intel Mac
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv (Python package manager)
+        uses: astral-sh/setup-uv@v4
+
+      # ========== Backend Build ==========
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          uv sync
+          uv pip install pyinstaller
+
+      - name: Build backend with PyInstaller
+        working-directory: backend
+        run: uv run python build.py
+
+      - name: Verify backend build
+        run: ls -la backend/dist/qbox-backend
+
+      # ========== Frontend Build ==========
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Package Electron app
+        working-directory: frontend
+        run: npm run make
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ========== Generate Update Metadata ==========
+      - name: Generate update metadata
+        run: |
+          chmod +x scripts/generate-update-yml.sh
+          ./scripts/generate-update-yml.sh
+
+      # ========== Upload Artifacts ==========
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbox-macos-${{ matrix.arch }}
+          path: |
+            frontend/out/make/**/*.dmg
+            frontend/out/make/**/*.yml
+          if-no-files-found: error
+
+  # ========== Create GitHub Release ==========
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          
+          # Copy all DMG and YML files, renaming to include architecture
+          for dir in artifacts/qbox-macos-*; do
+            arch=$(basename "$dir" | sed 's/qbox-macos-//')
+            
+            # Find and copy DMG files
+            find "$dir" -name "*.dmg" -exec sh -c '
+              for f; do
+                base=$(basename "$f" .dmg)
+                cp "$f" "release-files/${base}-'$arch'.dmg"
+              done
+            ' sh {} +
+            
+            # Copy YML files (use arm64 version as the main one)
+            if [ "$arch" = "arm64" ]; then
+              find "$dir" -name "*.yml" -exec cp {} release-files/ \;
+            fi
+          done
+          
+          echo "Files to release:"
+          ls -la release-files/
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger - use input or read from package.json
+            if [ -n "${{ inputs.version }}" ]; then
+              echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            else
+              VERSION=$(jq -r .version frontend/package.json)
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Tag trigger - extract version from tag
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: QBox v${{ steps.version.outputs.version }}
+          draft: true  # Create as draft so you can review before publishing
+          generate_release_notes: true
+          files: release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        run: |
+          echo "## 🎉 Release Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: **v${{ steps.version.outputs.version }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls release-files/ | while read f; do echo "- \`$f\`" >> $GITHUB_STEP_SUMMARY; done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to [Releases](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Review the draft release" >> $GITHUB_STEP_SUMMARY
+          echo "3. Edit release notes if needed" >> $GITHUB_STEP_SUMMARY
+          echo "4. Click **Publish release**" >> $GITHUB_STEP_SUMMARY

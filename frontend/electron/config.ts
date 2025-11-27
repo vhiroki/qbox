@@ -43,8 +43,15 @@ export const config = {
   autoUpdate: {
     enabled: true,
     checkInterval: 6 * 60 * 60 * 1000, // 6 hours in milliseconds
-    // Update server URL - configure this based on your deployment
-    // For GitHub releases: https://github.com/owner/repo/releases/latest
+    // GitHub repository for updates (owner/repo format)
+    // Configure these with your actual GitHub username/org and repo name
+    // Example: { owner: 'vhiroki', repo: 'qbox' }
+    github: {
+      owner: 'vhiroki',
+      repo: 'qbox',
+    },
+    // Alternative: Generic server URL (used if github is not configured)
+    // Example: 'https://your-server.com/releases'
     serverUrl: process.env.UPDATE_SERVER_URL || '',
   },
 

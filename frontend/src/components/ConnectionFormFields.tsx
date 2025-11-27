@@ -71,11 +71,11 @@ export default function ConnectionFormFields({
   }, [aliasValidation.isValid, onValidationChange]);
 
   // Type guards for form data
-  const isPostgresConfig = (data: PostgresConfig | S3Config): data is PostgresConfig => {
+  const isPostgresConfig = (_data: PostgresConfig | S3Config): _data is PostgresConfig => {
     return connectionType === 'postgres';
   };
 
-  const isS3Config = (data: PostgresConfig | S3Config): data is S3Config => {
+  const isS3Config = (_data: PostgresConfig | S3Config): _data is S3Config => {
     return connectionType === 's3';
   };
 

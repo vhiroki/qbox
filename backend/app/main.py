@@ -1,5 +1,40 @@
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
+
+# Fix SSL certificates and HTTP compression for PyInstaller bundles
+# This must be done before any imports that use SSL/HTTP (httpx, openai, litellm, etc.)
+def _setup_pyinstaller_fixes():
+    """Configure SSL certificates and fix HTTP issues for PyInstaller bundles."""
+    if not getattr(sys, 'frozen', False):
+        return
+        
+    # Running in a PyInstaller bundle
+    bundle_dir = sys._MEIPASS
+    
+    # 1. Configure SSL certificates
+    cert_path = os.path.join(bundle_dir, 'certifi', 'cacert.pem')
+    if os.path.exists(cert_path):
+        os.environ['SSL_CERT_FILE'] = cert_path
+        os.environ['REQUESTS_CA_BUNDLE'] = cert_path
+        print(f"🔐 SSL certificates configured: {cert_path}")
+    else:
+        print(f"⚠️ SSL certificate bundle not found at: {cert_path}")
+    
+    # 2. Disable HTTP compression for PyInstaller bundles
+    # This prevents "Error -3 while decompressing data: incorrect header check"
+    # by telling httpx to not request compressed responses
+    try:
+        import httpx._client
+        # Change Accept-Encoding from "gzip, deflate" to "identity"
+        # This tells the server to send uncompressed responses
+        httpx._client.ACCEPT_ENCODING = "identity"
+        print("📦 HTTP compression disabled for PyInstaller compatibility")
+    except Exception as e:
+        print(f"⚠️ Failed to disable HTTP compression: {e}")
+
+_setup_pyinstaller_fixes()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -85,3 +120,24 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# Entry point for PyInstaller executable
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Get port from environment variable (set by Electron) or default to 8080
+    port = int(os.environ.get("PORT", 8080))
+    host = os.environ.get("HOST", "127.0.0.1")
+    
+    print(f"🚀 Starting QBox Backend on {host}:{port}")
+    
+    # Run uvicorn server
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        # Single worker to avoid DuckDB concurrency issues
+        workers=1,
+    )

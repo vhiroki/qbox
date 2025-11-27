@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft } from "lucide-react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

@@ -59,7 +59,7 @@ export default function ConnectionManager() {
     database: '',
     username: '',
     password: '',
-    schema: 'public',
+    schemas: 'public',
   });
   const [createConnectionName, setCreateConnectionName] = useState('');
   const [createConnectionAlias, setCreateConnectionAlias] = useState('');
@@ -75,7 +75,7 @@ export default function ConnectionManager() {
     database: '',
     username: '',
     password: '',
-    schema: 'public',
+    schemas: 'public',
   });
   const [editConnectionName, setEditConnectionName] = useState('');
   const [editConnectionAlias, setEditConnectionAlias] = useState('');
@@ -131,7 +131,7 @@ export default function ConnectionManager() {
       database: '',
       username: '',
       password: '',
-      schema: 'public',
+      schemas: 'public',
     });
     setCreateError(null);
     setCreateDialogOpen(true);
@@ -149,7 +149,7 @@ export default function ConnectionManager() {
         database: '',
         username: '',
         password: '',
-        schema: 'public',
+        schemas: 'public',
       });
     } else if (type === 's3') {
       setCreateFormData({

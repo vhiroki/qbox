@@ -95,7 +95,7 @@ export default function QueryDetail({
   const savedHorizontalLayout = localStorage.getItem(HORIZONTAL_LAYOUT_KEY);
   const defaultHorizontalSizes = savedHorizontalLayout ? JSON.parse(savedHorizontalLayout) : [60, 40];
   const savedVerticalLayout = localStorage.getItem(VERTICAL_LAYOUT_KEY);
-  const defaultVerticalSizes = savedVerticalLayout ? JSON.parse(savedVerticalLayout) : [50, 50];
+  const defaultVerticalSizes = savedVerticalLayout ? JSON.parse(savedVerticalLayout) : [60, 40];
 
   // Save panel layouts on resize
   const handleHorizontalLayoutChange = useCallback((sizes: number[]) => {
@@ -747,7 +747,7 @@ export default function QueryDetail({
                         theme={monacoTheme}
                         options={{
                           minimap: { enabled: false },
-                          fontSize: 14,
+                          fontSize: 13,
                           lineNumbers: "on",
                           scrollBeyondLastLine: false,
                           automaticLayout: true,

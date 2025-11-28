@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, Play, History, PanelRightClose, PanelRight } from "lucide-react";
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import { useTheme } from "./theme-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -30,10 +28,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { useQueryStore } from "../stores";
 import { api } from "../services/api";
-import ChatInterface from "./ChatInterface";
 import QueryResults from "./QueryResults";
 import SQLHistoryModal from "./SQLHistoryModal";
-import DataSourcesPanel from "./DataSourcesPanel";
+import RightSidePanel from "./RightSidePanel";
 
 interface QueryDetailProps {
   queryId: string;
@@ -42,24 +39,6 @@ interface QueryDetailProps {
   onRenameComplete?: () => void;
 }
 
-/**
- * Generate a view name for an S3 file (matches backend logic in s3_service.py).
- * Format: s3_{sanitized_file_name}
- */
-function getS3ViewName(filePath: string): string {
-  // Get file name without extension
-  let fileName = filePath.split('/').pop() || filePath;
-  if (fileName.includes('.')) {
-    const parts = fileName.split('.');
-    parts.pop(); // Remove extension
-    fileName = parts.join('.');
-  }
-
-  // Sanitize file name (keep only alphanumeric and underscores)
-  const fileNameSafe = fileName.replace(/[^a-zA-Z0-9_]/g, '_');
-
-  return `s3_${fileNameSafe}`;
-}
 
 export default function QueryDetail({
   queryId,
@@ -108,7 +87,7 @@ export default function QueryDetail({
   const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
   // Refs
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -146,9 +125,6 @@ export default function QueryDetail({
   // Store connection info for displaying full qualified names
   const [connectionInfoMap, setConnectionInfoMap] = useState<Map<string, { name: string; alias: string }>>(new Map());
   
-  // Track which badge was copied (for showing checkmark feedback)
-  const [copiedBadge, setCopiedBadge] = useState<string | null>(null);
-
   useEffect(() => {
     setLocalError(null); // Clear local error when switching queries
     selectQuery(queryId);
@@ -274,17 +250,6 @@ export default function QueryDetail({
 
     return () => clearTimeout(timeoutId);
   }, [sqlText, query, updateQuerySQL]);
-
-  const handleCopyToClipboard = async (label: string, badgeKey: string) => {
-    try {
-      await navigator.clipboard.writeText(label);
-      setCopiedBadge(badgeKey);
-      // Reset after 2 seconds
-      setTimeout(() => setCopiedBadge(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
-    }
-  };
 
   const handleSelectionChange = async (
     connectionId: string,
@@ -688,214 +653,126 @@ export default function QueryDetail({
               </>
             )}
           </div>
-          {localError && (
-            <Alert variant="destructive" className="py-1 px-2 text-xs">
-              <AlertDescription>{localError}</AlertDescription>
-            </Alert>
-          )}
+          <div className="flex items-center gap-2">
+            {localError && (
+              <Alert variant="destructive" className="py-1 px-2 text-xs">
+                <AlertDescription>{localError}</AlertDescription>
+              </Alert>
+            )}
+            <Button
+              onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              title={isRightPanelCollapsed ? "Show Tables & AI panel" : "Hide Tables & AI panel"}
+            >
+              {isRightPanelCollapsed ? (
+                <PanelRight className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-4 relative">
+      <div className="flex-1 overflow-hidden p-4">
         <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* Left Panel - Tabs for SQL and Tables */}
-          <ResizablePanel defaultSize={isChatPanelCollapsed ? 100 : 65} minSize={40}>
+          {/* Left Panel - SQL Editor and Results */}
+          <ResizablePanel defaultSize={isRightPanelCollapsed ? 100 : 60} minSize={40}>
             <div className="h-full pr-3">
-              <Tabs defaultValue="sql" className="h-full flex flex-col">
-                <TabsList className="w-full justify-start mb-4 flex-shrink-0">
-                  <TabsTrigger value="sql">SQL Query</TabsTrigger>
-                  <TabsTrigger value="tables">
-                    Tables ({selections.length})
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* SQL Query Tab */}
-                <TabsContent value="sql" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
-                  <ResizablePanelGroup direction="vertical" className="h-full">
-                    {/* SQL Editor Panel */}
-                    <ResizablePanel defaultSize={50} minSize={30}>
-                      <div className="h-full flex flex-col">
-                        <div className="flex items-center gap-3 mb-2 flex-shrink-0">
-                          <Button
-                            onClick={handleExecuteQuery}
-                            size="sm"
-                            disabled={isExecuting || !sqlText.trim()}
-                          >
-                            <Play className="h-3 w-3 mr-2" />
-                            Run Query
-                          </Button>
-                          <span className="text-xs text-muted-foreground">
-                            {window.navigator.platform.match("Mac") ? "⌘" : "Ctrl"}+Enter
-                          </span>
-                          <div className="flex-1" />
-                          <Button
-                            onClick={() => setSqlHistoryModalOpen(true)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <History className="h-3 w-3 mr-2" />
-                            History
-                          </Button>
-                        </div>
-                        <div className="flex-1 border rounded-md overflow-hidden">
-                          <Editor
-                            defaultLanguage="sql"
-                            value={sqlText}
-                            onChange={handleSQLChange}
-                            beforeMount={handleEditorWillMount}
-                            onMount={handleEditorDidMount}
-                            theme={monacoTheme}
-                            options={{
-                              minimap: { enabled: false },
-                              fontSize: 14,
-                              lineNumbers: "on",
-                              scrollBeyondLastLine: false,
-                              automaticLayout: true,
-                              tabSize: 2,
-                              wordWrap: "on",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </ResizablePanel>
-
-                    <ResizableHandle withHandle />
-
-                    {/* Query Results Panel */}
-                    <ResizablePanel defaultSize={50} minSize={20}>
-                      <div className="h-full pt-2">
-                        <QueryResults
-                          result={executionState.result}
-                          isLoading={isExecuting}
-                          error={executionState.error}
-                          onPageChange={handlePageChange}
-                          onPageSizeChange={handlePageSizeChange}
-                          onExport={handleExportToCSV}
-                          isExporting={isExporting}
-                        />
-                      </div>
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
-                </TabsContent>
-
-                {/* Tables Tab - Tree View */}
-                <TabsContent value="tables" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
-                  <div className="h-full flex flex-col overflow-hidden">
-                    <div className="mb-3 flex-shrink-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">
-                          {selections.length} {selections.length === 1 ? "table" : "tables"} selected
-                        </h3>
-                      </div>
-                      {selections.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {selections.map((selection) => {
-                            let label: string;
-                            if (selection.source_type === "file") {
-                              const fileInfo = fileInfoMap.get(selection.connection_id);
-                              label = fileInfo?.viewName || selection.table_name;
-                            } else if (selection.source_type === "s3") {
-                              // Use S3 view name instead of full path
-                              label = getS3ViewName(selection.table_name);
-                            } else {
-                              // Database connection - use DuckDB alias format: pg_{sanitized_alias}
-                              const connectionInfo = connectionInfoMap.get(selection.connection_id);
-                              const alias = connectionInfo?.alias || selection.connection_id;
-                              const duckdbAlias = `pg_${alias.replace(/-/g, '_')}`;
-                              label = `${duckdbAlias}.${selection.schema_name}.${selection.table_name}`;
-                            }
-                            
-                            const badgeKey = `${selection.source_type}-${selection.connection_id}-${selection.schema_name}-${selection.table_name}`;
-                            const isCopied = copiedBadge === badgeKey;
-                            
-                            return (
-                              <Badge
-                                key={badgeKey}
-                                variant="secondary"
-                                className="pl-2 pr-1 py-0.5 text-xs gap-1"
-                              >
-                                <span className="truncate max-w-[400px]">{label}</span>
-                                <button
-                                  onClick={() => handleCopyToClipboard(label, badgeKey)}
-                                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
-                                  aria-label={`Copy ${label}`}
-                                  title="Copy to clipboard"
-                                >
-                                  {isCopied ? (
-                                    <Check className="h-3 w-3 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-3 w-3" />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleRemoveSelectionClick(
-                                      selection.connection_id,
-                                      selection.schema_name,
-                                      selection.table_name,
-                                      selection.source_type,
-                                      label
-                                    )
-                                  }
-                                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
-                                  aria-label={`Remove ${label}`}
-                                  title="Remove table"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      )}
+              <ResizablePanelGroup direction="vertical" className="h-full">
+                {/* SQL Editor Panel */}
+                <ResizablePanel defaultSize={50} minSize={25}>
+                  <div className="h-full flex flex-col">
+                    <div className="flex items-center gap-3 mb-2 flex-shrink-0">
+                      <Button
+                        onClick={handleExecuteQuery}
+                        size="sm"
+                        disabled={isExecuting || !sqlText.trim()}
+                      >
+                        <Play className="h-3 w-3 mr-2" />
+                        Run Query
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {window.navigator.platform.match("Mac") ? "⌘" : "Ctrl"}+Enter
+                      </span>
+                      <div className="flex-1" />
+                      <Button
+                        onClick={() => setSqlHistoryModalOpen(true)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <History className="h-3 w-3 mr-2" />
+                        History
+                      </Button>
                     </div>
-                    <div className="flex-1 overflow-hidden">
-                      <DataSourcesPanel
-                        queryId={queryId}
-                        selections={selections}
-                        onSelectionChange={handleSelectionChange}
-                        onFileDeleted={handleFileDeleted}
+                    <div className="flex-1 border rounded-md overflow-hidden">
+                      <Editor
+                        defaultLanguage="sql"
+                        value={sqlText}
+                        onChange={handleSQLChange}
+                        beforeMount={handleEditorWillMount}
+                        onMount={handleEditorDidMount}
+                        theme={monacoTheme}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 14,
+                          lineNumbers: "on",
+                          scrollBeyondLastLine: false,
+                          automaticLayout: true,
+                          tabSize: 2,
+                          wordWrap: "on",
+                        }}
                       />
                     </div>
                   </div>
-                </TabsContent>
-              </Tabs>
+                </ResizablePanel>
+
+                <ResizableHandle withHandle />
+
+                {/* Query Results Panel */}
+                <ResizablePanel defaultSize={50} minSize={20}>
+                  <div className="h-full pt-2">
+                    <QueryResults
+                      result={executionState.result}
+                      isLoading={isExecuting}
+                      error={executionState.error}
+                      onPageChange={handlePageChange}
+                      onPageSizeChange={handlePageSizeChange}
+                      onExport={handleExportToCSV}
+                      isExporting={isExporting}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </div>
           </ResizablePanel>
 
-          {!isChatPanelCollapsed && (
+          {!isRightPanelCollapsed && (
             <>
               <ResizableHandle withHandle />
 
-              {/* Right Panel - Chat */}
-              <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+              {/* Right Panel - Tables & AI Chat */}
+              <ResizablePanel defaultSize={40} minSize={25} maxSize={55}>
                 <div className="h-full pl-3">
-                  <ChatInterface
+                  <RightSidePanel
                     query={query}
-                    onSQLChange={(sql) => {
-                      setSqlText(sql);
-                    }}
-                    onCollapse={() => setIsChatPanelCollapsed(true)}
+                    queryId={queryId}
+                    selections={selections}
+                    onSQLChange={(sql) => setSqlText(sql)}
+                    onSelectionChange={handleSelectionChange}
+                    onFileDeleted={handleFileDeleted}
+                    onRemoveSelection={handleRemoveSelectionClick}
+                    fileInfoMap={fileInfoMap}
+                    connectionInfoMap={connectionInfoMap}
                   />
                 </div>
               </ResizablePanel>
             </>
           )}
         </ResizablePanelGroup>
-
-        {/* Floating expand button when chat is collapsed */}
-        {isChatPanelCollapsed && (
-          <Button
-            onClick={() => setIsChatPanelCollapsed(false)}
-            size="sm"
-            className="absolute top-4 right-4 z-10 shadow-lg"
-            title="Expand chat panel"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Chat with AI
-          </Button>
-        )}
       </div>
 
       {/* Delete Query Confirmation Dialog */}

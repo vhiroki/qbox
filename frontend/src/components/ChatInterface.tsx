@@ -4,19 +4,17 @@ import { useQueryStore } from "../stores";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { ScrollArea } from "./ui/scroll-area";
-import { AlertCircle, Loader2, Send, RotateCcw, Copy, Check, ChevronRight } from "lucide-react";
+import { AlertCircle, Loader2, Send, RotateCcw, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
 interface ChatInterfaceProps {
   query: Query;
   onSQLChange?: (sqlText: string) => void;
-  onCollapse?: () => void;
 }
 
 export default function ChatInterface({
   query,
   onSQLChange,
-  onCollapse,
 }: ChatInterfaceProps) {
   // Zustand store - only use chat-specific state, not global error
   const sendChatMessage = useQueryStore((state) => state.sendChatMessage);
@@ -112,31 +110,18 @@ export default function ChatInterface({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <h3 className="text-sm font-medium">Chat with AI</h3>
-        <div className="flex items-center gap-2">
-          {chatHistory.length > 0 && (
-            <Button
-              onClick={handleClearChat}
-              size="sm"
-              variant="ghost"
-              className="text-xs"
-            >
-              Clear History
-            </Button>
-          )}
-          {onCollapse && (
-            <Button
-              onClick={onCollapse}
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0"
-              title="Collapse chat panel"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        {chatHistory.length > 0 && (
+          <Button
+            onClick={handleClearChat}
+            size="sm"
+            variant="ghost"
+            className="text-xs"
+          >
+            Clear History
+          </Button>
+        )}
       </div>
 
       {/* Messages */}

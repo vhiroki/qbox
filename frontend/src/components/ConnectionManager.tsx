@@ -401,15 +401,15 @@ export default function ConnectionManager() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Edit Connection</DialogTitle>
             <DialogDescription>
               Update the connection details. Leave sensitive fields blank to keep existing values.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
             <ConnectionFormFields
               connectionType={editingConnection?.type as ConnectionType}
               connectionName={editConnectionName}
@@ -430,7 +430,7 @@ export default function ConnectionManager() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
@@ -443,15 +443,15 @@ export default function ConnectionManager() {
 
       {/* Create Connection Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Create New Connection</DialogTitle>
             <DialogDescription>
               Configure a new data source connection.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
             <ConnectionFormFields
               connectionType={createConnectionType}
               connectionName={createConnectionName}
@@ -471,7 +471,7 @@ export default function ConnectionManager() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2, ChevronDown, Pencil, Play, History, PanelRightClose, PanelRight } from "lucide-react";
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import { useTheme } from "./theme-provider";
@@ -39,6 +39,8 @@ interface QueryDetailProps {
   onRenameComplete?: () => void;
 }
 
+const HORIZONTAL_LAYOUT_KEY = 'qbox-query-horizontal-layout';
+const VERTICAL_LAYOUT_KEY = 'qbox-query-vertical-layout';
 
 export default function QueryDetail({
   queryId,
@@ -88,6 +90,21 @@ export default function QueryDetail({
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+
+  // Load saved panel layouts
+  const savedHorizontalLayout = localStorage.getItem(HORIZONTAL_LAYOUT_KEY);
+  const defaultHorizontalSizes = savedHorizontalLayout ? JSON.parse(savedHorizontalLayout) : [60, 40];
+  const savedVerticalLayout = localStorage.getItem(VERTICAL_LAYOUT_KEY);
+  const defaultVerticalSizes = savedVerticalLayout ? JSON.parse(savedVerticalLayout) : [50, 50];
+
+  // Save panel layouts on resize
+  const handleHorizontalLayoutChange = useCallback((sizes: number[]) => {
+    localStorage.setItem(HORIZONTAL_LAYOUT_KEY, JSON.stringify(sizes));
+  }, []);
+
+  const handleVerticalLayoutChange = useCallback((sizes: number[]) => {
+    localStorage.setItem(VERTICAL_LAYOUT_KEY, JSON.stringify(sizes));
+  }, []);
 
   // Refs
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -690,13 +707,13 @@ export default function QueryDetail({
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden p-4">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanelGroup direction="horizontal" className="h-full" onLayout={handleHorizontalLayoutChange}>
           {/* Left Panel - SQL Editor and Results */}
-          <ResizablePanel defaultSize={isRightPanelCollapsed ? 100 : 60} minSize={40}>
+          <ResizablePanel defaultSize={isRightPanelCollapsed ? 100 : defaultHorizontalSizes[0]} minSize={40}>
             <div className="h-full pr-3">
-              <ResizablePanelGroup direction="vertical" className="h-full">
+              <ResizablePanelGroup direction="vertical" className="h-full" onLayout={handleVerticalLayoutChange}>
                 {/* SQL Editor Panel */}
-                <ResizablePanel defaultSize={50} minSize={25}>
+                <ResizablePanel defaultSize={defaultVerticalSizes[0]} minSize={25}>
                   <div className="h-full flex flex-col">
                     <div className="flex items-center gap-3 mb-2 flex-shrink-0">
                       <Button
@@ -745,7 +762,7 @@ export default function QueryDetail({
                 <ResizableHandle withHandle />
 
                 {/* Query Results Panel */}
-                <ResizablePanel defaultSize={50} minSize={20}>
+                <ResizablePanel defaultSize={defaultVerticalSizes[1]} minSize={20}>
                   <div className="h-full pt-2">
                     <QueryResults
                       result={executionState.result}
@@ -768,7 +785,7 @@ export default function QueryDetail({
               <ResizableHandle withHandle />
 
               {/* Right Panel - Tables & AI Chat */}
-              <ResizablePanel defaultSize={40} minSize={25} maxSize={55}>
+              <ResizablePanel defaultSize={defaultHorizontalSizes[1]} minSize={25} maxSize={55}>
                 <div className="h-full pl-3">
                   <RightSidePanel
                     ref={rightSidePanelRef}

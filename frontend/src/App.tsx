@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { FileCode, PanelLeftClose, PanelLeft, Database, SquarePen } from 'lucide-react';
+import { PanelLeftClose, PanelLeft, Database, SquarePen, Home } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
 import ConnectionManager from './components/ConnectionManager';
 import QueryList from './components/QueryList';
 import QueryDetail from './components/QueryDetail';
+import HomePage from './components/HomePage';
 import { Button } from './components/ui/button';
 import {
   ResizableHandle,
@@ -20,15 +21,21 @@ import {
 import { useQueryStore } from './stores';
 
 const SIDEBAR_COLLAPSED_KEY = 'qbox-sidebar-collapsed';
+const SIDEBAR_LAYOUT_KEY = 'qbox-sidebar-layout';
 
-function QueryPage() {
+interface QueryPageProps {
+  onCreateQuery: () => void;
+  isCreating: boolean;
+}
+
+function QueryPage({ onCreateQuery, isCreating }: QueryPageProps) {
   const { queryId } = useParams<{ queryId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // Check if we should focus on rename input
   const shouldFocusRename = searchParams.get('rename') === 'true';
-  
+
   // Clear the rename param after it's been used
   const handleRenameComplete = () => {
     if (shouldFocusRename) {
@@ -51,13 +58,7 @@ function QueryPage() {
           onRenameComplete={handleRenameComplete}
         />
       ) : (
-        <div className="h-full flex items-center justify-center">
-          <div className="text-center text-muted-foreground">
-            <FileCode className="h-16 w-16 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">Select a query</h3>
-            <p className="text-sm">Choose a query from the list or create a new one</p>
-          </div>
-        </div>
+        <HomePage onCreateQuery={onCreateQuery} isCreating={isCreating} />
       )}
     </>
   );
@@ -89,9 +90,18 @@ function AppContent() {
   const createQuery = useQueryStore((state) => state.createQuery);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Load saved panel layout
+  const savedLayout = localStorage.getItem(SIDEBAR_LAYOUT_KEY);
+  const defaultSidebarSize = savedLayout ? JSON.parse(savedLayout)[0] : 18;
+
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
   }, [isCollapsed]);
+
+  // Save panel layout on resize
+  const handleLayoutChange = (sizes: number[]) => {
+    localStorage.setItem(SIDEBAR_LAYOUT_KEY, JSON.stringify(sizes));
+  };
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
@@ -136,6 +146,21 @@ function AppContent() {
             </TooltipTrigger>
             <TooltipContent side="right">
               <p>Expand sidebar</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={currentPage === 'queries' && !selectedQueryId ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => navigate('/')}
+                className="h-8 w-8"
+              >
+                <Home className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Home</p>
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -195,6 +220,21 @@ function AppContent() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                variant={currentPage === 'queries' && !selectedQueryId ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => navigate('/')}
+                className="h-8 w-8"
+              >
+                <Home className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Home</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
                 variant={currentPage === 'connections' ? 'default' : 'ghost'}
                 size="icon"
                 onClick={() => navigate('/connections')}
@@ -239,8 +279,8 @@ function AppContent() {
           </div>
         ) : (
           // Expanded: Resizable panel with content
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
-            <ResizablePanel defaultSize={18} minSize={15} maxSize={35}>
+          <ResizablePanelGroup direction="horizontal" className="flex-1" onLayout={handleLayoutChange}>
+            <ResizablePanel defaultSize={defaultSidebarSize} minSize={15} maxSize={35}>
               <div className="h-full border-r flex flex-col bg-card">
                 {/* Toolbar */}
                 <div className="flex items-center justify-between p-2 border-b">
@@ -256,11 +296,11 @@ function AppContent() {
             <ResizableHandle withHandle />
 
             {/* Main Content Area */}
-            <ResizablePanel defaultSize={82}>
+            <ResizablePanel defaultSize={100 - defaultSidebarSize}>
               <div className="h-full flex flex-col overflow-hidden">
                 <Routes>
-                  <Route path="/" element={<QueryPage />} />
-                  <Route path="/query/:queryId" element={<QueryPage />} />
+                  <Route path="/" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
+                  <Route path="/query/:queryId" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
                   <Route path="/connections" element={<ConnectionsPage />} />
                 </Routes>
               </div>
@@ -272,8 +312,8 @@ function AppContent() {
         {isCollapsed && (
           <div className="flex-1 h-full flex flex-col overflow-hidden">
             <Routes>
-              <Route path="/" element={<QueryPage />} />
-              <Route path="/query/:queryId" element={<QueryPage />} />
+              <Route path="/" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
+              <Route path="/query/:queryId" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
               <Route path="/connections" element={<ConnectionsPage />} />
             </Routes>
           </div>

@@ -11,7 +11,6 @@ interface QueryListProps {
 }
 
 export default function QueryList({
-  currentPage = 'queries',
   selectedQueryId,
 }: QueryListProps) {
   const navigate = useNavigate();

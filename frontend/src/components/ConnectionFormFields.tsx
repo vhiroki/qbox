@@ -266,6 +266,22 @@ export default function ConnectionFormFields({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="endpoint-url">
+              Endpoint URL <span className="text-muted-foreground font-normal">(Optional)</span>
+            </Label>
+            <Input
+              id="endpoint-url"
+              type="text"
+              value={formData.endpoint_url || ''}
+              onChange={(e) => onFormDataChange({ endpoint_url: e.target.value })}
+              placeholder="http://localhost:4566"
+            />
+            <p className="text-xs text-muted-foreground">
+              Custom S3 endpoint for LocalStack or S3-compatible services. Leave blank for AWS S3.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="credential-type">Credential Type</Label>
             <Select
               value={formData.credential_type || 'default'}

@@ -87,6 +87,10 @@ class S3ConnectionConfig(BaseModel):
     aws_secret_access_key: Optional[str] = None
     aws_session_token: Optional[str] = None
     region: Optional[str] = Field(default="us-east-1", description="AWS region")
+    endpoint_url: Optional[str] = Field(
+        default=None,
+        description="Custom S3 endpoint URL (e.g., http://localhost:4566 for LocalStack)"
+    )
     
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3ConnectionConfig":

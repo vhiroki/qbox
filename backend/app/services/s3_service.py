@@ -18,30 +18,42 @@ class S3Service:
 
     def _get_s3_client(self, connection_id: str):
         """Get boto3 S3 client configured with connection credentials."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Load connection config
         connection_config = self.connection_repo.get(connection_id)
         if not connection_config:
             raise ValueError(f"Connection {connection_id} not found")
-        
+
         if connection_config.type != DataSourceType.S3:
             raise ValueError(f"Connection {connection_id} is not an S3 connection")
-        
+
         config = connection_config.config
-        
-        # Configure boto3 client
+
+        # Configure boto3 session
         session_kwargs: dict[str, Any] = {
             'region_name': config.get('region', 'us-east-1')
         }
-        
+
         # Use manual credentials if specified
         if config.get('credential_type') == 'manual':
             session_kwargs['aws_access_key_id'] = config.get('aws_access_key_id')
             session_kwargs['aws_secret_access_key'] = config.get('aws_secret_access_key')
             if config.get('aws_session_token'):
                 session_kwargs['aws_session_token'] = config.get('aws_session_token')
-        
+
         session = boto3.Session(**session_kwargs)
-        return session.client('s3'), config.get('bucket')
+
+        # Configure S3 client with optional custom endpoint
+        client_kwargs: dict[str, Any] = {}
+        if config.get('endpoint_url'):
+            from botocore.client import Config
+            client_kwargs['endpoint_url'] = config.get('endpoint_url')
+            # Use path-style addressing for custom endpoints (required for LocalStack)
+            client_kwargs['config'] = Config(s3={'addressing_style': 'path'})
+
+        return session.client('s3', **client_kwargs), config.get('bucket')
 
     async def list_files(
         self,

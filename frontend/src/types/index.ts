@@ -23,6 +23,7 @@ export interface S3Config {
   aws_secret_access_key?: string;
   aws_session_token?: string;
   region?: string;
+  endpoint_url?: string;
 }
 
 export interface ConnectionStatus {

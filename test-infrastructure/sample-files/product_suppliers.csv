@@ -1,0 +1,11 @@
+supplier_id,supplier_name,contact_email,phone,country,rating,products_supplied
+1,Tech Supplies Inc,contact@techsupplies.com,555-1001,USA,4.5,150
+2,Mouse World,sales@mouseworld.com,555-1002,China,4.2,300
+3,Cable Co,info@cableco.com,555-1003,USA,4.8,500
+4,Keyboard Masters,support@kbmasters.com,555-1004,Taiwan,4.7,100
+5,Screen Solutions,orders@screensol.com,555-1005,South Korea,4.9,50
+6,Cam Tech,sales@camtech.com,555-1006,Japan,4.3,75
+7,Sound Systems,contact@soundsys.com,555-1007,Germany,4.6,120
+8,Display Pro,info@displaypro.com,555-1008,USA,4.4,80
+9,Input Devices Ltd,sales@inputdev.com,555-1009,UK,4.1,200
+10,Audio Excellence,orders@audioexcel.com,555-1010,Sweden,4.7,90

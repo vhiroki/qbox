@@ -1,0 +1,10 @@
+month,year,region,target_revenue,target_orders,achieved_revenue,achieved_orders,performance_pct
+January,2024,North America,400000,1200,450000,1250,112.5
+January,2024,Europe,300000,900,320000,890,106.7
+January,2024,Asia Pacific,500000,1400,580000,1450,116.0
+February,2024,North America,420000,1250,475000,1300,113.1
+February,2024,Europe,320000,950,340000,920,106.3
+February,2024,Asia Pacific,520000,1450,610000,1500,117.3
+March,2024,North America,450000,1300,485000,1350,107.8
+March,2024,Europe,350000,1000,365000,1020,104.3
+March,2024,Asia Pacific,550000,1500,630000,1580,114.5

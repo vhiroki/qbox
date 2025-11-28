@@ -277,34 +277,55 @@ class DuckDBManager:
         # Create S3 secret based on credential type
         try:
             if config.credential_type == "manual":
-                # Create secret with explicit credentials
-                create_secret_query = f"""
-                    CREATE SECRET {secret_name} (
-                        TYPE S3,
-                        KEY_ID '{config.aws_access_key_id}',
-                        SECRET '{config.aws_secret_access_key}',
-                        REGION '{config.region or 'us-east-1'}'
-                    )
-                """
+                # Build secret parameters
+                secret_params = [
+                    "TYPE S3",
+                    f"KEY_ID '{config.aws_access_key_id}'",
+                    f"SECRET '{config.aws_secret_access_key}'",
+                    f"REGION '{config.region or 'us-east-1'}'"
+                ]
+
                 # Add session token if provided
                 if config.aws_session_token:
-                    create_secret_query = f"""
-                        CREATE SECRET {secret_name} (
-                            TYPE S3,
-                            KEY_ID '{config.aws_access_key_id}',
-                            SECRET '{config.aws_secret_access_key}',
-                            SESSION_TOKEN '{config.aws_session_token}',
-                            REGION '{config.region or 'us-east-1'}'
-                        )
-                    """
+                    secret_params.append(f"SESSION_TOKEN '{config.aws_session_token}'")
+
+                # Add endpoint URL if provided (for LocalStack or S3-compatible services)
+                if config.endpoint_url:
+                    # Remove protocol from endpoint URL (DuckDB adds it automatically)
+                    endpoint = config.endpoint_url.replace('https://', '').replace('http://', '')
+                    secret_params.append(f"ENDPOINT '{endpoint}'")
+                    secret_params.append("URL_STYLE 'path'")  # Use path-style URLs for custom endpoints
+                    # Disable SSL for HTTP endpoints
+                    if config.endpoint_url.startswith('http://'):
+                        secret_params.append("USE_SSL 'false'")
+
+                create_secret_query = f"""
+                    CREATE SECRET {secret_name} (
+                        {', '.join(secret_params)}
+                    )
+                """
                 logger.debug(f"Creating S3 secret with manual credentials: {secret_name}")
             else:
                 # Use default credential provider chain
+                secret_params = [
+                    "TYPE S3",
+                    "PROVIDER CREDENTIAL_CHAIN",
+                    f"REGION '{config.region or 'us-east-1'}'"
+                ]
+
+                # Add endpoint URL if provided
+                if config.endpoint_url:
+                    # Remove protocol from endpoint URL (DuckDB adds it automatically)
+                    endpoint = config.endpoint_url.replace('https://', '').replace('http://', '')
+                    secret_params.append(f"ENDPOINT '{endpoint}'")
+                    secret_params.append("URL_STYLE 'path'")
+                    # Disable SSL for HTTP endpoints
+                    if config.endpoint_url.startswith('http://'):
+                        secret_params.append("USE_SSL 'false'")
+
                 create_secret_query = f"""
                     CREATE SECRET {secret_name} (
-                        TYPE S3,
-                        PROVIDER CREDENTIAL_CHAIN,
-                        REGION '{config.region or 'us-east-1'}'
+                        {', '.join(secret_params)}
                     )
                 """
                 logger.debug(f"Creating S3 secret with credential chain: {secret_name}")

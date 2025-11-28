@@ -1,0 +1,6 @@
+segment_id,segment_name,min_purchase,max_purchase,discount_rate,customer_count,avg_lifetime_value
+1,New Customer,0,100,0.00,500,45.50
+2,Regular,100,500,0.05,850,245.75
+3,Premium,500,2000,0.10,320,1250.00
+4,VIP,2000,5000,0.15,95,3500.00
+5,Enterprise,5000,999999,0.20,25,15000.00

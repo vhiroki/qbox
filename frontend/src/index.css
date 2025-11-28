@@ -20,6 +20,24 @@
    ========================================================================== */
 
 @layer base {
+  /* =========================================
+     Global cursor fix - restore pointer for 
+     interactive elements (Tailwind preflight 
+     removes this for "consistency")
+     ========================================= */
+  button,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  a[href],
+  label[for],
+  select,
+  summary,
+  [tabindex]:not([tabindex="-1"]) {
+    cursor: pointer;
+  }
+
   :root {
     /* Typography */
     --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;

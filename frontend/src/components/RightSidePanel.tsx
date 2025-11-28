@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { MessageSquare, Table2, X, Copy, Check } from "lucide-react";
+import { MessageSquare, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import ChatInterface from "./ChatInterface";
-import DataSourcesPanel from "./DataSourcesPanel";
+import SelectedTablesView from "./SelectedTablesView";
+import AddTableModal from "./AddTableModal";
 import type { Query, QueryTableSelection } from "@/types";
 
 interface RightSidePanelProps {
@@ -33,25 +33,6 @@ interface RightSidePanelProps {
 
 type PanelView = "tables" | "chat";
 
-/**
- * Generate a view name for an S3 file (matches backend logic in s3_service.py).
- * Format: s3_{sanitized_file_name}
- */
-function getS3ViewName(filePath: string): string {
-  // Get file name without extension
-  let fileName = filePath.split('/').pop() || filePath;
-  if (fileName.includes('.')) {
-    const parts = fileName.split('.');
-    parts.pop(); // Remove extension
-    fileName = parts.join('.');
-  }
-
-  // Sanitize file name (keep only alphanumeric and underscores)
-  const fileNameSafe = fileName.replace(/[^a-zA-Z0-9_]/g, '_');
-
-  return `s3_${fileNameSafe}`;
-}
-
 export default function RightSidePanel({
   query,
   queryId,
@@ -64,30 +45,42 @@ export default function RightSidePanel({
   connectionInfoMap,
 }: RightSidePanelProps) {
   const [activeView, setActiveView] = useState<PanelView>("tables");
-  const [copiedBadge, setCopiedBadge] = useState<string | null>(null);
+  const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
 
-  const handleCopyToClipboard = async (label: string, badgeKey: string) => {
-    try {
-      await navigator.clipboard.writeText(label);
-      setCopiedBadge(badgeKey);
-      setTimeout(() => setCopiedBadge(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
+  const handleSaveTableChanges = async (
+    additions: Array<{
+      connectionId: string;
+      schemaName: string;
+      tableName: string;
+      sourceType: string;
+    }>,
+    removals: Array<{
+      connectionId: string;
+      schemaName: string;
+      tableName: string;
+      sourceType: string;
+    }>
+  ) => {
+    // Process removals first
+    for (const removal of removals) {
+      await onSelectionChange(
+        removal.connectionId,
+        removal.schemaName,
+        removal.tableName,
+        false,
+        removal.sourceType
+      );
     }
-  };
 
-  const getSelectionLabel = (selection: QueryTableSelection): string => {
-    if (selection.source_type === "file") {
-      const fileInfo = fileInfoMap.get(selection.connection_id);
-      return fileInfo?.viewName || selection.table_name;
-    } else if (selection.source_type === "s3") {
-      return getS3ViewName(selection.table_name);
-    } else {
-      // Database connection - use DuckDB alias format: pg_{sanitized_alias}
-      const connectionInfo = connectionInfoMap.get(selection.connection_id);
-      const alias = connectionInfo?.alias || selection.connection_id;
-      const duckdbAlias = `pg_${alias.replace(/-/g, '_')}`;
-      return `${duckdbAlias}.${selection.schema_name}.${selection.table_name}`;
+    // Then process additions
+    for (const addition of additions) {
+      await onSelectionChange(
+        addition.connectionId,
+        addition.schemaName,
+        addition.tableName,
+        true,
+        addition.sourceType
+      );
     }
   };
 
@@ -101,9 +94,7 @@ export default function RightSidePanel({
           onClick={() => setActiveView("tables")}
           className={cn(
             "flex-1 h-8 text-xs font-medium transition-all",
-            activeView === "tables" 
-              ? "shadow-sm" 
-              : "hover:bg-muted/50"
+            activeView === "tables" ? "shadow-sm" : "hover:bg-muted/50"
           )}
         >
           <Table2 className="h-3.5 w-3.5 mr-1.5" />
@@ -120,9 +111,7 @@ export default function RightSidePanel({
           onClick={() => setActiveView("chat")}
           className={cn(
             "flex-1 h-8 text-xs font-medium transition-all",
-            activeView === "chat" 
-              ? "shadow-sm" 
-              : "hover:bg-muted/50"
+            activeView === "chat" ? "shadow-sm" : "hover:bg-muted/50"
           )}
         >
           <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
@@ -133,81 +122,27 @@ export default function RightSidePanel({
       {/* Panel Content */}
       <div className="flex-1 overflow-hidden">
         {activeView === "tables" ? (
-          <div className="h-full flex flex-col overflow-hidden">
-            {/* Selected Tables Badges */}
-            <div className="mb-3 flex-shrink-0">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {selections.length} {selections.length === 1 ? "table" : "tables"} selected
-                </h3>
-              </div>
-              {selections.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selections.map((selection) => {
-                    const label = getSelectionLabel(selection);
-                    const badgeKey = `${selection.source_type}-${selection.connection_id}-${selection.schema_name}-${selection.table_name}`;
-                    const isCopied = copiedBadge === badgeKey;
-
-                    return (
-                      <Badge
-                        key={badgeKey}
-                        variant="secondary"
-                        className="pl-2 pr-1 py-0.5 text-xs gap-1"
-                      >
-                        <span className="truncate max-w-[200px]">{label}</span>
-                        <button
-                          onClick={() => handleCopyToClipboard(label, badgeKey)}
-                          className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
-                          aria-label={`Copy ${label}`}
-                          title="Copy to clipboard"
-                        >
-                          {isCopied ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() =>
-                            onRemoveSelection(
-                              selection.connection_id,
-                              selection.schema_name,
-                              selection.table_name,
-                              selection.source_type,
-                              label
-                            )
-                          }
-                          className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
-                          aria-label={`Remove ${label}`}
-                          title="Remove table"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Data Sources Tree View */}
-            <div className="flex-1 overflow-hidden">
-              <DataSourcesPanel
-                queryId={queryId}
-                selections={selections}
-                onSelectionChange={onSelectionChange}
-                onFileDeleted={onFileDeleted}
-              />
-            </div>
-          </div>
-        ) : (
-          <ChatInterface
-            query={query}
-            onSQLChange={onSQLChange}
+          <SelectedTablesView
+            selections={selections}
+            onRemoveSelection={onRemoveSelection}
+            onAddTableClick={() => setIsAddTableModalOpen(true)}
+            fileInfoMap={fileInfoMap}
+            connectionInfoMap={connectionInfoMap}
           />
+        ) : (
+          <ChatInterface query={query} onSQLChange={onSQLChange} />
         )}
       </div>
+
+      {/* Add Table Modal */}
+      <AddTableModal
+        isOpen={isAddTableModalOpen}
+        onClose={() => setIsAddTableModalOpen(false)}
+        queryId={queryId}
+        currentSelections={selections}
+        onSave={handleSaveTableChanges}
+        onFileDeleted={onFileDeleted}
+      />
     </div>
   );
 }
-

@@ -191,12 +191,20 @@ class S3Service:
             
             # Construct S3 path
             s3_path = f"s3://{bucket}/{file_path}"
-            
-            # Use DuckDB to read file schema
-            # Get the secret name for this connection
+
+            # Ensure S3 secret is configured in DuckDB
             secret_name = self.duckdb_manager.get_attached_alias(connection_id)
             if not secret_name:
-                raise ValueError(f"S3 connection {connection_id} not configured in DuckDB")
+                # Configure the S3 secret
+                from app.models.schemas import S3ConnectionConfig
+                s3_config = S3ConnectionConfig(**connection_config.config)
+                self.duckdb_manager.configure_s3_secret(
+                    connection_id,
+                    connection_config.name,
+                    s3_config,
+                    custom_alias=connection_config.alias,
+                )
+                secret_name = self.duckdb_manager.get_attached_alias(connection_id)
             
             # Build query based on file type (secret is auto-used by DuckDB)
             if file_ext == 'parquet':

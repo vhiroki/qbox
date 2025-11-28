@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QBox - Loading</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #0a0a0b;
+      color: #fafafa;
+      font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .container {
+      text-align: center;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .logo {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      margin-bottom: 32px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .spinner-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #18181b;
+      border-top-color: #f59e0b;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .status {
+      color: #a1a1aa;
+      font-size: 14px;
+      font-weight: 500;
+      transition: opacity 0.3s ease;
+    }
+    
+    .status.ready {
+      color: #22c55e;
+    }
+    
+    .progress-bar {
+      width: 200px;
+      height: 4px;
+      background: #18181b;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #d97706, #f59e0b, #fbbf24);
+      width: 0%;
+      transition: width 0.3s ease;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">QBox</div>
+    <div class="spinner-container">
+      <div class="spinner"></div>
+      <span class="status" id="status">Starting backend...</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress"></div>
+    </div>
+  </div>
+  
+  <script>
+    const statusEl = document.getElementById('status');
+    const progressEl = document.getElementById('progress');
+    
+    const messages = [
+      'Starting backend...',
+      'Initializing services...',
+      'Connecting to database...',
+      'Almost ready...'
+    ];
+    
+    let messageIndex = 0;
+    let progress = 10;
+    
+    // Cycle through status messages
+    const messageInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % messages.length;
+      statusEl.textContent = messages[messageIndex];
+      progress = Math.min(progress + 20, 90);
+      progressEl.style.width = progress + '%';
+    }, 1500);
+    
+    // Listen for ready signal from main process
+    window.addEventListener('backend-ready', () => {
+      clearInterval(messageInterval);
+      statusEl.textContent = 'Ready!';
+      statusEl.classList.add('ready');
+      progressEl.style.width = '100%';
+    });
+  </script>
+</body>
+</html>

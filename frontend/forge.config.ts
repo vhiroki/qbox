@@ -12,7 +12,7 @@ const config: ForgeConfig = {
     executableName: 'qbox',
     appBundleId: 'com.qbox.app',
     appCategoryType: 'public.app-category.developer-tools',
-    // icon: path.resolve(__dirname, 'assets', 'icons', 'icon'), // TODO: Add icons
+    icon: path.resolve(__dirname, 'assets', 'icons', 'icon'),
     asar: true,
     extraResource: [
       // Backend executable will be placed here by the build script
@@ -45,7 +45,7 @@ const config: ForgeConfig = {
     // macOS DMG
     new MakerDMG({
       name: 'QBox',
-      // icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'), // TODO: Add icons
+      icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'),
       background: undefined,
       format: 'ULFO',
     }),

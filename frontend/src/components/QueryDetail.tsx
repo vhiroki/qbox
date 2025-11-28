@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft } from "lucide-react";
 import Editor, { type OnMount } from "@monaco-editor/react";
+import { useTheme } from "./theme-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -78,6 +79,13 @@ export default function QueryDetail({
   
   // Local error state for query detail operations (rename, delete, selection changes)
   const [localError, setLocalError] = useState<string | null>(null);
+  
+  // Theme for Monaco editor
+  const { theme } = useTheme();
+  const resolvedTheme = theme === "system" 
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme;
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
 
   // Query execution state from store
   const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
@@ -679,7 +687,7 @@ export default function QueryDetail({
                             value={sqlText}
                             onChange={handleSQLChange}
                             onMount={handleEditorDidMount}
-                            theme="vs-dark"
+                            theme={monacoTheme}
                             options={{
                               minimap: { enabled: false },
                               fontSize: 14,

@@ -234,14 +234,14 @@ function AppContent() {
         {/* Collapsible Left Sidebar */}
         {isCollapsed ? (
           // Collapsed: Just show toolbar icons vertically
-          <div className="h-full border-r flex flex-col items-center py-2 px-1 bg-background">
+          <div className="h-full border-r flex flex-col items-center py-2 px-1 bg-card">
             <Toolbar collapsed />
           </div>
         ) : (
           // Expanded: Resizable panel with content
           <ResizablePanelGroup direction="horizontal" className="flex-1">
             <ResizablePanel defaultSize={18} minSize={15} maxSize={35}>
-              <div className="h-full border-r flex flex-col">
+              <div className="h-full border-r flex flex-col bg-card">
                 {/* Toolbar */}
                 <div className="flex items-center justify-between p-2 border-b">
                   <Toolbar />

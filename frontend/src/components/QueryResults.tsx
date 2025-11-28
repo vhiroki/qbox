@@ -97,9 +97,9 @@ export default function QueryResults({
   const { columns, rows, total_rows, page, page_size, total_pages, execution_time_ms } = result;
 
   return (
-    <div className="h-full flex flex-col border rounded-md bg-[#1e1e1e]">
+    <div className="h-full flex flex-col border rounded-md bg-card">
       {/* Header with stats and controls */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-[#1e1e1e] flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-card flex-shrink-0">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span>
             {total_rows !== undefined && (
@@ -133,12 +133,12 @@ export default function QueryResults({
       {/* Table */}
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full caption-bottom text-sm">
-          <thead className="sticky top-0 z-10 bg-[#1e1e1e] border-b" style={{ position: 'sticky', top: 0 }}>
-            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+          <thead className="sticky top-0 z-10 bg-card border-b" style={{ position: 'sticky', top: 0 }}>
+            <tr className="border-b transition-colors">
               {columns.map((column) => (
                 <th
                   key={column}
-                  className="h-10 px-4 text-left align-middle font-semibold text-muted-foreground bg-[#1e1e1e] whitespace-nowrap"
+                  className="h-10 px-4 text-left align-middle font-semibold text-muted-foreground bg-card whitespace-nowrap"
                   title={column}
                 >
                   {column}
@@ -148,7 +148,7 @@ export default function QueryResults({
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+              <tr className="border-b transition-colors hover:bg-muted/50">
                 <td
                   colSpan={columns.length}
                   className="px-4 py-2 align-middle text-center text-muted-foreground h-24 whitespace-nowrap"
@@ -160,7 +160,7 @@ export default function QueryResults({
               rows.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
-                  className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                  className="border-b transition-colors hover:bg-muted/50"
                 >
                   {columns.map((column) => (
                     <td 
@@ -182,7 +182,7 @@ export default function QueryResults({
 
       {/* Pagination Controls */}
       {total_pages !== undefined && (
-        <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0 bg-[#1e1e1e]">
+        <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0 bg-card">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Rows per page:</span>
             <Select
@@ -236,7 +236,7 @@ export default function QueryResults({
                     onKeyDown={handlePageInputKeyDown}
                     onBlur={handlePageInputSubmit}
                     placeholder={String(page)}
-                    className="w-12 h-8 text-center text-sm border rounded px-2 bg-[#1e1e1e]"
+                    className="w-12 h-8 text-center text-sm border rounded px-2 bg-background"
                   />
                 </div>
                 <Button

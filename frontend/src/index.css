@@ -21,20 +21,12 @@
 
 @layer base {
   /* =========================================
-     Global cursor fix - restore pointer for 
-     interactive elements (Tailwind preflight 
-     removes this for "consistency")
+     Restore pointer cursor for buttons
+     (Tailwind v4 changed default to arrow)
+     Official shadcn/ui recommendation
      ========================================= */
-  button,
-  [role="button"],
-  [type="button"],
-  [type="submit"],
-  [type="reset"],
-  a[href],
-  label[for],
-  select,
-  summary,
-  [tabindex]:not([tabindex="-1"]) {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
     cursor: pointer;
   }
 

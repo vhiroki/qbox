@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FileCode } from 'lucide-react';
+import { ThemeProvider } from './components/theme-provider';
 import ConnectionManager from './components/ConnectionManager';
 import QueryList from './components/QueryList';
 import QueryDetail from './components/QueryDetail';
@@ -55,10 +56,10 @@ function AppContent() {
   const selectedQueryId = location.pathname.match(/^\/query\/([^/]+)$/)?.[1] || null;
 
   return (
-    <div className="h-screen flex bg-background text-foreground dark">
+    <div className="h-screen flex bg-background text-foreground">
       {/* Permanent Left Sidebar - Query List */}
       <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={15} minSize={10} maxSize={60}>
+        <ResizablePanel defaultSize={15} minSize={15} maxSize={30}>
           <div className="h-full border-r flex flex-col">
             <QueryList
               currentPage={currentPage}
@@ -88,9 +89,11 @@ function App() {
   // Use HashRouter for Electron compatibility (file:// protocol)
   // URLs will be like: file://...index.html#/ and file://...index.html#/query/123
   return (
-    <HashRouter>
-      <AppContent />
-    </HashRouter>
+    <ThemeProvider defaultTheme="dark" storageKey="qbox-theme">
+      <HashRouter>
+        <AppContent />
+      </HashRouter>
+    </ThemeProvider>
   );
 }
 

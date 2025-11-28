@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   QBox Theme - Amber/Gold on Dark
+   QBox Theme - Amber/Gold with Light & Dark modes
    
    Color Palette:
+   Dark Mode:
    - Background: #0a0a0b (primary), #111113 (secondary), #18181b (tertiary)
    - Text: #fafafa (primary), #a1a1aa (secondary), #71717a (muted)
-   - Accent: #f59e0b (amber), #fbbf24 (light), #d97706 (dark)
-   - Border: rgba(255, 255, 255, 0.08)
+   - Accent: #f59e0b (amber-500) - bright amber for dark backgrounds
+   
+   Light Mode:
+   - Background: #ffffff (primary), #fafafa (secondary), #f5f5f5 (tertiary)
+   - Text: #0a0a0b (primary), #52525b (secondary), #71717a (muted)
+   - Accent: #b45309 (amber-700) - darker amber for better contrast
    
    Typography:
    - Sans: Instrument Sans
@@ -23,26 +28,6 @@
     /* Sizing */
     --radius: 0.5rem;
     
-    /* Light mode colors (unused but defined for completeness) */
-    --background: oklch(0.985 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(0.985 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(0.985 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.769 0.188 70.08);
-    --primary-foreground: oklch(0.145 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.769 0.188 70.08);
-    --accent-foreground: oklch(0.145 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.769 0.188 70.08);
-    
     /* Reduced spacing scale */
     --spacing-0: 0;
     --spacing-1: 0.125rem;
@@ -54,6 +39,71 @@
     --spacing-8: 1.5rem;
   }
 
+  /* =========================================
+     LIGHT THEME (default)
+     Using darker amber (#b45309) for contrast
+     ========================================= */
+  :root, .light {
+    /* Background hierarchy - clean whites */
+    --background: #ffffff;
+    --foreground: #0a0a0b;
+    
+    /* Cards and elevated surfaces */
+    --card: #fafafa;
+    --card-foreground: #0a0a0b;
+    
+    /* Popovers and dropdowns */
+    --popover: #ffffff;
+    --popover-foreground: #0a0a0b;
+    
+    /* Primary action color - Darker Amber for contrast */
+    --primary: #b45309;
+    --primary-foreground: #ffffff;
+    
+    /* Secondary/tertiary surfaces */
+    --secondary: #f5f5f5;
+    --secondary-foreground: #0a0a0b;
+    
+    /* Muted elements */
+    --muted: #f5f5f5;
+    --muted-foreground: #71717a;
+    
+    /* Accent - amber tint for highlights */
+    --accent: rgba(180, 83, 9, 0.1);
+    --accent-foreground: #b45309;
+    
+    /* Destructive actions */
+    --destructive: #dc2626;
+    
+    /* Borders and inputs */
+    --border: #e5e5e5;
+    --input: #e5e5e5;
+    --ring: #b45309;
+    
+    /* Extended palette for custom use */
+    --surface-elevated: #fafafa;
+    --surface-header: #f5f5f5;
+    --text-secondary: #52525b;
+    --text-muted: #71717a;
+    --amber-400: #fbbf24;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --amber-glow: rgba(180, 83, 9, 0.1);
+    --border-light: #d4d4d4;
+    
+    /* Code syntax highlighting (light theme) */
+    --syntax-keyword: #a626a4;
+    --syntax-function: #4078f2;
+    --syntax-number: #986801;
+    --syntax-string: #50a14f;
+    --syntax-comment: #a0a1a7;
+  }
+
+  /* =========================================
+     DARK THEME
+     Using bright amber (#f59e0b) that glows
+     ========================================= */
   .dark {
     /* Background hierarchy - deep blacks */
     --background: #0a0a0b;
@@ -67,7 +117,7 @@
     --popover: #111113;
     --popover-foreground: #fafafa;
     
-    /* Primary action color - Amber */
+    /* Primary action color - Bright Amber */
     --primary: #f59e0b;
     --primary-foreground: #0a0a0b;
     
@@ -79,7 +129,7 @@
     --muted: #18181b;
     --muted-foreground: #71717a;
     
-    /* Accent - same as primary for consistency */
+    /* Accent - amber glow for highlights */
     --accent: rgba(245, 158, 11, 0.15);
     --accent-foreground: #f59e0b;
     
@@ -99,10 +149,11 @@
     --amber-400: #fbbf24;
     --amber-500: #f59e0b;
     --amber-600: #d97706;
+    --amber-700: #b45309;
     --amber-glow: rgba(245, 158, 11, 0.15);
     --border-light: rgba(255, 255, 255, 0.12);
     
-    /* Code syntax highlighting */
+    /* Code syntax highlighting (dark theme) */
     --syntax-keyword: #c678dd;
     --syntax-function: #61afef;
     --syntax-number: #d19a66;
@@ -140,6 +191,7 @@
   --color-amber-400: var(--amber-400);
   --color-amber-500: var(--amber-500);
   --color-amber-600: var(--amber-600);
+  --color-amber-700: var(--amber-700);
   --color-amber-glow: var(--amber-glow);
   --color-border-light: var(--border-light);
   
@@ -193,18 +245,18 @@
 @layer utilities {
   /* Amber glow effect for special elements */
   .glow-amber {
-    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2),
-                0 0 40px rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 20px var(--amber-glow),
+                0 0 40px var(--amber-glow);
   }
   
   /* Subtle amber border glow on focus */
   .focus-glow:focus {
-    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 0 0 2px var(--amber-glow);
   }
   
   /* Text gradient for special headings */
   .text-gradient-amber {
-    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+    background: linear-gradient(135deg, var(--amber-400) 0%, var(--amber-500) 50%, var(--amber-600) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -225,35 +277,69 @@
   }
 }
 
-/* Scrollbar styling for dark theme */
+/* Scrollbar styling - theme aware */
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
   
-  *::-webkit-scrollbar {
+  /* Light theme scrollbar */
+  :root *, .light * {
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+  
+  :root *::-webkit-scrollbar, .light *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   
-  *::-webkit-scrollbar-track {
+  :root *::-webkit-scrollbar-track, .light *::-webkit-scrollbar-track {
     background: transparent;
   }
   
-  *::-webkit-scrollbar-thumb {
+  :root *::-webkit-scrollbar-thumb, .light *::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  :root *::-webkit-scrollbar-thumb:hover, .light *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Dark theme scrollbar */
+  .dark * {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+  
+  .dark *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .dark *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .dark *::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.15);
     border-radius: 4px;
   }
   
-  *::-webkit-scrollbar-thumb:hover {
+  .dark *::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255, 255, 255, 0.25);
   }
 }
 
-/* Selection styling */
+/* Selection styling - theme aware */
 @layer base {
-  ::selection {
+  /* Light theme selection */
+  :root ::selection, .light ::selection {
+    background-color: rgba(180, 83, 9, 0.25);
+    color: #0a0a0b;
+  }
+  
+  /* Dark theme selection */
+  .dark ::selection {
     background-color: rgba(245, 158, 11, 0.3);
     color: #fafafa;
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Trash2, Save } from "lucide-react";
+import { Settings, Trash2, Save, Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTheme } from "@/components/theme-provider";
 import { api } from "../services/api";
 import type { AISettings, AISettingsUpdate } from "../types";
 
@@ -36,6 +37,7 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const { theme, setTheme } = useTheme();
   
   // AI Settings state
   const [aiSettings, setAISettings] = useState<AISettings>({
@@ -162,8 +164,54 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
               </Alert>
             )}
 
-            {/* AI Configuration Section */}
+            {/* Appearance Section */}
             <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium mb-1">Appearance</h3>
+                <p className="text-sm text-muted-foreground">
+                  Customize how QBox looks on your device.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Theme</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={theme === "light" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("light")}
+                    className="flex-1"
+                  >
+                    <Sun className="h-4 w-4 mr-2" />
+                    Light
+                  </Button>
+                  <Button
+                    variant={theme === "dark" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("dark")}
+                    className="flex-1"
+                  >
+                    <Moon className="h-4 w-4 mr-2" />
+                    Dark
+                  </Button>
+                  <Button
+                    variant={theme === "system" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("system")}
+                    className="flex-1"
+                  >
+                    <Monitor className="h-4 w-4 mr-2" />
+                    System
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Select your preferred theme or use system settings.
+                </p>
+              </div>
+            </div>
+
+            {/* AI Configuration Section */}
+            <div className="space-y-4 pt-4 border-t">
               <div>
                 <h3 className="text-sm font-medium mb-1">AI Configuration</h3>
                 <p className="text-sm text-muted-foreground">

@@ -26,16 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useQueryStore } from "../stores";
 import { api } from "../services/api";
 import ChatInterface from "./ChatInterface";
@@ -46,6 +37,8 @@ import DataSourcesPanel from "./DataSourcesPanel";
 interface QueryDetailProps {
   queryId: string;
   onQueryDeleted: () => void;
+  autoFocusRename?: boolean;
+  onRenameComplete?: () => void;
 }
 
 /**
@@ -70,6 +63,8 @@ function getS3ViewName(filePath: string): string {
 export default function QueryDetail({
   queryId,
   onQueryDeleted,
+  autoFocusRename = false,
+  onRenameComplete,
 }: QueryDetailProps) {
   // Zustand stores
   const queries = useQueryStore((state) => state.queries);
@@ -90,7 +85,8 @@ export default function QueryDetail({
 
   // Local UI state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const [removeSelectionDialogOpen, setRemoveSelectionDialogOpen] = useState(false);
   const [selectionToRemove, setSelectionToRemove] = useState<{
     connectionId: string;
@@ -99,18 +95,19 @@ export default function QueryDetail({
     sourceType: string;
     label: string;
   } | null>(null);
-  const [newQueryName, setNewQueryName] = useState("");
   const [sqlText, setSqlText] = useState("");
   const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(false);
 
-  // Monaco Editor ref for keyboard shortcuts
+  // Refs
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
   const isExecutingRef = useRef(isExecuting);
   const sqlTextRef = useRef(sqlText);
   const handleExecuteQueryRef = useRef<(() => void) | null>(null);
+  const lastAutoFocusedQueryIdRef = useRef<string | null>(null);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -222,6 +219,34 @@ export default function QueryDetail({
       setSqlText(query.sql_text);
     }
   }, [query?.sql_text]);
+
+  // Auto-focus rename input when autoFocusRename is true (after creating a new query)
+  useEffect(() => {
+    // Only trigger if:
+    // 1. autoFocusRename is true (URL has ?rename=true)
+    // 2. query is loaded
+    // 3. We haven't already auto-focused this specific query
+    if (autoFocusRename && query && lastAutoFocusedQueryIdRef.current !== queryId) {
+      lastAutoFocusedQueryIdRef.current = queryId;
+      setEditedName(query.name);
+      setIsEditingName(true);
+      // Focus will happen via the other effect when isEditingName becomes true
+    }
+  }, [autoFocusRename, query, queryId]);
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditingName) {
+      // Use a small timeout to ensure the input is rendered and ready
+      const timer = setTimeout(() => {
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+          nameInputRef.current.select();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditingName]);
 
   // Auto-save SQL with debouncing (1 second after user stops typing)
   useEffect(() => {
@@ -343,18 +368,47 @@ export default function QueryDetail({
     }
   };
 
+  const startEditing = () => {
+    if (query) {
+      setEditedName(query.name);
+      setIsEditingName(true);
+    }
+  };
+
+  const cancelEditing = () => {
+    setIsEditingName(false);
+    setEditedName("");
+    onRenameComplete?.();
+  };
+
   const handleRenameQuery = async () => {
-    if (!newQueryName.trim()) {
-      setQueryError("Query name cannot be empty");
+    if (!editedName.trim()) {
+      // If empty, revert to original name
+      cancelEditing();
       return;
     }
 
-    try {
-      await updateQueryName(queryId, newQueryName.trim());
-      setRenameDialogOpen(false);
-      setNewQueryName("");
-    } catch (err: any) {
-      // Error is already set in store
+    // Only update if name actually changed
+    if (query && editedName.trim() !== query.name) {
+      try {
+        await updateQueryName(queryId, editedName.trim());
+      } catch (err: any) {
+        // Error is already set in store
+      }
+    }
+    
+    setIsEditingName(false);
+    setEditedName("");
+    onRenameComplete?.();
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleRenameQuery();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEditing();
     }
   };
 
@@ -521,32 +575,50 @@ export default function QueryDetail({
       {/* Header */}
       <div className="border-b bg-muted/10 p-4">
         <div className="flex items-start justify-between">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <h2 className="text-2xl font-bold">{query.name}</h2>
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem
-                onClick={() => {
-                  setNewQueryName(query.name);
-                  setRenameDialogOpen(true);
-                }}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Rename Query
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setDeleteDialogOpen(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Query
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            {isEditingName ? (
+              <Input
+                ref={nameInputRef}
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={handleRenameQuery}
+                onKeyDown={handleNameKeyDown}
+                className="text-2xl font-bold h-auto py-1 px-2 w-[300px]"
+                placeholder="Query name"
+                autoFocus
+              />
+            ) : (
+              <>
+                <h2 
+                  className="text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={startEditing}
+                  title="Click to rename"
+                >
+                  {query.name}
+                </h2>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-1 rounded hover:bg-muted transition-colors">
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={startEditing}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Rename Query
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setDeleteDialogOpen(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Query
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+          </div>
         </div>
 
         {queryError && (
@@ -756,49 +828,6 @@ export default function QueryDetail({
           </Button>
         )}
       </div>
-
-      {/* Rename Dialog */}
-      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Query</DialogTitle>
-            <DialogDescription>
-              Enter a new name for this query.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="query-name">Query Name</Label>
-              <Input
-                id="query-name"
-                value={newQueryName}
-                onChange={(e) => setNewQueryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleRenameQuery();
-                  }
-                }}
-                placeholder="Enter query name"
-                autoFocus
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRenameDialogOpen(false);
-                setNewQueryName("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleRenameQuery} disabled={isQueryLoading || !newQueryName.trim()}>
-              Rename
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Query Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

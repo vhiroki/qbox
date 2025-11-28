@@ -74,9 +74,10 @@ export default function QueryDetail({
   const deleteQuery = useQueryStore((state) => state.deleteQuery);
   const loadQuerySelections = useQueryStore((state) => state.loadQuerySelections);
   const querySelections = useQueryStore((state) => state.querySelections);
-  const queryError = useQueryStore((state) => state.error);
   const isQueryLoading = useQueryStore((state) => state.isLoading);
-  const setQueryError = useQueryStore((state) => state.setError);
+  
+  // Local error state for query detail operations (rename, delete, selection changes)
+  const [localError, setLocalError] = useState<string | null>(null);
 
   // Query execution state from store
   const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
@@ -141,6 +142,7 @@ export default function QueryDetail({
   const [copiedBadge, setCopiedBadge] = useState<string | null>(null);
 
   useEffect(() => {
+    setLocalError(null); // Clear local error when switching queries
     selectQuery(queryId);
     loadQuerySelections(queryId);
   }, [queryId, selectQuery, loadQuerySelections]);
@@ -284,6 +286,7 @@ export default function QueryDetail({
     sourceType: string
   ) => {
     try {
+      setLocalError(null);
       if (checked) {
         // Add table
         await api.addQuerySelection(queryId, {
@@ -305,7 +308,7 @@ export default function QueryDetail({
       await loadQuerySelections(queryId);
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || "Failed to update table selection";
-      setQueryError(errorMsg);
+      setLocalError(errorMsg);
     }
   };
 
@@ -621,9 +624,9 @@ export default function QueryDetail({
           </div>
         </div>
 
-        {queryError && (
+        {localError && (
           <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{queryError}</AlertDescription>
+            <AlertDescription>{localError}</AlertDescription>
           </Alert>
         )}
       </div>

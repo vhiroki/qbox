@@ -18,17 +18,16 @@ export default function ChatInterface({
   onSQLChange,
   onCollapse,
 }: ChatInterfaceProps) {
-  // Zustand store
+  // Zustand store - only use chat-specific state, not global error
   const sendChatMessage = useQueryStore((state) => state.sendChatMessage);
   const retryChatMessage = useQueryStore((state) => state.retryChatMessage);
   const loadChatHistory = useQueryStore((state) => state.loadChatHistory);
   const clearChatHistory = useQueryStore((state) => state.clearChatHistory);
   const queryChatHistory = useQueryStore((state) => state.queryChatHistory);
-  const isLoading = useQueryStore((state) => state.isLoading);
-  const storeError = useQueryStore((state) => state.error);
 
   const [userMessage, setUserMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +49,7 @@ export default function ChatInterface({
     const messageText = userMessage;
     setError(null);
     setUserMessage(""); // Clear input immediately for better UX
+    setIsSending(true);
 
     try {
       const response = await sendChatMessage(query.id, messageText);
@@ -60,12 +60,16 @@ export default function ChatInterface({
       }
     } catch (err: any) {
       // Don't restore message - retry button will be shown in chat history
-      setError(storeError || "Failed to process message. Please try again.");
+      const errorMessage = err.response?.data?.detail || err.message || "Failed to process message. Please try again.";
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleRetry = async (messageId: string) => {
     setError(null);
+    setIsSending(true);
     try {
       const response = await retryChatMessage(query.id, messageId);
 
@@ -74,7 +78,10 @@ export default function ChatInterface({
         onSQLChange(response.updatedSQL);
       }
     } catch (err: any) {
-      setError(storeError || "Failed to retry message. Please try again.");
+      const errorMessage = err.response?.data?.detail || err.message || "Failed to retry message. Please try again.";
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -84,7 +91,8 @@ export default function ChatInterface({
     try {
       await clearChatHistory(query.id);
     } catch (err: any) {
-      setError(storeError || "Failed to clear chat history. Please try again.");
+      const errorMessage = err.response?.data?.detail || err.message || "Failed to clear chat history. Please try again.";
+      setError(errorMessage);
     }
   };
 
@@ -223,15 +231,15 @@ export default function ChatInterface({
           }}
           placeholder="Ask AI to modify your SQL query... (Shift+Enter for new line)"
           className="flex-1 min-h-[60px] max-h-[120px] resize-none"
-          disabled={isLoading}
+          disabled={isSending}
         />
         <Button
           onClick={handleSendMessage}
-          disabled={isLoading || !userMessage.trim()}
+          disabled={isSending || !userMessage.trim()}
           size="icon"
           className="h-[60px] w-[60px]"
         >
-          {isLoading ? (
+          {isSending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />

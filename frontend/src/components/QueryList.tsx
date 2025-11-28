@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { FileCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,14 +16,24 @@ export default function QueryList({
 }: QueryListProps) {
   const navigate = useNavigate();
 
-  // Zustand store
+  // Zustand store - only get query list state
   const queries = useQueryStore((state) => state.queries);
   const isLoading = useQueryStore((state) => state.isLoading);
-  const error = useQueryStore((state) => state.error);
   const loadQueries = useQueryStore((state) => state.loadQueries);
+  
+  // Local error state for query list operations only
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadQueries();
+    const load = async () => {
+      try {
+        setLoadError(null);
+        await loadQueries();
+      } catch (err: any) {
+        setLoadError(err.response?.data?.detail || err.message || "Failed to load queries");
+      }
+    };
+    load();
   }, [loadQueries]);
 
   const formatDate = (dateString: string) => {
@@ -52,10 +62,10 @@ export default function QueryList({
           </div>
         )}
 
-        {error && (
+        {loadError && (
           <div className="p-4">
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{loadError}</AlertDescription>
             </Alert>
           </div>
         )}

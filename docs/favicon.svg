@@ -4,5 +4,9 @@
     <!-- Horizontal lines -->
     <path d="M8 12h16M8 16h12M8 20h8" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
     <!-- Q tail extending from the gap -->
+<<<<<<< HEAD
     <path d="M24 24L30 30" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
+=======
+    <path d="M24 24L30 30" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+>>>>>>> main
 </svg>

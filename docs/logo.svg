@@ -1,0 +1,8 @@
+<svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Box with open bottom-right corner -->
+    <path d="M88 120 H32 Q8 120 8 96 V32 Q8 8 32 8 H96 Q120 8 120 32 V88" stroke="#f59e0b" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <!-- Horizontal lines -->
+    <path d="M32 48h64M32 64h48M32 80h32" stroke="#f59e0b" stroke-width="10" stroke-linecap="round"/>
+    <!-- Q tail extending from the gap -->
+    <path d="M96 96L120 120" stroke="#f59e0b" stroke-width="16" stroke-linecap="round"/>
+</svg>

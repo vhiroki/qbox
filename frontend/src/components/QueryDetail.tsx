@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft } from "lucide-react";
-import Editor, { type OnMount } from "@monaco-editor/react";
+import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import { useTheme } from "./theme-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -85,7 +85,7 @@ export default function QueryDetail({
   const resolvedTheme = theme === "system" 
     ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
     : theme;
-  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const monacoTheme = resolvedTheme === "dark" ? "qbox-dark" : "qbox-light";
 
   // Query execution state from store
   const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
@@ -543,6 +543,64 @@ export default function QueryDetail({
     }
   };
 
+  // Define custom themes before the editor mounts
+  const handleEditorWillMount: BeforeMount = (monaco) => {
+    // Define custom warm dark theme to match our app's aesthetic
+    monaco.editor.defineTheme('qbox-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: 'c678dd' },
+        { token: 'keyword.sql', foreground: 'c678dd' },
+        { token: 'string', foreground: '98c379' },
+        { token: 'string.sql', foreground: '98c379' },
+        { token: 'number', foreground: 'd19a66' },
+        { token: 'comment', foreground: '5c6370' },
+        { token: 'operator', foreground: '56b6c2' },
+        { token: 'identifier', foreground: 'e5c07b' },
+      ],
+      colors: {
+        'editor.background': '#1b1913',
+        'editor.foreground': '#edecec',
+        'editor.lineHighlightBackground': '#201e18',
+        'editor.selectionBackground': '#3a3830',
+        'editor.inactiveSelectionBackground': '#2a2820',
+        'editorCursor.foreground': '#f59e0b',
+        'editorLineNumber.foreground': '#5c5a52',
+        'editorLineNumber.activeForeground': '#a8a7a5',
+        'editorIndentGuide.background': '#26241e',
+        'editorIndentGuide.activeBackground': '#3a3830',
+        'editorGutter.background': '#1b1913',
+      },
+    });
+
+    // Define custom warm light theme
+    monaco.editor.defineTheme('qbox-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: 'a626a4' },
+        { token: 'keyword.sql', foreground: 'a626a4' },
+        { token: 'string', foreground: '50a14f' },
+        { token: 'string.sql', foreground: '50a14f' },
+        { token: 'number', foreground: '986801' },
+        { token: 'comment', foreground: 'a0a1a7' },
+        { token: 'operator', foreground: '0184bc' },
+        { token: 'identifier', foreground: 'c18401' },
+      ],
+      colors: {
+        'editor.background': '#fafafa',
+        'editor.foreground': '#0a0a0b',
+        'editor.lineHighlightBackground': '#f0f0f0',
+        'editor.selectionBackground': '#d0d0d0',
+        'editorCursor.foreground': '#b45309',
+        'editorLineNumber.foreground': '#a0a1a7',
+        'editorLineNumber.activeForeground': '#52525b',
+        'editorGutter.background': '#fafafa',
+      },
+    });
+  };
+
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
 
@@ -686,6 +744,7 @@ export default function QueryDetail({
                             defaultLanguage="sql"
                             value={sqlText}
                             onChange={handleSQLChange}
+                            beforeMount={handleEditorWillMount}
                             onMount={handleEditorDidMount}
                             theme={monacoTheme}
                             options={{

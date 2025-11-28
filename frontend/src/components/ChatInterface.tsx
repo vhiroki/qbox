@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import type { Query } from "../types";
 import { useQueryStore } from "../stores";
 import { Button } from "./ui/button";
@@ -10,12 +10,20 @@ import { Alert, AlertDescription } from "./ui/alert";
 interface ChatInterfaceProps {
   query: Query;
   onSQLChange?: (sqlText: string) => void;
+  pendingMessage?: string | null;
+  onMessageSent?: () => void;
 }
 
-export default function ChatInterface({
+export interface ChatInterfaceRef {
+  sendMessage: (message: string) => void;
+}
+
+const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   query,
   onSQLChange,
-}: ChatInterfaceProps) {
+  pendingMessage,
+  onMessageSent,
+}, ref) => {
   // Zustand store - only use chat-specific state, not global error
   const sendChatMessage = useQueryStore((state) => state.sendChatMessage);
   const retryChatMessage = useQueryStore((state) => state.retryChatMessage);
@@ -35,6 +43,48 @@ export default function ChatInterface({
   useEffect(() => {
     loadChatHistory(query.id);
   }, [query.id, loadChatHistory]);
+
+  // Handle pending messages from parent
+  useEffect(() => {
+    if (pendingMessage && !isSending) {
+      setUserMessage(pendingMessage);
+      // Auto-send the message
+      const sendPendingMessage = async () => {
+        const messageText = pendingMessage;
+        setError(null);
+        setUserMessage(""); // Clear input
+        setIsSending(true);
+
+        try {
+          const response = await sendChatMessage(query.id, messageText);
+
+          // Notify parent of SQL change if callback provided
+          if (onSQLChange) {
+            onSQLChange(response.updatedSQL);
+          }
+
+          // Notify parent that message was sent
+          onMessageSent?.();
+        } catch (err: any) {
+          const errorMessage = err.response?.data?.detail || err.message || "Failed to process message. Please try again.";
+          setError(errorMessage);
+          // On error, restore the message so user can edit/retry
+          setUserMessage(messageText);
+        } finally {
+          setIsSending(false);
+        }
+      };
+
+      sendPendingMessage();
+    }
+  }, [pendingMessage, isSending, sendChatMessage, query.id, onSQLChange, onMessageSent]);
+
+  // Expose method to parent component
+  useImperativeHandle(ref, () => ({
+    sendMessage: (message: string) => {
+      setUserMessage(message);
+    },
+  }));
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -233,4 +283,8 @@ export default function ChatInterface({
       </div>
     </div>
   );
-}
+});
+
+ChatInterface.displayName = "ChatInterface";
+
+export default ChatInterface;

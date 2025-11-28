@@ -30,7 +30,7 @@ import { useQueryStore } from "../stores";
 import { api } from "../services/api";
 import QueryResults from "./QueryResults";
 import SQLHistoryModal from "./SQLHistoryModal";
-import RightSidePanel from "./RightSidePanel";
+import RightSidePanel, { type RightSidePanelRef } from "./RightSidePanel";
 
 interface QueryDetailProps {
   queryId: string;
@@ -96,6 +96,7 @@ export default function QueryDetail({
   const sqlTextRef = useRef(sqlText);
   const handleExecuteQueryRef = useRef<(() => void) | null>(null);
   const lastAutoFocusedQueryIdRef = useRef<string | null>(null);
+  const rightSidePanelRef = useRef<RightSidePanelRef>(null);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -508,6 +509,17 @@ export default function QueryDetail({
     }
   };
 
+  const handleFixWithAI = (error: string) => {
+    // Expand right panel if collapsed
+    if (isRightPanelCollapsed) {
+      setIsRightPanelCollapsed(false);
+    }
+
+    // Send error message to chat with helpful context
+    const errorMessage = `I'm getting this error when running my query:\n\n${error}\n\nCan you help me fix it?`;
+    rightSidePanelRef.current?.sendChatMessage(errorMessage);
+  };
+
   // Define custom themes before the editor mounts
   const handleEditorWillMount: BeforeMount = (monaco) => {
     // Define custom warm dark theme to match our app's aesthetic
@@ -743,6 +755,7 @@ export default function QueryDetail({
                       onPageSizeChange={handlePageSizeChange}
                       onExport={handleExportToCSV}
                       isExporting={isExporting}
+                      onFixWithAI={handleFixWithAI}
                     />
                   </div>
                 </ResizablePanel>
@@ -758,6 +771,7 @@ export default function QueryDetail({
               <ResizablePanel defaultSize={40} minSize={25} maxSize={55}>
                 <div className="h-full pl-3">
                   <RightSidePanel
+                    ref={rightSidePanelRef}
                     query={query}
                     queryId={queryId}
                     selections={selections}

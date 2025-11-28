@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useImperativeHandle, forwardRef, useRef } from "react";
 import { MessageSquare, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,9 +31,13 @@ interface RightSidePanelProps {
   connectionInfoMap: Map<string, { name: string; alias: string }>;
 }
 
+export interface RightSidePanelRef {
+  sendChatMessage: (message: string) => void;
+}
+
 type PanelView = "tables" | "chat";
 
-export default function RightSidePanel({
+const RightSidePanel = forwardRef<RightSidePanelRef, RightSidePanelProps>(({
   query,
   queryId,
   selections,
@@ -43,9 +47,21 @@ export default function RightSidePanel({
   onRemoveSelection,
   fileInfoMap,
   connectionInfoMap,
-}: RightSidePanelProps) {
+}, ref) => {
   const [activeView, setActiveView] = useState<PanelView>("tables");
   const [isAddTableModalOpen, setIsAddTableModalOpen] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const chatInterfaceRef = useRef<{ sendMessage: (message: string) => void } | null>(null);
+
+  // Expose method to parent component
+  useImperativeHandle(ref, () => ({
+    sendChatMessage: (message: string) => {
+      // Switch to chat view
+      setActiveView("chat");
+      // Store the pending message to be sent when ChatInterface is ready
+      setPendingMessage(message);
+    },
+  }));
 
   const handleSaveTableChanges = async (
     additions: Array<{
@@ -130,7 +146,13 @@ export default function RightSidePanel({
             connectionInfoMap={connectionInfoMap}
           />
         ) : (
-          <ChatInterface query={query} onSQLChange={onSQLChange} />
+          <ChatInterface
+            query={query}
+            onSQLChange={onSQLChange}
+            ref={chatInterfaceRef}
+            pendingMessage={pendingMessage}
+            onMessageSent={() => setPendingMessage(null)}
+          />
         )}
       </div>
 
@@ -145,4 +167,8 @@ export default function RightSidePanel({
       />
     </div>
   );
-}
+});
+
+RightSidePanel.displayName = "RightSidePanel";
+
+export default RightSidePanel;

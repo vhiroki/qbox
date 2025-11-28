@@ -24,6 +24,7 @@ interface QueryResultsProps {
   onPageSizeChange: (pageSize: number) => void;
   onExport: () => void;
   isExporting: boolean;
+  onFixWithAI?: (error: string) => void;
 }
 
 export default function QueryResults({
@@ -34,6 +35,7 @@ export default function QueryResults({
   onPageSizeChange,
   onExport,
   isExporting,
+  onFixWithAI,
 }: QueryResultsProps) {
 
   if (isLoading) {
@@ -52,7 +54,19 @@ export default function QueryResults({
       <div className="h-full flex items-center justify-center p-4">
         <Alert variant="destructive" className="max-w-2xl">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="flex items-start justify-between gap-3">
+            <span className="flex-1">{error}</span>
+            {onFixWithAI && (
+              <Button
+                onClick={() => onFixWithAI(error)}
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs flex-shrink-0"
+              >
+                Fix with AI
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -70,12 +84,23 @@ export default function QueryResults({
   }
 
   if (!result.success || !result.columns || !result.rows) {
+    const resultError = result.error || "Failed to execute query";
     return (
       <div className="h-full flex items-center justify-center p-4">
         <Alert variant="destructive" className="max-w-2xl">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {result.error || "Failed to execute query"}
+          <AlertDescription className="flex items-start justify-between gap-3">
+            <span className="flex-1">{resultError}</span>
+            {onFixWithAI && (
+              <Button
+                onClick={() => onFixWithAI(resultError)}
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs flex-shrink-0"
+              >
+                Fix with AI
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       </div>

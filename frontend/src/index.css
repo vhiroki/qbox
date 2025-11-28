@@ -38,6 +38,16 @@
     cursor: pointer;
   }
 
+  /* =========================================
+     Set default border color to theme border
+     (Tailwind defaults to currentColor)
+     ========================================= */
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
+
   :root {
     /* Typography */
     --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -120,56 +130,57 @@
 
   /* =========================================
      DARK THEME
+     Warm blacks inspired by Cursor IDE
      Using bright amber (#f59e0b) that glows
      ========================================= */
   .dark {
-    /* Background hierarchy - deep blacks */
-    --background: #0a0a0b;
-    --foreground: #fafafa;
+    /* Background hierarchy - warm blacks (Cursor-inspired) */
+    --background: #14120b;
+    --foreground: #edecec;
     
-    /* Cards and elevated surfaces */
-    --card: #111113;
-    --card-foreground: #fafafa;
+    /* Cards and elevated surfaces - warm tones */
+    --card: #1b1913;
+    --card-foreground: #edecec;
     
     /* Popovers and dropdowns */
-    --popover: #111113;
-    --popover-foreground: #fafafa;
+    --popover: #1d1b15;
+    --popover-foreground: #edecec;
     
     /* Primary action color - Bright Amber */
     --primary: #f59e0b;
-    --primary-foreground: #0a0a0b;
+    --primary-foreground: #14120b;
     
-    /* Secondary/tertiary surfaces */
-    --secondary: #18181b;
-    --secondary-foreground: #fafafa;
+    /* Secondary/tertiary surfaces - warm grays */
+    --secondary: #201e18;
+    --secondary-foreground: #d7d6d5;
     
     /* Muted elements */
-    --muted: #18181b;
-    --muted-foreground: #71717a;
+    --muted: #1d1b15;
+    --muted-foreground: #a8a7a5;
     
     /* Accent - amber glow for highlights */
-    --accent: rgba(245, 158, 11, 0.15);
+    --accent: rgba(245, 158, 11, 0.12);
     --accent-foreground: #f59e0b;
     
     /* Destructive actions */
     --destructive: #ef4444;
     
-    /* Borders and inputs */
-    --border: rgba(255, 255, 255, 0.08);
-    --input: rgba(255, 255, 255, 0.08);
+    /* Borders and inputs - warm solid colors */
+    --border: #26241e;
+    --input: #26241e;
     --ring: #f59e0b;
     
     /* Extended palette for custom use */
-    --surface-elevated: #141416;
-    --surface-header: #18181b;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
+    --surface-elevated: #1d1b15;
+    --surface-header: #201e18;
+    --text-secondary: #d7d6d5;
+    --text-muted: #a8a7a5;
     --amber-400: #fbbf24;
     --amber-500: #f59e0b;
     --amber-600: #d97706;
     --amber-700: #b45309;
     --amber-glow: rgba(245, 158, 11, 0.15);
-    --border-light: rgba(255, 255, 255, 0.12);
+    --border-light: #2e2c25;
     
     /* Code syntax highlighting (dark theme) */
     --syntax-keyword: #c678dd;

@@ -75,14 +75,14 @@ export default function QueryList({
             <button
               key={query.id}
               onClick={() => navigate(`/query/${query.id}`)}
-              className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
+              className={`w-full text-left p-3 rounded-lg mb-2 transition-all border-l-2 ${
                 selectedQueryId === query.id
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-accent"
+                  ? "border-l-primary bg-accent"
+                  : "border-l-transparent hover:bg-accent/50"
               }`}
             >
               <div className="font-medium truncate">{query.name}</div>
-              <div className="text-xs opacity-70 mt-1">
+              <div className="text-xs text-muted-foreground mt-1">
                 {formatDate(query.updated_at)}
               </div>
             </button>

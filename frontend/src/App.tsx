@@ -11,6 +11,12 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from './components/ui/resizable';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from './components/ui/tooltip';
 import { useQueryStore } from './stores';
 
 const SIDEBAR_COLLAPSED_KEY = 'qbox-sidebar-collapsed';
@@ -117,34 +123,52 @@ function AppContent() {
       // Collapsed: All icons stacked vertically
       return (
         <div className="flex flex-col items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="h-8 w-8"
-            title="Expand sidebar"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={currentPage === 'connections' ? 'default' : 'ghost'}
-            size="icon"
-            onClick={() => navigate('/connections')}
-            className="h-8 w-8"
-            title="Connections"
-          >
-            <Database className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCreateQuery}
-            disabled={isCreating}
-            className="h-8 w-8"
-            title="Create Query"
-          >
-            <SquarePen className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSidebar}
+                className="h-8 w-8"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Expand sidebar</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={currentPage === 'connections' ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => navigate('/connections')}
+                className="h-8 w-8"
+              >
+                <Database className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Connections</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCreateQuery}
+                disabled={isCreating}
+                className="h-8 w-8"
+              >
+                <SquarePen className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>New Query</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       );
     }
@@ -152,90 +176,110 @@ function AppContent() {
     // Expanded: Collapse on left, other icons on right
     return (
       <div className="flex items-center justify-between w-full">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          className="h-8 w-8"
-          title="Collapse sidebar"
-        >
-          <PanelLeftClose className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Collapse sidebar</p>
+          </TooltipContent>
+        </Tooltip>
         <div className="flex items-center gap-1">
-          <Button
-            variant={currentPage === 'connections' ? 'default' : 'ghost'}
-            size="icon"
-            onClick={() => navigate('/connections')}
-            className="h-8 w-8"
-            title="Connections"
-          >
-            <Database className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCreateQuery}
-            disabled={isCreating}
-            className="h-8 w-8"
-            title="Create Query"
-          >
-            <SquarePen className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={currentPage === 'connections' ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => navigate('/connections')}
+                className="h-8 w-8"
+              >
+                <Database className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Connections</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCreateQuery}
+                disabled={isCreating}
+                className="h-8 w-8"
+              >
+                <SquarePen className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>New Query</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="h-screen flex bg-background text-foreground">
-      {/* Collapsible Left Sidebar */}
-      {isCollapsed ? (
-        // Collapsed: Just show toolbar icons vertically
-        <div className="h-full border-r flex flex-col items-center py-2 px-1 bg-background">
-          <Toolbar collapsed />
-        </div>
-      ) : (
-        // Expanded: Resizable panel with content
-        <ResizablePanelGroup direction="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={18} minSize={15} maxSize={35}>
-            <div className="h-full border-r flex flex-col">
-              {/* Toolbar */}
-              <div className="flex items-center justify-between p-2 border-b">
-                <Toolbar />
+    <TooltipProvider delayDuration={300}>
+      <div className="h-screen flex bg-background text-foreground">
+        {/* Collapsible Left Sidebar */}
+        {isCollapsed ? (
+          // Collapsed: Just show toolbar icons vertically
+          <div className="h-full border-r flex flex-col items-center py-2 px-1 bg-background">
+            <Toolbar collapsed />
+          </div>
+        ) : (
+          // Expanded: Resizable panel with content
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            <ResizablePanel defaultSize={18} minSize={15} maxSize={35}>
+              <div className="h-full border-r flex flex-col">
+                {/* Toolbar */}
+                <div className="flex items-center justify-between p-2 border-b">
+                  <Toolbar />
+                </div>
+                <QueryList
+                  currentPage={currentPage}
+                  selectedQueryId={selectedQueryId}
+                />
               </div>
-              <QueryList
-                currentPage={currentPage}
-                selectedQueryId={selectedQueryId}
-              />
-            </div>
-          </ResizablePanel>
+            </ResizablePanel>
 
-          <ResizableHandle withHandle />
+            <ResizableHandle withHandle />
 
-          {/* Main Content Area */}
-          <ResizablePanel defaultSize={82}>
-            <div className="h-full flex flex-col overflow-hidden">
-              <Routes>
-                <Route path="/" element={<QueryPage />} />
-                <Route path="/query/:queryId" element={<QueryPage />} />
-                <Route path="/connections" element={<ConnectionsPage />} />
-              </Routes>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      )}
+            {/* Main Content Area */}
+            <ResizablePanel defaultSize={82}>
+              <div className="h-full flex flex-col overflow-hidden">
+                <Routes>
+                  <Route path="/" element={<QueryPage />} />
+                  <Route path="/query/:queryId" element={<QueryPage />} />
+                  <Route path="/connections" element={<ConnectionsPage />} />
+                </Routes>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
 
-      {/* When collapsed, main content takes full width */}
-      {isCollapsed && (
-        <div className="flex-1 h-full flex flex-col overflow-hidden">
-          <Routes>
-            <Route path="/" element={<QueryPage />} />
-            <Route path="/query/:queryId" element={<QueryPage />} />
-            <Route path="/connections" element={<ConnectionsPage />} />
-          </Routes>
-        </div>
-      )}
-    </div>
+        {/* When collapsed, main content takes full width */}
+        {isCollapsed && (
+          <div className="flex-1 h-full flex flex-col overflow-hidden">
+            <Routes>
+              <Route path="/" element={<QueryPage />} />
+              <Route path="/query/:queryId" element={<QueryPage />} />
+              <Route path="/connections" element={<ConnectionsPage />} />
+            </Routes>
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
 

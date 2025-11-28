@@ -642,9 +642,9 @@ export default function QueryDetail({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="border-b bg-muted/10 p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
+      <div className="border-b p-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
             {isEditingName ? (
               <Input
                 ref={nameInputRef}
@@ -652,14 +652,14 @@ export default function QueryDetail({
                 onChange={(e) => setEditedName(e.target.value)}
                 onBlur={handleRenameQuery}
                 onKeyDown={handleNameKeyDown}
-                className="text-2xl font-bold h-auto py-1 px-2 w-[300px]"
+                className="text-sm font-semibold h-8 py-1 px-2 w-[250px]"
                 placeholder="Query name"
                 autoFocus
               />
             ) : (
               <>
                 <h2 
-                  className="text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity"
+                  className="text-sm font-semibold cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={startEditing}
                   title="Click to rename"
                 >
@@ -667,8 +667,8 @@ export default function QueryDetail({
                 </h2>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-1 rounded hover:bg-muted transition-colors">
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <button className="p-0.5 rounded hover:bg-muted transition-colors">
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
@@ -688,13 +688,12 @@ export default function QueryDetail({
               </>
             )}
           </div>
+          {localError && (
+            <Alert variant="destructive" className="py-1 px-2 text-xs">
+              <AlertDescription>{localError}</AlertDescription>
+            </Alert>
+          )}
         </div>
-
-        {localError && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{localError}</AlertDescription>
-          </Alert>
-        )}
       </div>
 
       {/* Main Content */}

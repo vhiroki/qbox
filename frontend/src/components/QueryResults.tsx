@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, Loader2 } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, Loader2, MoreHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Alert, AlertDescription } from "./ui/alert";
 import {
@@ -9,6 +8,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import type { QueryExecuteResult } from "../types";
 
 interface QueryResultsProps {
@@ -30,23 +35,6 @@ export default function QueryResults({
   onExport,
   isExporting,
 }: QueryResultsProps) {
-  const [pageInput, setPageInput] = useState<string>("");
-
-  const handlePageInputSubmit = () => {
-    if (!result || !result.total_pages) return;
-    
-    const page = parseInt(pageInput, 10);
-    if (page >= 1 && page <= result.total_pages) {
-      onPageChange(page);
-      setPageInput("");
-    }
-  };
-
-  const handlePageInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handlePageInputSubmit();
-    }
-  };
 
   if (isLoading) {
     return (
@@ -99,46 +87,48 @@ export default function QueryResults({
   return (
     <div className="h-full flex flex-col border rounded-md bg-card">
       {/* Header with stats and controls */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-card flex-shrink-0">
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span>
-            {total_rows !== undefined && (
-              <>{total_rows.toLocaleString()} total rows</>
-            )}
-          </span>
+      <div className="flex items-center justify-between px-2 py-1 border-b bg-card flex-shrink-0">
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          {total_rows !== undefined && (
+            <span>{total_rows.toLocaleString()} rows</span>
+          )}
           {execution_time_ms !== undefined && (
-            <span>• {execution_time_ms.toFixed(2)}ms</span>
+            <span>• {execution_time_ms.toFixed(1)}ms</span>
           )}
         </div>
-        <Button
-          onClick={onExport}
-          size="sm"
-          variant="outline"
-          disabled={isExporting}
-        >
-          {isExporting ? (
-            <>
-              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-              Exporting...
-            </>
-          ) : (
-            <>
-              <Download className="h-3 w-3 mr-2" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onExport} disabled={isExporting}>
+              <Download className="h-3.5 w-3.5 mr-2" />
               Export to CSV
-            </>
-          )}
-        </Button>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Table */}
       <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full caption-bottom text-sm">
+        <table className="w-full caption-bottom text-xs">
           <thead className="sticky top-0 z-10 bg-card border-b" style={{ position: 'sticky', top: 0 }}>
             <tr className="border-b transition-colors">
               {columns.map((column) => (
                 <th
                   key={column}
-                  className="h-10 px-4 text-left align-middle font-semibold text-muted-foreground bg-card whitespace-nowrap"
+                  className="h-7 px-2 text-left align-middle font-semibold text-muted-foreground bg-card whitespace-nowrap"
                   title={column}
                 >
                   {column}
@@ -151,7 +141,7 @@ export default function QueryResults({
               <tr className="border-b transition-colors hover:bg-muted/50">
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-2 align-middle text-center text-muted-foreground h-24 whitespace-nowrap"
+                  className="px-2 py-1 align-middle text-center text-muted-foreground h-16 whitespace-nowrap"
                 >
                   No data returned
                 </td>
@@ -165,7 +155,7 @@ export default function QueryResults({
                   {columns.map((column) => (
                     <td 
                       key={`${rowIndex}-${column}`} 
-                      className="px-4 py-2 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-md"
+                      className="px-2 py-1 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-md"
                       title={row[column] !== null && row[column] !== undefined ? String(row[column]) : 'null'}
                     >
                       {row[column] !== null && row[column] !== undefined
@@ -182,88 +172,74 @@ export default function QueryResults({
 
       {/* Pagination Controls */}
       {total_pages !== undefined && (
-        <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0 bg-card">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Rows per page:</span>
-            <Select
-              value={String(page_size)}
-              onValueChange={(value) => onPageSizeChange(Number(value))}
-            >
-              <SelectTrigger className="h-8 w-[70px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="250">250</SelectItem>
-                <SelectItem value="500">500</SelectItem>
-                <SelectItem value="1000">1000</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center justify-between px-2.5 py-1 border-t flex-shrink-0 bg-card">
+          <Select
+            value={String(page_size)}
+            onValueChange={(value) => onPageSizeChange(Number(value))}
+          >
+            <SelectTrigger size="xs" className="w-[54px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="50" className="text-xs py-0.5">50</SelectItem>
+              <SelectItem value="100" className="text-xs py-0.5">100</SelectItem>
+              <SelectItem value="250" className="text-xs py-0.5">250</SelectItem>
+              <SelectItem value="500" className="text-xs py-0.5">500</SelectItem>
+              <SelectItem value="1000" className="text-xs py-0.5">1000</SelectItem>
+            </SelectContent>
+          </Select>
 
           {total_pages > 1 ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                Page {page} of {total_pages}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground">
+                {page}/{total_pages}
               </span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-5 w-5"
                   onClick={() => onPageChange(1)}
                   disabled={page === 1}
                   title="First page"
                 >
-                  <ChevronsLeft className="h-4 w-4" />
+                  <ChevronsLeft className="h-3 w-3" />
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-5 w-5"
                   onClick={() => onPageChange(page - 1)}
                   disabled={page === 1}
                   title="Previous page"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3 w-3" />
                 </Button>
-                <div className="flex items-center gap-1 px-2">
-                  <input
-                    type="text"
-                    value={pageInput}
-                    onChange={(e) => setPageInput(e.target.value)}
-                    onKeyDown={handlePageInputKeyDown}
-                    onBlur={handlePageInputSubmit}
-                    placeholder={String(page)}
-                    className="w-12 h-8 text-center text-sm border rounded px-2 bg-background"
-                  />
-                </div>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-5 w-5"
                   onClick={() => onPageChange(page + 1)}
                   disabled={page === total_pages}
                   title="Next page"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3 w-3" />
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-5 w-5"
                   onClick={() => onPageChange(total_pages)}
                   disabled={page === total_pages}
                   title="Last page"
                 >
-                  <ChevronsRight className="h-4 w-4" />
+                  <ChevronsRight className="h-3 w-3" />
                 </Button>
               </div>
             </div>
           ) : (
-            <span className="text-xs text-muted-foreground">
-              Showing all {rows.length} {rows.length === 1 ? "row" : "rows"}
+            <span className="text-[11px] text-muted-foreground">
+              {rows.length} {rows.length === 1 ? "row" : "rows"}
             </span>
           )}
         </div>

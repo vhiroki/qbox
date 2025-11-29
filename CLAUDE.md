@@ -163,7 +163,7 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 
 **Persistent Storage:**
 - `~/.qbox/connections.db` - SQLite database with:
-  - `connections` table: Connection configurations (id, name, type, config JSON, alias, timestamps)
+  - `connections` table: Connection configurations (id, name, type, config JSON, timestamps)
   - `queries` table: Query definitions (id, name, sql_text, created_at, updated_at)
   - `query_selections` table: Selected tables (query_id, connection_id, schema_name, table_name, source_type)
   - `query_chat_history` table: Chat messages (id, query_id, role, message, created_at)
@@ -201,12 +201,12 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 
 **DuckDB Manager (Persistent Query Engine):**
 - Single persistent instance at `~/.qbox/qbox.duckdb`
-- Attaches PostgreSQL databases with aliases: `pg_{connection_id_with_underscores}`
+- Attaches PostgreSQL databases with identifiers derived from connection names
 - Registers CSV/Excel files as views
 - Attaches S3 buckets with httpfs extension
 - Uses system functions for metadata: `duckdb_schemas()`, `duckdb_tables()`, `duckdb_columns()`
-- Important: Aliases must use underscores (not hyphens) to avoid SQL identifier errors
-- Example: Connection ID `abc123-def456` → alias `pg_abc123_def456`
+- Important: Identifiers use underscores (not hyphens) to avoid SQL identifier errors
+- Example: Connection "My Database" → identifier `my_database`
 
 **Repository Pattern:**
 - Separate repositories for connections, queries, and files

@@ -198,7 +198,7 @@ class PostgresConnection(BaseConnection):
     async def cleanup(self, duckdb_manager) -> None:
         """Cleanup PostgreSQL connection from DuckDB."""
         # For PostgreSQL, we detach from the persistent DuckDB instance
-        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        identifier = duckdb_manager.get_attached_identifier(self.connection_id)
         if identifier:
             duckdb_manager.detach_source(identifier)
             duckdb_manager.remove_connection_from_cache(self.connection_id)

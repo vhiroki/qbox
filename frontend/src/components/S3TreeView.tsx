@@ -79,13 +79,17 @@ export default function S3TreeView({
   const loadedFoldersRef = useRef<Set<string>>(new Set());
   // Debounce timer for prefix filter
   const filterTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track if we've already attempted to load connections
+  const hasAttemptedLoadRef = useRef(false);
 
   // Load connections on mount if not already loaded
   useEffect(() => {
-    if (connections.length === 0 && !isLoadingConnections) {
+    if (!hasAttemptedLoadRef.current && connections.length === 0 && !isLoadingConnections) {
+      hasAttemptedLoadRef.current = true;
       loadConnections();
     }
-  }, [connections.length, isLoadingConnections, loadConnections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections.length, isLoadingConnections]);
 
   // Auto-expand connections with selected files
   useEffect(() => {

@@ -79,22 +79,22 @@ docker compose down -v
 1. Open QBox
 2. Add new PostgreSQL connection
 3. Use these settings:
+   - **Name**: `Sales DB` (or any name you prefer)
    - **Host**: `localhost`
    - **Port**: `5432`
    - **Database**: `testdb`
    - **Username**: `testuser`
    - **Password**: `testpass`
-   - **Alias**: `sales_db` (or any name you prefer)
 
 ### PostgreSQL Connection 2
 1. Add another PostgreSQL connection
 2. Use these settings:
+   - **Name**: `HR DB` (or any name you prefer)
    - **Host**: `localhost`
    - **Port**: `5433`
    - **Database**: `testdb2`
    - **Username**: `testuser2`
    - **Password**: `testpass2`
-   - **Alias**: `hr_db` (or any name you prefer)
 
 ### S3 Connection
 1. Add S3 connection in QBox

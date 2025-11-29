@@ -94,13 +94,13 @@ export default function SelectedTablesView({
     new Map()
   );
   const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
-  const [copiedAlias, setCopiedAlias] = useState<string | null>(null);
+  const [copiedQualifiedName, setCopiedQualifiedName] = useState<string | null>(null);
 
   const getTableKey = (selection: QueryTableSelection): string => {
     return `${selection.source_type}-${selection.connection_id}-${selection.schema_name}-${selection.table_name}`;
   };
 
-  const getAlias = (selection: QueryTableSelection): string => {
+  const getQualifiedName = (selection: QueryTableSelection): string => {
     if (selection.source_type === "file") {
       const fileInfo = fileInfoMap.get(selection.connection_id);
       return fileInfo?.viewName || selection.table_name;
@@ -223,8 +223,8 @@ export default function SelectedTablesView({
   const handleCopyIdentifier = async (identifier: string, key: string) => {
     try {
       await navigator.clipboard.writeText(identifier);
-      setCopiedAlias(key);
-      setTimeout(() => setCopiedAlias(null), 2000);
+      setCopiedQualifiedName(key);
+      setTimeout(() => setCopiedQualifiedName(null), 2000);
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
     }
@@ -269,10 +269,10 @@ export default function SelectedTablesView({
             const isExpanded = expandedTables.has(key);
             const isLoading = loadingDetails.has(key);
             const details = tableDetails.get(key);
-            const qualifiedName = getAlias(selection);
+            const qualifiedName = getQualifiedName(selection);
             const displayName = getDisplayName(selection);
             const subtitle = getSubtitle(selection);
-            const isCopied = copiedAlias === key;
+            const isCopied = copiedQualifiedName === key;
 
             return (
               <div

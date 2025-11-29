@@ -189,7 +189,7 @@ export default function QueryDetail({
     loadFileInfo();
   }, [query, selections]);
 
-  // Load connection info for database selections to get aliases
+  // Load connection info for database selections to get identifiers
   useEffect(() => {
     // Don't run if query doesn't exist (e.g., after deletion)
     if (!query) return;

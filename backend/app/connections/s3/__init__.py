@@ -105,7 +105,7 @@ class S3Connection(BaseConnection):
         Note: S3 connections use secrets which are configured during connection creation.
         This method returns the existing secret name/identifier.
         """
-        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        identifier = duckdb_manager.get_attached_identifier(self.connection_id)
         if not identifier:
             raise RuntimeError(f"S3 connection {self.connection_id} not configured in DuckDB")
         return identifier
@@ -122,7 +122,7 @@ class S3Connection(BaseConnection):
     async def cleanup(self, duckdb_manager) -> None:
         """Cleanup S3 secret from DuckDB."""
         # For S3, we drop the secret from the persistent DuckDB instance
-        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        identifier = duckdb_manager.get_attached_identifier(self.connection_id)
         if identifier:
             duckdb_manager.drop_secret(identifier)
             duckdb_manager.remove_connection_from_cache(self.connection_id)

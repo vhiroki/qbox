@@ -201,7 +201,7 @@ qbox/
 - Cross-source queries (join PostgreSQL with CSV, etc.)
 - Persistent storage at `~/.qbox/qbox.duckdb`
 - Single writer mode to avoid concurrency issues
-- Connections attached with `pg_` prefix aliases
+- Connections attached with identifiers derived from connection names
 
 ### User Interface
 - **Dark theme** design for comfortable use

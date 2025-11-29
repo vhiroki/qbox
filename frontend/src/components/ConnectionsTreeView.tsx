@@ -45,8 +45,8 @@ export default function ConnectionsTreeView({
   // Track which table was copied (for showing checkmark feedback)
   const [copiedTable, setCopiedTable] = useState<string | null>(null);
 
-  // Store connection aliases for full qualified names
-  const [connectionAliases, setConnectionAliases] = useState<Map<string, string>>(new Map());
+  // Store connection names for full qualified names
+  const [connectionNames, setConnectionNames] = useState<Map<string, string>>(new Map());
 
   // Filter and display options
   const [tableFilter, setTableFilter] = useState("");
@@ -84,7 +84,7 @@ export default function ConnectionsTreeView({
             nameMap.set(conn.connection_id, conn.connection_name);
           }
         }
-        setConnectionAliases(nameMap);
+        setConnectionNames(nameMap);
         hasFetchedRef.current = true;
       } catch (err: any) {
         setError(err.message || "Failed to load connections");
@@ -260,7 +260,7 @@ export default function ConnectionsTreeView({
     event.stopPropagation();
 
     // Get the connection name (or use connection_id as fallback)
-    const connectionName = connectionAliases.get(connectionId) || connectionId;
+    const connectionName = connectionNames.get(connectionId) || connectionId;
 
     // Generate DuckDB identifier from connection name
     const identifier = generateDuckDBIdentifier(connectionName);

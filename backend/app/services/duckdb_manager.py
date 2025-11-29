@@ -25,7 +25,7 @@ class DuckDBManager:
 
         self.db_path = db_path
         self.conn: Optional[duckdb.DuckDBPyConnection] = None
-        # Cache of attached connections: {connection_id: alias}
+        # Cache of attached connections: {connection_id: identifier}
         self._attached_connections: dict[str, str] = {}
         # Cache of registered files: {file_id: view_name}
         self._registered_files: dict[str, str] = {}
@@ -54,10 +54,10 @@ class DuckDBManager:
             result = self.conn.execute("SELECT database_name FROM duckdb_databases()")
             databases = result.fetchall()
             
-            # Filter for postgres connections (start with pg_)
+            # Filter for postgres connections (skip system databases)
             for (db_name,) in databases:
-                if db_name.startswith('pg_') and db_name != 'pg_catalog':
-                    # We can't reconstruct the original connection_id reliably from alias alone
+                if db_name not in ('memory', 'system', 'temp') and db_name != 'pg_catalog':
+                    # We can't reconstruct the original connection_id reliably from identifier alone
                     # So we'll just log that connections exist, but won't add to cache
                     # The cache will be populated as connections are used
                     logger.debug(f"Found existing attached database: {db_name}")
@@ -120,14 +120,14 @@ class DuckDBManager:
         """
         return connection_id in self._attached_connections
     
-    def get_attached_alias(self, connection_id: str) -> Optional[str]:
-        """Get the alias for an attached connection.
-        
+    def get_attached_identifier(self, connection_id: str) -> Optional[str]:
+        """Get the identifier for an attached connection.
+
         Args:
             connection_id: Unique identifier for the connection
-            
+
         Returns:
-            The alias if attached, None otherwise
+            The identifier if attached, None otherwise
         """
         return self._attached_connections.get(connection_id)
     
@@ -330,24 +330,24 @@ class DuckDBManager:
         if connection_id in self._attached_connections:
             del self._attached_connections[connection_id]
     
-    def detach_source(self, alias: str) -> None:
-        """Detach a data source from DuckDB by alias and remove from cache."""
+    def detach_source(self, identifier: str) -> None:
+        """Detach a data source from DuckDB by identifier and remove from cache."""
         if not self.conn:
             return
 
         try:
-            self.conn.execute(f"DETACH {alias}")
+            self.conn.execute(f"DETACH {identifier}")
             # Remove from cache
             connection_id_to_remove = None
-            for conn_id, cached_alias in self._attached_connections.items():
-                if cached_alias == alias:
+            for conn_id, cached_identifier in self._attached_connections.items():
+                if cached_identifier == identifier:
                     connection_id_to_remove = conn_id
                     break
             if connection_id_to_remove:
                 del self._attached_connections[connection_id_to_remove]
-            logger.info(f"Detached source: {alias}")
+            logger.info(f"Detached source: {identifier}")
         except Exception as e:
-            logger.warning(f"Could not detach {alias}: {e}")
+            logger.warning(f"Could not detach {identifier}: {e}")
     
     def drop_secret(self, secret_name: str) -> None:
         """Drop a DuckDB secret and remove from cache."""

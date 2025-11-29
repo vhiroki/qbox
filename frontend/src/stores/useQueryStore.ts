@@ -18,6 +18,7 @@ interface QueryState {
   querySelections: Map<string, QueryTableSelection[]>; // queryId -> selections
   queryChatHistory: Map<string, ChatMessage[]>; // queryId -> messages
   queryResults: Map<string, QueryExecutionState>; // queryId -> execution state
+  queryDraftMessages: Map<string, string>; // queryId -> draft message
 
   // Loading & Error states
   isLoading: boolean;
@@ -41,6 +42,8 @@ interface QueryState {
   sendChatMessage: (queryId: string, message: string) => Promise<{ updatedSQL: string }>;
   retryChatMessage: (queryId: string, tempMessageId: string) => Promise<{ updatedSQL: string }>;
   clearChatHistory: (queryId: string) => Promise<void>;
+  setDraftMessage: (queryId: string, message: string) => void;
+  getDraftMessage: (queryId: string) => string;
 
   // Query Execution Results
   getQueryExecutionState: (queryId: string) => QueryExecutionState | undefined;
@@ -63,6 +66,7 @@ export const useQueryStore = create<QueryState>()(
       querySelections: new Map(),
       queryChatHistory: new Map(),
       queryResults: new Map(),
+      queryDraftMessages: new Map(),
       isLoading: false,
       error: null,
 
@@ -150,12 +154,13 @@ export const useQueryStore = create<QueryState>()(
         set({ isLoading: true, error: null });
         try {
           await api.deleteQuery(queryId);
-          const { querySelections, queryChatHistory, queryResults } = get();
+          const { querySelections, queryChatHistory, queryResults, queryDraftMessages } = get();
 
           // Clean up related data
           querySelections.delete(queryId);
           queryChatHistory.delete(queryId);
           queryResults.delete(queryId);
+          queryDraftMessages.delete(queryId);
 
           set((state) => ({
             queries: state.queries.filter((q) => q.id !== queryId),
@@ -163,6 +168,7 @@ export const useQueryStore = create<QueryState>()(
             querySelections: new Map(querySelections),
             queryChatHistory: new Map(queryChatHistory),
             queryResults: new Map(queryResults),
+            queryDraftMessages: new Map(queryDraftMessages),
             isLoading: false,
           }));
         } catch (error: any) {
@@ -382,6 +388,22 @@ export const useQueryStore = create<QueryState>()(
           // Note: We do NOT set global error here - chat errors are handled locally in ChatInterface
           throw error;
         }
+      },
+
+      // Draft message management
+      setDraftMessage: (queryId, message) => {
+        const { queryDraftMessages } = get();
+        if (message.trim() === '') {
+          queryDraftMessages.delete(queryId);
+        } else {
+          queryDraftMessages.set(queryId, message);
+        }
+        set({ queryDraftMessages: new Map(queryDraftMessages) });
+      },
+
+      getDraftMessage: (queryId) => {
+        const { queryDraftMessages } = get();
+        return queryDraftMessages.get(queryId) || '';
       },
 
       // Query Execution Results Management

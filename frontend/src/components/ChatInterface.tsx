@@ -30,8 +30,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   const loadChatHistory = useQueryStore((state) => state.loadChatHistory);
   const clearChatHistory = useQueryStore((state) => state.clearChatHistory);
   const queryChatHistory = useQueryStore((state) => state.queryChatHistory);
+  const setDraftMessage = useQueryStore((state) => state.setDraftMessage);
+  const queryDraftMessages = useQueryStore((state) => state.queryDraftMessages);
 
-  const [userMessage, setUserMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -39,6 +40,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   const loadedChatForQueryRef = useRef<string | null>(null);
 
   const chatHistory = queryChatHistory.get(query.id) || [];
+  const userMessage = queryDraftMessages.get(query.id) || '';
 
   // Load chat history on mount or when switching queries
   useEffect(() => {
@@ -52,12 +54,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   // Handle pending messages from parent
   useEffect(() => {
     if (pendingMessage && !isSending) {
-      setUserMessage(pendingMessage);
+      setDraftMessage(query.id, pendingMessage);
       // Auto-send the message
       const sendPendingMessage = async () => {
         const messageText = pendingMessage;
         setError(null);
-        setUserMessage(""); // Clear input
+        setDraftMessage(query.id, ""); // Clear input
         setIsSending(true);
 
         try {
@@ -74,7 +76,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
           const errorMessage = err.response?.data?.detail || err.message || "Failed to process message. Please try again.";
           setError(errorMessage);
           // On error, restore the message so user can edit/retry
-          setUserMessage(messageText);
+          setDraftMessage(query.id, messageText);
         } finally {
           setIsSending(false);
         }
@@ -82,14 +84,14 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
 
       sendPendingMessage();
     }
-  }, [pendingMessage, isSending, sendChatMessage, query.id, onSQLChange, onMessageSent]);
+  }, [pendingMessage, isSending, sendChatMessage, query.id, onSQLChange, onMessageSent, setDraftMessage]);
 
   // Expose method to parent component
   useImperativeHandle(ref, () => ({
     sendMessage: (message: string) => {
-      setUserMessage(message);
+      setDraftMessage(query.id, message);
     },
-  }));
+  }), [query.id, setDraftMessage]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -101,7 +103,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
 
     const messageText = userMessage;
     setError(null);
-    setUserMessage(""); // Clear input immediately for better UX
+    setDraftMessage(query.id, ""); // Clear input immediately for better UX
     setIsSending(true);
 
     try {
@@ -262,7 +264,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
       <div className="flex gap-2 flex-shrink-0">
         <Textarea
           value={userMessage}
-          onChange={(e) => setUserMessage(e.target.value)}
+          onChange={(e) => setDraftMessage(query.id, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();

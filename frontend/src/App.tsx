@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { PanelLeftClose, PanelLeft, Database, SquarePen, Home } from 'lucide-react';
 import { ThemeProvider } from './components/theme-provider';
@@ -86,13 +86,24 @@ function AppContent() {
     return saved === 'true';
   });
 
-  // Get createQuery from store
+  // Get createQuery and loadQueries from store
   const createQuery = useQueryStore((state) => state.createQuery);
+  const loadQueries = useQueryStore((state) => state.loadQueries);
   const [isCreating, setIsCreating] = useState(false);
 
   // Load saved panel layout
   const savedLayout = localStorage.getItem(SIDEBAR_LAYOUT_KEY);
   const defaultSidebarSize = savedLayout ? JSON.parse(savedLayout)[0] : 18;
+
+  // Load queries once on app mount (global state needed throughout the app)
+  const hasLoadedQueries = useRef(false);
+
+  useEffect(() => {
+    if (!hasLoadedQueries.current) {
+      hasLoadedQueries.current = true;
+      loadQueries();
+    }
+  }, [loadQueries]);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));

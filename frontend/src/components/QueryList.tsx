@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { FileCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { FileCode } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SettingsModal from "./SettingsModal";
 import { useQueryStore } from "../stores";
@@ -15,25 +14,11 @@ export default function QueryList({
 }: QueryListProps) {
   const navigate = useNavigate();
 
-  // Zustand store - only get query list state
+  // Zustand store - queries are loaded at app level, we just read them here
   const queries = useQueryStore((state) => state.queries);
   const isLoading = useQueryStore((state) => state.isLoading);
+  const error = useQueryStore((state) => state.error);
   const loadQueries = useQueryStore((state) => state.loadQueries);
-  
-  // Local error state for query list operations only
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoadError(null);
-        await loadQueries();
-      } catch (err: any) {
-        setLoadError(err.response?.data?.detail || err.message || "Failed to load queries");
-      }
-    };
-    load();
-  }, [loadQueries]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -61,15 +46,15 @@ export default function QueryList({
           </div>
         )}
 
-        {loadError && (
+        {error && (
           <div className="p-4">
             <Alert variant="destructive">
-              <AlertDescription>{loadError}</AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           </div>
         )}
 
-        {!isLoading && queries.length === 0 && (
+        {!isLoading && queries.length === 0 && !error && (
           <div className="p-8 text-center text-muted-foreground">
             <FileCode className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">No queries yet</p>

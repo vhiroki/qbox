@@ -114,6 +114,7 @@ export default function QueryDetail({
   const handleExecuteQueryRef = useRef<(() => void) | null>(null);
   const lastAutoFocusedQueryIdRef = useRef<string | null>(null);
   const rightSidePanelRef = useRef<RightSidePanelRef>(null);
+  const loadedSelectionsForQueryRef = useRef<string | null>(null);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -146,7 +147,12 @@ export default function QueryDetail({
   useEffect(() => {
     setLocalError(null); // Clear local error when switching queries
     selectQuery(queryId);
-    loadQuerySelections(queryId);
+
+    // Only load selections if we haven't loaded them for this query yet
+    if (loadedSelectionsForQueryRef.current !== queryId) {
+      loadedSelectionsForQueryRef.current = queryId;
+      loadQuerySelections(queryId);
+    }
   }, [queryId, selectQuery, loadQuerySelections]);
 
   // Load file info for file selections to get view names

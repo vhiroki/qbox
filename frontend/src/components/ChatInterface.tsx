@@ -36,12 +36,17 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const loadedChatForQueryRef = useRef<string | null>(null);
 
   const chatHistory = queryChatHistory.get(query.id) || [];
 
-  // Load chat history on mount
+  // Load chat history on mount or when switching queries
   useEffect(() => {
-    loadChatHistory(query.id);
+    // Only load if we haven't loaded for this query yet
+    if (loadedChatForQueryRef.current !== query.id) {
+      loadedChatForQueryRef.current = query.id;
+      loadChatHistory(query.id);
+    }
   }, [query.id, loadChatHistory]);
 
   // Handle pending messages from parent

@@ -329,6 +329,11 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                         break
                 sql = "\n".join(sql_lines).strip()
 
+        # Final fallback: if no explanation was found but we have content,
+        # treat the entire response as the explanation (e.g., answering questions about results)
+        if not explanation and not sql and content.strip():
+            explanation = content.strip()
+
         return sql, explanation
 
     def _format_schema_context(self, query_metadata: list[dict[str, Any]]) -> str:

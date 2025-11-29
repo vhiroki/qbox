@@ -15,24 +15,10 @@ class SettingsRepository:
         """Initialize the settings repository."""
         if db_path is None:
             db_path = Path.home() / ".qbox" / "connections.db"
-        
+
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
-
-    def _init_db(self) -> None:
-        """Initialize the settings table."""
-        with sqlite3.connect(str(self.db_path)) as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-                """
-            )
-            conn.commit()
-            logger.info("Settings table initialized")
+        # Note: Schema initialization is now handled by migrations
 
     def get(self, key: str) -> Optional[str]:
         """Get a setting value by key."""

@@ -18,41 +18,7 @@ class ConnectionRepository:
             db_path = data_dir / "connections.db"
 
         self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        """Initialize the database schema."""
-        with sqlite3.connect(self.db_path) as conn:
-            # Create connections table with all columns
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS connections (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    config TEXT NOT NULL,
-                    alias TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
-            )
-            
-            # Create indexes
-            # Add unique constraint on connection name
-            conn.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_name_unique
-                ON connections(name)
-            """
-            )
-            conn.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_alias
-                ON connections(alias) WHERE alias IS NOT NULL
-            """
-            )
-            conn.commit()
+        # Note: Schema initialization is now handled by migrations
 
     def save(self, connection_id: str, config: ConnectionConfig) -> None:
         """Save or update a connection configuration."""

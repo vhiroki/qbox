@@ -264,16 +264,22 @@ class DuckDBManager:
 
                 # Add endpoint URL if provided (for LocalStack or S3-compatible services)
                 if config.endpoint_url:
-                    # Remove protocol from endpoint URL (DuckDB adds it automatically)
-                    endpoint = config.endpoint_url.replace('https://', '').replace('http://', '')
+                    import re
+                    # Strip whitespace and remove all invisible/non-printable characters
+                    endpoint_url = config.endpoint_url.strip()
+                    # Remove invisible Unicode characters (zero-width space, etc.)
+                    endpoint_url = re.sub(r'[\u200B-\u200D\uFEFF\u2060]', '', endpoint_url)
+                    # Remove protocol (DuckDB adds it based on USE_SSL)
+                    endpoint = endpoint_url.replace('https://', '').replace('http://', '')
                     secret_params.append(f"ENDPOINT '{endpoint}'")
                     secret_params.append("URL_STYLE 'path'")  # Use path-style URLs for custom endpoints
+                    secret_params.append("URL_COMPATIBILITY_MODE true")  # Enable S3-compatible mode
                     # Disable SSL for HTTP endpoints
-                    if config.endpoint_url.startswith('http://'):
-                        secret_params.append("USE_SSL 'false'")
+                    if endpoint_url.startswith('http://'):
+                        secret_params.append("USE_SSL false")
 
                 create_secret_query = f"""
-                    CREATE SECRET {secret_name} (
+                    CREATE OR REPLACE SECRET {secret_name} (
                         {', '.join(secret_params)}
                     )
                 """
@@ -288,16 +294,22 @@ class DuckDBManager:
 
                 # Add endpoint URL if provided
                 if config.endpoint_url:
-                    # Remove protocol from endpoint URL (DuckDB adds it automatically)
-                    endpoint = config.endpoint_url.replace('https://', '').replace('http://', '')
+                    import re
+                    # Strip whitespace and remove all invisible/non-printable characters
+                    endpoint_url = config.endpoint_url.strip()
+                    # Remove invisible Unicode characters (zero-width space, etc.)
+                    endpoint_url = re.sub(r'[\u200B-\u200D\uFEFF\u2060]', '', endpoint_url)
+                    # Remove protocol (DuckDB adds it based on USE_SSL)
+                    endpoint = endpoint_url.replace('https://', '').replace('http://', '')
                     secret_params.append(f"ENDPOINT '{endpoint}'")
                     secret_params.append("URL_STYLE 'path'")
+                    secret_params.append("URL_COMPATIBILITY_MODE true")  # Enable S3-compatible mode
                     # Disable SSL for HTTP endpoints
-                    if config.endpoint_url.startswith('http://'):
-                        secret_params.append("USE_SSL 'false'")
+                    if endpoint_url.startswith('http://'):
+                        secret_params.append("USE_SSL false")
 
                 create_secret_query = f"""
-                    CREATE SECRET {secret_name} (
+                    CREATE OR REPLACE SECRET {secret_name} (
                         {', '.join(secret_params)}
                     )
                 """

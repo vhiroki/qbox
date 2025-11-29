@@ -243,8 +243,30 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
         # Attach all required connections (skip files as they're already registered as views)
         attached_connections = set()
         for selection in selections:
-            # Skip files and S3 - they're already registered as views in DuckDB
-            if selection.source_type in ["file", "s3"]:
+            # Skip files - they're already registered as views in DuckDB
+            if selection.source_type == "file":
+                continue
+
+            # Handle S3 connections - need to configure the secret
+            if selection.source_type == "s3":
+                if selection.connection_id not in attached_connections:
+                    conn_config = connection_repository.get(selection.connection_id)
+                    if not conn_config:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"S3 connection {selection.connection_id} not found",
+                        )
+
+                    # Configure S3 secret in DuckDB
+                    from app.models.schemas import S3ConnectionConfig
+                    s3_config = S3ConnectionConfig(**conn_config.config)
+                    duckdb.configure_s3_secret(
+                        selection.connection_id,
+                        conn_config.name,
+                        s3_config,
+                        force_recreate=True,  # Always recreate to ensure latest config
+                    )
+                    attached_connections.add(selection.connection_id)
                 continue
                 
             if selection.connection_id not in attached_connections:
@@ -340,8 +362,30 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
         # Attach all required connections (skip files as they're already registered as views)
         attached_connections = set()
         for selection in selections:
-            # Skip files and S3 - they're already registered as views in DuckDB
-            if selection.source_type in ["file", "s3"]:
+            # Skip files - they're already registered as views in DuckDB
+            if selection.source_type == "file":
+                continue
+
+            # Handle S3 connections - need to configure the secret
+            if selection.source_type == "s3":
+                if selection.connection_id not in attached_connections:
+                    conn_config = connection_repository.get(selection.connection_id)
+                    if not conn_config:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"S3 connection {selection.connection_id} not found",
+                        )
+
+                    # Configure S3 secret in DuckDB
+                    from app.models.schemas import S3ConnectionConfig
+                    s3_config = S3ConnectionConfig(**conn_config.config)
+                    duckdb.configure_s3_secret(
+                        selection.connection_id,
+                        conn_config.name,
+                        s3_config,
+                        force_recreate=True,  # Always recreate to ensure latest config
+                    )
+                    attached_connections.add(selection.connection_id)
                 continue
                 
             if selection.connection_id not in attached_connections:

@@ -20,97 +20,13 @@ class QueryRepository:
             db_path = data_dir / "connections.db"  # Use same database
 
         self.db_path = db_path
-        self._init_db()
+        # Note: Schema initialization is now handled by migrations
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get a database connection with foreign keys enabled."""
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
-
-    def _init_db(self):
-        """Initialize the database schema."""
-        with self._get_connection() as conn:
-            # Queries table
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS queries (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    sql_text TEXT DEFAULT '',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
-            )
-
-            # Query selections table
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS query_selections (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    query_id TEXT NOT NULL,
-                    connection_id TEXT NOT NULL,
-                    schema_name TEXT NOT NULL,
-                    table_name TEXT NOT NULL,
-                    source_type TEXT DEFAULT 'connection',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(query_id, connection_id, schema_name, table_name),
-                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
-                )
-            """
-            )
-
-            # Query chat history table
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS query_chat_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    query_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
-                )
-            """
-            )
-
-            # Query SQL history table
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS query_sql_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    query_id TEXT NOT NULL,
-                    sql_text TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
-                )
-            """
-            )
-
-            # Create indexes
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_query_selections
-                ON query_selections(query_id)
-            """
-            )
-
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_query_chat_history
-                ON query_chat_history(query_id, created_at)
-            """
-            )
-
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_query_sql_history
-                ON query_sql_history(query_id, created_at DESC)
-            """
-            )
-
-            conn.commit()
 
 
     # Query CRUD operations

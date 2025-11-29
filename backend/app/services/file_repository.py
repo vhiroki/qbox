@@ -26,50 +26,13 @@ class FileRepository:
 
         self.db_path = db_path
         self.files_dir = files_dir
-        self._init_db()
+        # Note: Schema initialization is now handled by migrations
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get a database connection with foreign keys enabled."""
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
-
-    def _init_db(self):
-        """Initialize the database schema."""
-        with self._get_connection() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS files (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    original_filename TEXT NOT NULL,
-                    file_type TEXT NOT NULL,
-                    file_path TEXT NOT NULL,
-                    size_bytes INTEGER,
-                    view_name TEXT,
-                    query_id TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE
-                )
-            """
-            )
-
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_files_name
-                ON files(name)
-            """
-            )
-            
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_files_query_id
-                ON files(query_id)
-            """
-            )
-
-            conn.commit()
 
     # File CRUD operations
 

@@ -16,6 +16,7 @@ class S3Service:
         self.connection_repo = ConnectionRepository()
         self.duckdb_manager = get_duckdb_manager()
 
+
     def _get_s3_client(self, connection_id: str):
         """Get boto3 S3 client configured with connection credentials."""
         import logging
@@ -49,7 +50,12 @@ class S3Service:
         client_kwargs: dict[str, Any] = {}
         if config.get('endpoint_url'):
             from botocore.client import Config
-            client_kwargs['endpoint_url'] = config.get('endpoint_url')
+            import re
+            # Strip whitespace and remove all invisible/non-printable characters from endpoint URL
+            endpoint_url = config.get('endpoint_url').strip()
+            # Remove invisible Unicode characters (zero-width space, etc.)
+            endpoint_url = re.sub(r'[\u200B-\u200D\uFEFF\u2060]', '', endpoint_url)
+            client_kwargs['endpoint_url'] = endpoint_url
             # Use path-style addressing for custom endpoints (required for LocalStack)
             client_kwargs['config'] = Config(s3={'addressing_style': 'path'})
 
@@ -182,28 +188,26 @@ class S3Service:
                 raise ValueError(f"Connection {connection_id} not found")
             
             bucket = connection_config.config.get('bucket')
-            
+
             # Determine file type
             file_ext = file_path.split('.')[-1].lower()
-            
+
             if file_ext not in ['parquet', 'csv', 'xlsx', 'xls', 'json', 'jsonl']:
                 raise ValueError(f"Unsupported file type: {file_ext}")
-            
+
             # Construct S3 path
             s3_path = f"s3://{bucket}/{file_path}"
 
             # Ensure S3 secret is configured in DuckDB
             secret_name = self.duckdb_manager.get_attached_identifier(connection_id)
             if not secret_name:
-                # Configure the S3 secret
                 from app.models.schemas import S3ConnectionConfig
                 s3_config = S3ConnectionConfig(**connection_config.config)
-                self.duckdb_manager.configure_s3_secret(
+                secret_name = self.duckdb_manager.configure_s3_secret(
                     connection_id,
                     connection_config.name,
                     s3_config,
                 )
-                secret_name = self.duckdb_manager.get_attached_identifier(connection_id)
             
             # Build query based on file type (secret is auto-used by DuckDB)
             if file_ext == 'parquet':
@@ -316,15 +320,15 @@ class S3Service:
             
             # Determine file type
             file_ext = file_path.split('.')[-1].lower()
-            
+
             # Construct S3 path
             s3_path = f"s3://{bucket}/{file_path}"
-            
+
             # Get the secret name for this connection
             secret_name = self.duckdb_manager.get_attached_identifier(connection_id)
             if not secret_name:
                 raise ValueError(f"S3 connection {connection_id} not configured in DuckDB")
-            
+
             # Build CREATE VIEW query based on file type (secret is auto-used by DuckDB)
             if file_ext == 'parquet':
                 create_query = f"CREATE OR REPLACE VIEW {view_name} AS SELECT * FROM read_parquet('{s3_path}')"

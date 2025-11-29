@@ -42,6 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import connections, files, metadata, query, s3
 from app.api import settings as settings_api
 from app.config.settings import get_settings
+from app.services.migration_service import run_migrations
 
 # Configure logging
 logging.basicConfig(
@@ -60,12 +61,29 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+# Create logger for main module
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     # Startup
     print("🚀 Starting QBox API...")
+
+    # Run database migrations
+    print("🔄 Checking database migrations...")
+    try:
+        applied = run_migrations()
+        if applied > 0:
+            print(f"✅ Applied {applied} database migration(s)")
+        else:
+            print("✅ Database schema is up to date")
+    except Exception as e:
+        print(f"⚠️  WARNING: Migration error: {e}")
+        logger.exception("Migration failed")
+        # Continue startup - this ensures backward compatibility
+
     print("📊 Debug logging enabled for AI and metadata services")
     yield
     # Shutdown

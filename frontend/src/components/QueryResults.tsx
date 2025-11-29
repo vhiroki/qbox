@@ -113,7 +113,7 @@ export default function QueryResults({
     <div className="h-full flex flex-col border rounded-md bg-card">
       {/* Header with stats and controls */}
       <div className="flex items-center justify-between px-2 py-1 border-b bg-card flex-shrink-0">
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
           {total_rows !== undefined && (
             <span>{total_rows.toLocaleString()} rows</span>
           )}
@@ -147,7 +147,7 @@ export default function QueryResults({
 
       {/* Table */}
       <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full caption-bottom text-xs">
+        <table className="w-full caption-bottom text-[13px]">
           <thead className="sticky top-0 z-10 bg-card border-b" style={{ position: 'sticky', top: 0 }}>
             <tr className="border-b transition-colors">
               {columns.map((column) => (
@@ -206,17 +206,17 @@ export default function QueryResults({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="50" className="text-xs py-0.5">50</SelectItem>
-              <SelectItem value="100" className="text-xs py-0.5">100</SelectItem>
-              <SelectItem value="250" className="text-xs py-0.5">250</SelectItem>
-              <SelectItem value="500" className="text-xs py-0.5">500</SelectItem>
-              <SelectItem value="1000" className="text-xs py-0.5">1000</SelectItem>
+              <SelectItem value="50" className="text-[13px] py-0.5">50</SelectItem>
+              <SelectItem value="100" className="text-[13px] py-0.5">100</SelectItem>
+              <SelectItem value="250" className="text-[13px] py-0.5">250</SelectItem>
+              <SelectItem value="500" className="text-[13px] py-0.5">500</SelectItem>
+              <SelectItem value="1000" className="text-[13px] py-0.5">1000</SelectItem>
             </SelectContent>
           </Select>
 
           {total_pages > 1 ? (
             <div className="flex items-center gap-1">
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[13px] text-muted-foreground">
                 {page}/{total_pages}
               </span>
               <div className="flex items-center">
@@ -263,7 +263,7 @@ export default function QueryResults({
               </div>
             </div>
           ) : (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[13px] text-muted-foreground">
               {rows.length} {rows.length === 1 ? "row" : "rows"}
             </span>
           )}

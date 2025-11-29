@@ -386,10 +386,10 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                 schema_name = table_meta.get("schema_name", "public")
                 table_name = table_meta.get("table_name", "unknown")
                 
-                # Get the DuckDB alias (now human-readable from connection name)
-                alias = table_meta.get("alias", f"pg_{connection_id.replace('-', '_')}")
+                # Get the DuckDB identifier (generated from connection name)
+                identifier = table_meta.get("alias", connection_id.replace('-', '_'))
                 
-                table_info = f"\nTable: {alias}.{schema_name}.{table_name}"
+                table_info = f"\nTable: {identifier}.{schema_name}.{table_name}"
                 table_info += f"\nConnection: {connection_name}"
                 table_info += f"\nRow Count: {row_count}"
                 table_info += "\nColumns:"

@@ -79,16 +79,15 @@ class BaseConnection(ABC):
         pass
 
     @abstractmethod
-    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+    def attach_to_duckdb(self, duckdb_manager) -> str:
         """
         Attach this connection to DuckDB for query execution.
-        
+
         Args:
             duckdb_manager: DuckDB manager instance
-            custom_alias: Optional custom alias to use instead of auto-generated one
-            
+
         Returns:
-            The alias/identifier used in DuckDB for this connection
+            The identifier used in DuckDB for this connection
         """
         pass
 

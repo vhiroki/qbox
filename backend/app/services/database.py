@@ -61,7 +61,7 @@ class ConnectionManager:
                 try:
                     connection_repository.save(connection_id, config)
                 except ValueError as e:
-                    # Validation error (e.g., duplicate alias)
+                    # Validation error (e.g., duplicate name or identifier collision)
                     # Disconnect the connection since we can't save it
                     await datasource.disconnect()
                     del self.connections[connection_id]
@@ -200,7 +200,6 @@ class ConnectionManager:
             "name": config.name,
             "type": config.type.value,
             "config": safe_config,
-            "alias": config.alias,
         }
 
     async def update_saved_connection(
@@ -226,7 +225,7 @@ class ConnectionManager:
         try:
             connection_repository.save(connection_id, config)
         except ValueError as e:
-            # Validation error (e.g., duplicate alias)
+            # Validation error (e.g., duplicate name or identifier collision)
             return False, str(e)
 
         # If the connection is currently active, disconnect and cleanup

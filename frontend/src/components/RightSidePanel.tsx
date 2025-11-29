@@ -28,7 +28,7 @@ interface RightSidePanelProps {
     label: string
   ) => void;
   fileInfoMap: Map<string, { name: string; viewName: string }>;
-  connectionInfoMap: Map<string, { name: string; alias: string }>;
+  connectionInfoMap: Map<string, { name: string }>;
 }
 
 export interface RightSidePanelRef {

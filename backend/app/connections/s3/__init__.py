@@ -38,7 +38,6 @@ class S3Connection(BaseConnection):
                 connection_id=self.connection_id,
                 connection_name=self.connection_name,
                 config=self.s3_config,
-                custom_alias=None,  # Use auto-generated secret name
                 force_recreate=False,
             )
             return True
@@ -99,17 +98,17 @@ class S3Connection(BaseConnection):
             last_updated=datetime.utcnow().isoformat(),
         )
 
-    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+    def attach_to_duckdb(self, duckdb_manager) -> str:
         """
         Attach S3 connection to DuckDB for query execution.
-        
+
         Note: S3 connections use secrets which are configured during connection creation.
-        This method returns the existing secret name/alias.
+        This method returns the existing secret name/identifier.
         """
-        alias = duckdb_manager.get_attached_alias(self.connection_id)
-        if not alias:
+        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        if not identifier:
             raise RuntimeError(f"S3 connection {self.connection_id} not configured in DuckDB")
-        return alias
+        return identifier
 
     async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
         """

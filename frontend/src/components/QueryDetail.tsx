@@ -142,7 +142,7 @@ export default function QueryDetail({
   const [fileInfoMap, setFileInfoMap] = useState<Map<string, { name: string; viewName: string }>>(new Map());
   
   // Store connection info for displaying full qualified names
-  const [connectionInfoMap, setConnectionInfoMap] = useState<Map<string, { name: string; alias: string }>>(new Map());
+  const [connectionInfoMap, setConnectionInfoMap] = useState<Map<string, { name: string }>>(new Map());
   
   useEffect(() => {
     setLocalError(null); // Clear local error when switching queries
@@ -201,17 +201,16 @@ export default function QueryDetail({
         return;
       }
 
-      const newConnectionInfoMap = new Map<string, { name: string; alias: string }>();
-      
+      const newConnectionInfoMap = new Map<string, { name: string }>();
+
       // Get unique connection IDs
       const uniqueConnectionIds = [...new Set(connectionSelections.map((s) => s.connection_id))];
-      
+
       for (const connectionId of uniqueConnectionIds) {
         try {
           const connectionInfo = await api.getSavedConnection(connectionId);
           newConnectionInfoMap.set(connectionId, {
             name: connectionInfo.name,
-            alias: connectionInfo.alias || connectionInfo.name,
           });
         } catch (err) {
           console.error(`Failed to load connection info for ${connectionId}:`, err);

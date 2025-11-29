@@ -4,7 +4,6 @@ export interface ConnectionConfig {
   name: string;
   type: ConnectionType;
   config: Record<string, any>;
-  alias?: string;
 }
 
 export interface PostgresConfig {
@@ -41,7 +40,6 @@ export interface SavedConnection {
   id: string;
   name: string;
   type: string;
-  alias?: string;
   created_at: string;
   updated_at: string;
 }

@@ -202,7 +202,6 @@ class S3Service:
                     connection_id,
                     connection_config.name,
                     s3_config,
-                    custom_alias=connection_config.alias,
                 )
                 secret_name = self.duckdb_manager.get_attached_alias(connection_id)
             

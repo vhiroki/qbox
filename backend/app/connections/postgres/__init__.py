@@ -166,13 +166,12 @@ class PostgresConnection(BaseConnection):
         
         return metadata
 
-    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+    def attach_to_duckdb(self, duckdb_manager) -> str:
         """Attach PostgreSQL connection to DuckDB for query execution."""
         return duckdb_manager.attach_postgres(
             connection_id=self.connection_id,
             connection_name=self.connection_name,
             config=self.postgres_config,
-            custom_alias=custom_alias,
         )
 
     async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:

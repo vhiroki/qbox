@@ -151,7 +151,6 @@ async def add_query_selection(query_id: str, selection: QueryTableSelectionReque
                     selection.connection_id,
                     conn_config.name,
                     s3_config,
-                    custom_alias=conn_config.alias,
                 )
                 logger.info(f"Configured S3 secret for connection {selection.connection_id}")
 
@@ -262,8 +261,7 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
 
                 pg_config = PostgresConnectionConfig(**conn_config.config)
                 duckdb.attach_postgres(
-                    selection.connection_id, conn_config.name, pg_config,
-                    custom_alias=conn_config.alias
+                    selection.connection_id, conn_config.name, pg_config
                 )
                 attached_connections.add(selection.connection_id)
 
@@ -281,8 +279,9 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
         offset = (request.page - 1) * request.page_size
 
         # Execute paginated query
+        # Wrap in subquery to handle cases where user query already has LIMIT/OFFSET
         paginated_query = f"""
-            {clean_sql}
+            SELECT * FROM ({clean_sql}) AS user_query
             LIMIT {request.page_size}
             OFFSET {offset}
         """
@@ -359,8 +358,7 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
 
                 pg_config = PostgresConnectionConfig(**conn_config.config)
                 duckdb.attach_postgres(
-                    selection.connection_id, conn_config.name, pg_config,
-                    custom_alias=conn_config.alias
+                    selection.connection_id, conn_config.name, pg_config
                 )
                 attached_connections.add(selection.connection_id)
 

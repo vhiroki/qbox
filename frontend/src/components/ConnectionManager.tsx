@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { SavedConnection, PostgresConfig, S3Config, ConnectionConfig, ConnectionType } from '../types';
 import { api } from '../services/api';
 import { useConnectionStore } from '../stores';
+import { generateDuckDBIdentifier } from '../utils/identifier';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,8 +63,6 @@ export default function ConnectionManager() {
     schemas: 'public',
   });
   const [createConnectionName, setCreateConnectionName] = useState('');
-  const [createConnectionAlias, setCreateConnectionAlias] = useState('');
-  const [isCreateAliasValid, setIsCreateAliasValid] = useState(true);
   const [createError, setCreateError] = useState<string | null>(null);
   
   // Edit dialog state
@@ -78,7 +77,6 @@ export default function ConnectionManager() {
     schemas: 'public',
   });
   const [editConnectionName, setEditConnectionName] = useState('');
-  const [editConnectionAlias, setEditConnectionAlias] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
 
   // Delete dialog state
@@ -123,7 +121,6 @@ export default function ConnectionManager() {
 
   const handleCreate = () => {
     setCreateConnectionName('');
-    setCreateConnectionAlias('');
     setCreateConnectionType('postgres');
     setCreateFormData({
       host: 'localhost',
@@ -167,7 +164,6 @@ export default function ConnectionManager() {
         name: createConnectionName,
         type: createConnectionType,
         config: createFormData,
-        alias: createConnectionAlias || undefined,
       };
 
       await createConnection(config);
@@ -182,11 +178,9 @@ export default function ConnectionManager() {
   const handleEdit = async (connection: SavedConnection) => {
     try {
       const fullConfig = await api.getSavedConnection(connection.id);
-      
+
       setEditingConnection(connection);
       setEditConnectionName(fullConfig.name);
-      // Show the actual alias (should always exist after creation)
-      setEditConnectionAlias(fullConfig.alias || '');
       
       // Set form data based on connection type
       if (fullConfig.type === 'postgres') {
@@ -213,6 +207,7 @@ export default function ConnectionManager() {
         setEditFormData({
           bucket: fullConfig.config.bucket || '',
           credential_type: fullConfig.config.credential_type || 'default',
+          endpoint_url: fullConfig.config.endpoint_url || '', // Preserve endpoint URL
           aws_access_key_id: '', // Don't populate credentials
           aws_secret_access_key: '', // Don't populate credentials
           aws_session_token: '', // Don't populate credentials
@@ -237,7 +232,6 @@ export default function ConnectionManager() {
         name: editConnectionName,
         type: editingConnection.type as ConnectionType,
         config: editFormData,
-        alias: editConnectionAlias || undefined,
       };
 
       await updateConnection(editingConnection.id, updateConfig);
@@ -337,7 +331,7 @@ export default function ConnectionManager() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Alias</TableHead>
+                  <TableHead>SQL Identifier</TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Last Updated</TableHead>
@@ -354,13 +348,9 @@ export default function ConnectionManager() {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      {connection.alias ? (
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                          {getTypePrefix(connection.type)}_{connection.alias}
-                        </code>
-                      ) : (
-                        <span className="text-muted-foreground italic">auto</span>
-                      )}
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {generateDuckDBIdentifier(connection.name)}
+                      </code>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {connection.id.substring(0, 8)}...
@@ -413,13 +403,10 @@ export default function ConnectionManager() {
             <ConnectionFormFields
               connectionType={editingConnection?.type as ConnectionType}
               connectionName={editConnectionName}
-              connectionAlias={editConnectionAlias}
               formData={editFormData}
               onNameChange={setEditConnectionName}
-              onAliasChange={setEditConnectionAlias}
               onFormDataChange={(updates) => setEditFormData({ ...editFormData, ...updates })}
               showPasswordPlaceholder={true}
-              aliasReadOnly={true}
               typeReadOnly={true}
             />
 
@@ -455,13 +442,10 @@ export default function ConnectionManager() {
             <ConnectionFormFields
               connectionType={createConnectionType}
               connectionName={createConnectionName}
-              connectionAlias={createConnectionAlias}
               formData={createFormData}
               onTypeChange={handleConnectionTypeChange}
               onNameChange={setCreateConnectionName}
-              onAliasChange={setCreateConnectionAlias}
               onFormDataChange={(updates) => setCreateFormData({ ...createFormData, ...updates })}
-              onValidationChange={setIsCreateAliasValid}
             />
 
             {createError && (
@@ -475,7 +459,7 @@ export default function ConnectionManager() {
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateSubmit} disabled={isLoading || !isCreateAliasValid}>
+            <Button onClick={handleCreateSubmit} disabled={isLoading}>
               Create Connection
             </Button>
           </DialogFooter>

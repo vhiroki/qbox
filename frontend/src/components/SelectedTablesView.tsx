@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { generateDuckDBIdentifier } from "../utils/identifier";
 import {
   Database,
   Cloud,
@@ -27,7 +28,7 @@ interface SelectedTablesViewProps {
   ) => void;
   onAddTableClick: () => void;
   fileInfoMap: Map<string, { name: string; viewName: string }>;
-  connectionInfoMap: Map<string, { name: string; alias: string }>;
+  connectionInfoMap: Map<string, { name: string }>;
 }
 
 interface TableDetails {
@@ -107,9 +108,8 @@ export default function SelectedTablesView({
       return getS3ViewName(selection.table_name);
     } else {
       const connectionInfo = connectionInfoMap.get(selection.connection_id);
-      const alias = connectionInfo?.alias || selection.connection_id;
-      const duckdbAlias = `pg_${alias.replace(/-/g, "_")}`;
-      return `${duckdbAlias}.${selection.schema_name}.${selection.table_name}`;
+      const identifier = connectionInfo?.name ? generateDuckDBIdentifier(connectionInfo.name) : selection.connection_id.replace(/-/g, "_");
+      return `${identifier}.${selection.schema_name}.${selection.table_name}`;
     }
   };
 
@@ -220,9 +220,9 @@ export default function SelectedTablesView({
     }
   };
 
-  const handleCopyAlias = async (alias: string, key: string) => {
+  const handleCopyIdentifier = async (identifier: string, key: string) => {
     try {
-      await navigator.clipboard.writeText(alias);
+      await navigator.clipboard.writeText(identifier);
       setCopiedAlias(key);
       setTimeout(() => setCopiedAlias(null), 2000);
     } catch (err) {
@@ -269,7 +269,7 @@ export default function SelectedTablesView({
             const isExpanded = expandedTables.has(key);
             const isLoading = loadingDetails.has(key);
             const details = tableDetails.get(key);
-            const alias = getAlias(selection);
+            const qualifiedName = getAlias(selection);
             const displayName = getDisplayName(selection);
             const subtitle = getSubtitle(selection);
             const isCopied = copiedAlias === key;
@@ -325,8 +325,8 @@ export default function SelectedTablesView({
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0 flex-shrink-0"
-                    onClick={() => handleCopyAlias(alias, key)}
-                    title={`Copy alias: ${alias}`}
+                    onClick={() => handleCopyIdentifier(qualifiedName, key)}
+                    title={`Copy identifier: ${qualifiedName}`}
                   >
                     {isCopied ? (
                       <Check className="h-3.5 w-3.5 text-green-500" />
@@ -346,7 +346,7 @@ export default function SelectedTablesView({
                         selection.schema_name,
                         selection.table_name,
                         selection.source_type,
-                        alias
+                        qualifiedName
                       )
                     }
                     title="Remove from query"
@@ -355,10 +355,10 @@ export default function SelectedTablesView({
                   </Button>
                 </div>
 
-                {/* Alias (always visible) */}
+                {/* Qualified Name (always visible) */}
                 <div className="px-3 pb-2 -mt-1">
                   <code className="text-[11px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded">
-                    {alias}
+                    {qualifiedName}
                   </code>
                 </div>
 

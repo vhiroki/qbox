@@ -84,45 +84,30 @@ class DuckDBManager:
             except Exception as e:
                 logger.warning(f"Could not load extension {ext}: {e}")
 
-    def _sanitize_alias(self, name: str, connection_id: str, connection_type: DataSourceType) -> str:
-        """Create a valid SQL identifier from connection name with type-based prefix.
-        
+    def _generate_duckdb_identifier(self, name: str) -> str:
+        """Create a valid SQL identifier from connection name.
+
         Args:
             name: The connection name
-            connection_id: The connection ID (used for uniqueness suffix)
-            connection_type: The type of connection (determines prefix)
-            
+
         Returns:
-            A valid SQL identifier like 'pg_production_db' or 's3_data_bucket'
+            A valid SQL identifier like 'production_db' or 'data_bucket'
         """
-        # Map connection types to prefixes
-        prefix_map = {
-            DataSourceType.POSTGRES: "pg",
-            DataSourceType.S3: "s3",
-            DataSourceType.MYSQL: "mysql",
-            DataSourceType.ORACLE: "oracle",
-            DataSourceType.DYNAMODB: "dynamodb",
-        }
-        prefix = prefix_map.get(connection_type, "db")
-        
         # Convert to lowercase and replace spaces/special chars with underscores
         sanitized = re.sub(r'[^a-z0-9]+', '_', name.lower())
-        
+
         # Remove leading/trailing underscores
         sanitized = sanitized.strip('_')
-        
+
         # Ensure it doesn't start with a digit
         if sanitized and sanitized[0].isdigit():
             sanitized = f"db_{sanitized}"
-        
-        # Add short unique suffix from connection_id (first 8 chars)
-        # This prevents collisions if two connections have similar names
-        suffix = connection_id.replace('-', '')[:8]
-        
-        # Combine with type-specific prefix
-        alias = f"{prefix}_{sanitized}_{suffix}"
-        
-        return alias
+
+        # Truncate to reasonable length (50 chars)
+        if len(sanitized) > 50:
+            sanitized = sanitized[:50].rstrip('_')
+
+        return sanitized
 
     def is_attached(self, connection_id: str) -> bool:
         """Check if a connection is already attached.
@@ -163,7 +148,6 @@ class DuckDBManager:
         connection_id: str,
         connection_name: str,
         config: PostgresConnectionConfig,
-        custom_alias: Optional[str] = None,
         force_reattach: bool = False,
     ) -> str:
         """Attach a PostgreSQL database to DuckDB (idempotent).
@@ -172,30 +156,25 @@ class DuckDBManager:
             connection_id: Unique identifier for this connection
             connection_name: Human-readable name for the connection
             config: PostgreSQL connection configuration
-            custom_alias: Optional custom alias (if set by user)
-                         Falls back to auto-generated from connection_name
             force_reattach: If True, detaches and re-attaches even if already attached
 
         Returns:
-            The alias used for the attachment
+            The identifier used for the attachment
         """
         # Check if already attached (unless forced to reattach)
         if not force_reattach and connection_id in self._attached_connections:
-            cached_alias = self._attached_connections[connection_id]
-            logger.debug(f"Connection {connection_id} already attached as '{cached_alias}'")
-            return cached_alias
-        
+            cached_identifier = self._attached_connections[connection_id]
+            logger.debug(f"Connection {connection_id} already attached as '{cached_identifier}'")
+            return cached_identifier
+
         conn = self.connect()
-        # Use custom alias if provided, otherwise generate from connection name
-        if custom_alias:
-            alias = f"pg_{custom_alias}"
-        else:
-            alias = self._sanitize_alias(connection_name, connection_id, DataSourceType.POSTGRES)
+        # Generate identifier from connection name
+        identifier = self._generate_duckdb_identifier(connection_name)
 
         # Detach if already exists (in case of reattach or stale state)
         try:
-            conn.execute(f"DETACH {alias}")
-            logger.debug(f"Detached existing connection: {alias}")
+            conn.execute(f"DETACH {identifier}")
+            logger.debug(f"Detached existing connection: {identifier}")
         except Exception:
             pass  # Ignore if doesn't exist
 
@@ -210,7 +189,7 @@ class DuckDBManager:
                 dbname={config.database}
                 user={config.username}
                 password={config.password}'
-                AS {alias} (TYPE POSTGRES, SCHEMA '{config.schema_names[0]}')
+                AS {identifier} (TYPE POSTGRES, SCHEMA '{config.schema_names[0]}')
             """
         else:
             # No schemas or multiple schemas: omit SCHEMA parameter to get all
@@ -220,15 +199,15 @@ class DuckDBManager:
                 dbname={config.database}
                 user={config.username}
                 password={config.password}'
-                AS {alias} (TYPE POSTGRES)
+                AS {identifier} (TYPE POSTGRES)
             """
 
         try:
             conn.execute(attach_query)
             # Cache the attachment
-            self._attached_connections[connection_id] = alias
-            logger.info(f"Attached PostgreSQL database as '{alias}' (cached)")
-            return alias
+            self._attached_connections[connection_id] = identifier
+            logger.info(f"Attached PostgreSQL database as '{identifier}' (cached)")
+            return identifier
         except Exception as e:
             logger.error(f"Failed to attach PostgreSQL: {e}")
             raise
@@ -238,7 +217,6 @@ class DuckDBManager:
         connection_id: str,
         connection_name: str,
         config: S3ConnectionConfig,
-        custom_alias: Optional[str] = None,
         force_recreate: bool = False,
     ) -> str:
         """Configure S3 credentials as a DuckDB secret.
@@ -247,8 +225,6 @@ class DuckDBManager:
             connection_id: Unique identifier for this connection
             connection_name: Human-readable name for the connection
             config: S3 configuration
-            custom_alias: Optional custom alias (if set by user)
-                         Falls back to auto-generated from connection_name
             force_recreate: If True, drops and recreates the secret even if it exists
 
         Returns:
@@ -259,13 +235,10 @@ class DuckDBManager:
             cached_secret = self._attached_connections[connection_id]
             logger.debug(f"S3 secret for connection {connection_id} already exists: '{cached_secret}'")
             return cached_secret
-        
+
         conn = self.connect()
-        # Use custom alias if provided, otherwise generate from connection name
-        if custom_alias:
-            secret_name = f"s3_{custom_alias}"
-        else:
-            secret_name = self._sanitize_alias(connection_name, connection_id, DataSourceType.S3)
+        # Generate identifier from connection name
+        secret_name = self._generate_duckdb_identifier(connection_name)
 
         # Drop secret if it exists (in case of recreate)
         try:

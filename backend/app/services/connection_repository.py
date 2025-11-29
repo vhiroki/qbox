@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
@@ -38,15 +39,16 @@ class ConnectionRepository:
             )
             
             # Create indexes
+            # Add unique constraint on connection name
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_connections_name 
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_name_unique
                 ON connections(name)
             """
             )
             conn.execute(
                 """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_alias 
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_alias
                 ON connections(alias) WHERE alias IS NOT NULL
             """
             )
@@ -56,30 +58,22 @@ class ConnectionRepository:
         """Save or update a connection configuration."""
         # Check if this is an update (connection already exists)
         existing = self.get(connection_id)
-        
-        # Validate alias uniqueness if provided
-        if config.alias:
-            if not self._is_alias_valid(config.alias):
-                raise ValueError(
-                    "Invalid alias. Must be alphanumeric with underscores, "
-                    "start with a letter, and be 3-50 characters long."
-                )
-            if not self._is_alias_unique(config.alias, connection_id):
-                raise ValueError(f"Alias '{config.alias}' is already in use by another connection.")
-        
-        # Prevent alias changes on existing connections
-        if existing and existing.alias and existing.alias != config.alias:
+
+        # Check for identifier collision (sanitized name conflict)
+        conflicting_name = self.check_identifier_collision(config.name, connection_id)
+        if conflicting_name:
+            sanitized_id = self._sanitize_identifier(config.name)
             raise ValueError(
-                "Cannot change alias after connection creation. "
-                "This would break existing queries that reference the connection."
+                f"Connection identifier '{sanitized_id}' conflicts with existing connection '{conflicting_name}'. "
+                f"Please choose a different name."
             )
         
         with sqlite3.connect(self.db_path) as conn:
             if existing:
-                # Update existing connection - preserve alias
+                # Update existing connection
                 conn.execute(
                     """
-                    UPDATE connections 
+                    UPDATE connections
                     SET name = ?, type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
@@ -91,18 +85,17 @@ class ConnectionRepository:
                     ),
                 )
             else:
-                # Insert new connection - allow alias
+                # Insert new connection (no alias needed)
                 conn.execute(
                     """
-                    INSERT INTO connections (id, name, type, config, alias, updated_at)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    INSERT INTO connections (id, name, type, config, updated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
                     (
                         connection_id,
                         config.name,
                         config.type.value,
                         json.dumps(config.config),
-                        config.alias,
                     ),
                 )
             conn.commit()
@@ -112,7 +105,7 @@ class ConnectionRepository:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
-                "SELECT name, type, config, alias FROM connections WHERE id = ?",
+                "SELECT name, type, config FROM connections WHERE id = ?",
                 (connection_id,),
             )
             row = cursor.fetchone()
@@ -122,7 +115,6 @@ class ConnectionRepository:
                     name=row["name"],
                     type=DataSourceType(row["type"]),
                     config=json.loads(row["config"]),
-                    alias=row["alias"],
                 )
             return None
 
@@ -132,8 +124,8 @@ class ConnectionRepository:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT id, name, type, alias, created_at, updated_at 
-                FROM connections 
+                SELECT id, name, type, created_at, updated_at
+                FROM connections
                 ORDER BY updated_at DESC
                 """
             )
@@ -152,27 +144,57 @@ class ConnectionRepository:
             cursor = conn.execute("SELECT 1 FROM connections WHERE id = ?", (connection_id,))
             return cursor.fetchone() is not None
 
-    def _is_alias_valid(self, alias: str) -> bool:
-        """Validate alias format: alphanumeric + underscores, start with letter, 3-50 chars."""
-        import re
-        # Must start with letter, contain only alphanumeric and underscores, 3-50 chars
-        pattern = r'^[a-zA-Z][a-zA-Z0-9_]{2,49}$'
-        return bool(re.match(pattern, alias))
+    def _sanitize_identifier(self, name: str) -> str:
+        """Sanitize connection name to a valid DuckDB identifier.
 
-    def _is_alias_unique(self, alias: str, exclude_connection_id: Optional[str] = None) -> bool:
-        """Check if alias is unique across all connections."""
+        This must match the logic in DuckDBManager._generate_duckdb_identifier()
+        to ensure collision detection works correctly.
+        """
+        # Convert to lowercase and replace spaces/special chars with underscores
+        sanitized = re.sub(r'[^a-z0-9]+', '_', name.lower())
+
+        # Remove leading/trailing underscores
+        sanitized = sanitized.strip('_')
+
+        # Ensure it doesn't start with a digit
+        if sanitized and sanitized[0].isdigit():
+            sanitized = f"db_{sanitized}"
+
+        # Truncate to reasonable length (50 chars)
+        if len(sanitized) > 50:
+            sanitized = sanitized[:50].rstrip('_')
+
+        return sanitized
+
+    def check_identifier_collision(self, connection_name: str, exclude_id: Optional[str] = None) -> Optional[str]:
+        """Check if sanitized identifier would conflict with existing connections.
+
+        Args:
+            connection_name: The connection name to check
+            exclude_id: Optional connection ID to exclude from check (for updates)
+
+        Returns:
+            Name of conflicting connection if collision detected, None otherwise
+        """
+        proposed_identifier = self._sanitize_identifier(connection_name)
+
         with sqlite3.connect(self.db_path) as conn:
-            if exclude_connection_id:
+            conn.row_factory = sqlite3.Row
+            # Get all connections except the one being updated
+            if exclude_id:
                 cursor = conn.execute(
-                    "SELECT 1 FROM connections WHERE alias = ? AND id != ?",
-                    (alias, exclude_connection_id),
+                    "SELECT name FROM connections WHERE id != ?",
+                    (exclude_id,),
                 )
             else:
-                cursor = conn.execute(
-                    "SELECT 1 FROM connections WHERE alias = ?",
-                    (alias,),
-                )
-            return cursor.fetchone() is None
+                cursor = conn.execute("SELECT name FROM connections")
+
+            for row in cursor.fetchall():
+                existing_identifier = self._sanitize_identifier(row["name"])
+                if existing_identifier == proposed_identifier:
+                    return row["name"]
+
+        return None
 
 
 # Global repository instance

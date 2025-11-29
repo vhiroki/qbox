@@ -188,8 +188,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
             
             # Attach to DuckDB using connection-specific logic
             alias = connection.attach_to_duckdb(
-                duckdb_manager=duckdb_manager,
-                custom_alias=connection_config.alias
+                duckdb_manager=duckdb_manager
             )
             
         except Exception as e:

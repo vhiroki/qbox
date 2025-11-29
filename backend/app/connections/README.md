@@ -2,6 +2,27 @@
 
 This directory contains modular connection implementations for QBox. Each connection type is self-contained and automatically registered with the system.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Adding a New Connection Type](#adding-a-new-connection-type)
+  - [1. Create a new directory](#1-create-a-new-directory)
+  - [2. Create __init__.py with your connection class](#2-create-__init__py-with-your-connection-class)
+  - [3. Register your connection module](#3-register-your-connection-module)
+  - [4. Add the connection type to models](#4-add-the-connection-type-to-models)
+  - [5. That's it!](#5-thats-it)
+- [Example Connections](#example-connections)
+  - [PostgreSQL (app/connections/postgres/)](#postgresql-appconnectionspostgres)
+  - [S3 (app/connections/s3/)](#s3-appconnectionss3)
+- [Connection Lifecycle](#connection-lifecycle)
+- [Key Methods](#key-methods)
+  - [connect() -> bool](#connect---bool)
+  - [disconnect() -> None](#disconnect---none)
+  - [execute_query(query: str) -> tuple[list[str], list[dict]]](#execute_queryquery-str---tupleliststr-listdict)
+  - [get_schema() -> list[TableSchema]](#get_schema---listtableschema)
+  - [cleanup(duckdb_manager) -> None](#cleanupduckdb_manager---none)
+- [Best Practices](#best-practices)
+
 ## Architecture
 
 The connection system uses a **plugin-like architecture** with these components:

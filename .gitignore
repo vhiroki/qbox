@@ -71,6 +71,7 @@ out/
 # Electron
 frontend/out/
 frontend/dist/
+frontend/.vite/
 backend/dist/
 
 # TypeScript

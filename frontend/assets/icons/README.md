@@ -2,6 +2,19 @@
 
 This directory contains application icons for different platforms.
 
+## Table of Contents
+
+- [Required Icons](#required-icons)
+  - [macOS](#macos)
+  - [Windows](#windows)
+  - [Linux](#linux)
+- [Creating Icons](#creating-icons)
+  - [Option 1: Using ImageMagick](#option-1-using-imagemagick)
+  - [Option 2: Online Tools](#option-2-online-tools)
+  - [Option 3: Using macOS iconutil](#option-3-using-macos-iconutil)
+- [Current Status](#current-status)
+- [Updating Icons](#updating-icons)
+
 ## Required Icons
 
 ### macOS
@@ -47,25 +60,26 @@ mkdir icon.iconset
 iconutil -c icns icon.iconset -o icon.icns
 ```
 
-## TODO
+## Current Status
 
-Currently, this directory contains only placeholder documentation.
-You need to add your actual application icons:
+✅ **Icons are now configured!** This directory contains the QBox application icons in all required formats:
 
-1. Create or design your QBox logo (512x512 PNG recommended)
-2. Convert to platform-specific formats
-3. Place the icons in this directory with the exact names specified above
-4. The build process will automatically include them in the packaged app
+- `icon.icns` - macOS application icon (197 KB)
+- `icon.ico` - Windows application icon (372 KB)
+- `icon.png` - Linux application icon (512x512)
+- Additional PNG sizes for various uses (16x16 to 1024x1024)
 
-## Temporary Workaround
+These icons are automatically included in the packaged Electron app for all platforms.
 
-If you want to build the app without custom icons:
-1. You can use Electron's default icon (no files needed)
-2. Or create simple colored squares as placeholders:
+## Updating Icons
+
+To update the application icons:
+
+1. Create or update your source image (preferably 1024x1024 PNG)
+2. Use the icon generation script:
    ```bash
-   # Create a simple placeholder
-   convert -size 512x512 xc:blue icon.png
+   cd frontend
+   npm run generate-icons
    ```
-
-The Electron build will still work without icons, but your app will use default system icons.
+3. The script will automatically create all required formats and sizes
 

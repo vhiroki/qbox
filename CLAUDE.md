@@ -2,6 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Important Development Guidelines](#important-development-guidelines)
+- [Common Commands](#common-commands)
+  - [Development](#development)
+  - [Linting and Formatting](#linting-and-formatting)
+  - [Ports (Development Mode)](#ports-development-mode)
+  - [Troubleshooting](#troubleshooting)
+- [Architecture](#architecture)
+  - [Backend Structure (Python + FastAPI)](#backend-structure-python--fastapi)
+  - [Frontend Structure (React + TypeScript + Electron)](#frontend-structure-react--typescript--electron)
+  - [Core Architectural Patterns](#core-architectural-patterns)
+  - [Extensible Data Sources](#extensible-data-sources)
+- [Code Style Standards](#code-style-standards)
+  - [Python](#python)
+  - [TypeScript/React/Electron](#typescriptreactelectron)
+  - [Prefer](#prefer)
+  - [Avoid](#avoid)
+- [Error Handling](#error-handling)
+- [Security](#security)
+- [Performance](#performance)
+- [Electron Desktop Architecture](#electron-desktop-architecture)
+
 ## Project Overview
 
 QBox is an Electron desktop application for building and managing SQL queries across multiple data sources. It features PostgreSQL connections, AI-powered chat for SQL building, table selection with metadata, and query execution using DuckDB. The app runs locally with a bundled Python backend - no external servers required.
@@ -10,10 +34,25 @@ QBox is an Electron desktop application for building and managing SQL queries ac
 
 **Tech Stack:**
 - **Desktop**: Electron 39+ with Electron Forge, auto-update support, bundled backend
-- **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite, uvicorn, uv
+- **Backend**: Python 3.11+, FastAPI, DuckDB, SQLite, uvicorn, uv
 - **Frontend**: React 18, TypeScript 5+, Vite, TailwindCSS 4, shadcn/ui, Zustand
 - **Build**: PyInstaller for backend bundling, Electron Forge for packaging
 - **Platform**: macOS (Intel + Apple Silicon), Windows (x64), Linux (x64)
+
+## Important Development Guidelines
+
+**Build and Testing:**
+- **DO NOT** attempt to build the backend or frontend after making changes
+- The user will test all changes independently
+- Focus on making code changes without running build commands
+
+**Documentation Updates:**
+- **ALWAYS** update relevant documentation when making major changes
+- Update both [CLAUDE.md](CLAUDE.md) (development guide) and [README.md](README.md) (user-facing documentation)
+- Update specialized README files when changing those areas:
+  - [frontend/assets/icons/README.md](frontend/assets/icons/README.md) for icon changes
+  - [backend/app/connections/README.md](backend/app/connections/README.md) for connection system changes
+- Keep documentation in sync with code changes to maintain accuracy
 
 ## Common Commands
 
@@ -76,7 +115,7 @@ ruff check app/                       # Lint code
 **TypeScript:**
 ```bash
 cd frontend
-pnpm lint                             # Run ESLint
+npm run lint                          # Run ESLint
 ```
 
 ### Ports (Development Mode)

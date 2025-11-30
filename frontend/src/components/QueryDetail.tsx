@@ -640,7 +640,6 @@ export default function QueryDetail({
     );
   }
 
-
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -793,7 +792,7 @@ export default function QueryDetail({
               <ResizableHandle withHandle />
 
               {/* Right Panel - Tables & AI Chat */}
-              <ResizablePanel defaultSize={defaultHorizontalSizes[1]} minSize={25} maxSize={55}>
+              <ResizablePanel defaultSize={defaultHorizontalSizes[1]} minSize={10} maxSize={60}>
                 <div className="h-full pl-3">
                   <RightSidePanel
                     ref={rightSidePanelRef}

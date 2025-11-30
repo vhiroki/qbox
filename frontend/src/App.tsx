@@ -93,7 +93,7 @@ function AppContent() {
 
   // Load saved panel layout
   const savedLayout = localStorage.getItem(SIDEBAR_LAYOUT_KEY);
-  const defaultSidebarSize = savedLayout ? JSON.parse(savedLayout)[0] : 18;
+  const defaultSidebarSize = savedLayout ? JSON.parse(savedLayout)[0] : 20;
 
   // Load queries once on app mount (global state needed throughout the app)
   const hasLoadedQueries = useRef(false);
@@ -291,7 +291,7 @@ function AppContent() {
         ) : (
           // Expanded: Resizable panel with content
           <ResizablePanelGroup direction="horizontal" className="flex-1" onLayout={handleLayoutChange}>
-            <ResizablePanel defaultSize={defaultSidebarSize} minSize={15} maxSize={35}>
+            <ResizablePanel defaultSize={defaultSidebarSize} minSize={10} maxSize={35}>
               <div className="h-full border-r flex flex-col bg-card">
                 {/* Toolbar */}
                 <div className="flex items-center justify-between p-2 border-b">

@@ -296,122 +296,147 @@ export default function SelectedTablesView({
                 className="border rounded-lg bg-card overflow-hidden"
               >
                 {/* Table Header */}
-                <div className="flex items-center gap-2 p-3">
-                  {/* Expand Button */}
-                  <button
-                    onClick={() => handleToggleExpand(selection)}
-                    className="p-0.5 hover:bg-muted rounded transition-colors flex-shrink-0"
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </button>
+                <div className="p-2">
+                  {/* Top Row: Icons and Table Name */}
+                  <div className="flex items-start gap-1.5">
+                    {/* Expand Button */}
+                    <button
+                      onClick={() => handleToggleExpand(selection)}
+                      className="p-0.5 hover:bg-muted rounded transition-colors flex-shrink-0"
+                      title={isExpanded ? "Collapse" : "Expand"}
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </button>
 
-                  {/* Source Type Icon */}
-                  <SourceTypeIcon sourceType={selection.source_type} />
+                    {/* Source Type Icon */}
+                    <div className="flex-shrink-0 mt-0.5" title={getSourceTypeLabel(selection.source_type)}>
+                      <SourceTypeIcon sourceType={selection.source_type} />
+                    </div>
 
-                  {/* Table Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium truncate">
+                    {/* Table Name - takes available space */}
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className="text-sm font-medium block truncate"
+                        title={displayName}
+                      >
                         {displayName}
                       </span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {/* Copy Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleCopyIdentifier(qualifiedName, key)}
+                        title={`Copy identifier: ${qualifiedName}`}
+                      >
+                        {isCopied ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+
+                      {/* Remove Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() =>
+                          onRemoveSelection(
+                            selection.connection_id,
+                            selection.schema_name,
+                            selection.table_name,
+                            selection.source_type,
+                            qualifiedName
+                          )
+                        }
+                        title="Remove from query"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Second Row: Metadata */}
+                  <div className="ml-6 mt-1 space-y-0.5">
+                    {/* Source Type Badge and Subtitle */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
                         {getSourceTypeLabel(selection.source_type)}
                       </span>
+                      {subtitle && (
+                        <span
+                          className="text-xs text-muted-foreground truncate"
+                          title={subtitle}
+                        >
+                          {subtitle}
+                        </span>
+                      )}
                     </div>
-                    {subtitle && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {subtitle}
+
+                    {/* Row Count */}
+                    {details?.row_count != null && (
+                      <p className="text-xs text-muted-foreground">
+                        {details.row_count.toLocaleString()} rows
                       </p>
                     )}
                   </div>
-
-                  {/* Row Count */}
-                  {details?.row_count != null && (
-                    <span className="text-xs text-muted-foreground flex-shrink-0">
-                      {details.row_count.toLocaleString()} rows
-                    </span>
-                  )}
-
-                  {/* Copy Button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 flex-shrink-0"
-                    onClick={() => handleCopyIdentifier(qualifiedName, key)}
-                    title={`Copy identifier: ${qualifiedName}`}
-                  >
-                    {isCopied ? (
-                      <Check className="h-3.5 w-3.5 text-green-500" />
-                    ) : (
-                      <Copy className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-
-                  {/* Remove Button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() =>
-                      onRemoveSelection(
-                        selection.connection_id,
-                        selection.schema_name,
-                        selection.table_name,
-                        selection.source_type,
-                        qualifiedName
-                      )
-                    }
-                    title="Remove from query"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
 
                 {/* Qualified Name (always visible) */}
-                <div className="px-3 pb-2 -mt-1">
-                  <code className="text-[11px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded">
+                <div className="px-2 pb-2">
+                  <code
+                    className="text-[11px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded block break-all"
+                    title={qualifiedName}
+                  >
                     {qualifiedName}
                   </code>
                 </div>
 
                 {/* Expanded Content - Columns */}
                 {isExpanded && (
-                  <div className="border-t bg-muted/20 px-3 py-2">
+                  <div className="border-t bg-muted/20 px-2 py-2">
                     {isLoading ? (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Loading columns...
                       </div>
                     ) : details?.columns && details.columns.length > 0 ? (
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
                           Columns ({details.columns.length})
                         </div>
                         {details.columns.map((column) => (
                           <div
                             key={column.name}
-                            className="flex items-center gap-2 text-xs"
+                            className="space-y-0.5"
                           >
-                            <span className="font-medium text-foreground">
-                              {column.name}
-                            </span>
-                            <span className="font-mono text-muted-foreground text-[11px]">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="font-medium text-foreground text-xs break-all">
+                                {column.name}
+                              </span>
+                              {column.is_primary_key && (
+                                <span className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded flex-shrink-0">
+                                  PK
+                                </span>
+                              )}
+                              {column.nullable === false && (
+                                <span className="text-[10px] bg-orange-500/10 text-orange-600 px-1 py-0.5 rounded flex-shrink-0">
+                                  NOT NULL
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-mono text-muted-foreground text-[11px] break-all">
                               {column.type}
-                            </span>
-                            {column.is_primary_key && (
-                              <span className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded">
-                                PK
-                              </span>
-                            )}
-                            {column.nullable === false && (
-                              <span className="text-[10px] bg-orange-500/10 text-orange-600 px-1 py-0.5 rounded">
-                                NOT NULL
-                              </span>
-                            )}
+                            </div>
                           </div>
                         ))}
                       </div>

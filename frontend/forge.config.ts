@@ -18,17 +18,18 @@ const config: ForgeConfig = {
       // Backend executable will be placed here by the build script
       path.resolve(__dirname, '..', 'backend', 'dist'),
     ],
-    // Code signing disabled for development builds
-    // To enable, uncomment and provide proper credentials:
-    // osxSign: {
-    //   identity: 'Developer ID Application: Your Name (TEAM_ID)',
-    // },
-    // osxNotarize: {
-    //   tool: 'notarytool',
-    //   appleId: process.env.APPLE_ID || '',
-    //   appleIdPassword: process.env.APPLE_PASSWORD || '',
-    //   teamId: process.env.APPLE_TEAM_ID || '',
-    // },
+    // Code signing configuration for macOS
+    // Environment variables must be set: APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID, APPLE_IDENTITY
+    // In GitHub Actions, these are set via repository secrets
+    osxSign: process.env.APPLE_IDENTITY ? {
+      identity: process.env.APPLE_IDENTITY,
+    } : undefined,
+    osxNotarize: process.env.APPLE_ID ? {
+      tool: 'notarytool',
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_PASSWORD || '',
+      teamId: process.env.APPLE_TEAM_ID || '',
+    } : undefined,
   },
   rebuildConfig: {},
   makers: [

@@ -27,12 +27,12 @@ const ICON_CONFIG = {
   // Corner radius (percentage of icon size) - for rounded square look
   cornerRadius: 0.22,
   // Gradient colors (from QBox palette)
-  gradientStart: '#18181b',  // Top - Tertiary BG (window headers)
-  gradientEnd: '#0a0a0b',    // Bottom - Primary BG (main background)
+  gradientStart: '#212121ff',  // Top - Tertiary BG (window headers)
+  gradientEnd: '#14120b',    // Bottom - Primary BG (main background)
   // Optional: subtle amber glow behind logo
   glowEnabled: true,
   glowColor: 'rgba(245, 158, 11, 0.08)',
-  glowRadius: 0.35, // percentage of icon size
+  glowRadius: 0.25, // percentage of icon size
 };
 
 // Sizes needed for iconset (macOS)

@@ -44,9 +44,13 @@ from app.api import settings as settings_api
 from app.config.settings import get_settings
 from app.services.migration_service import run_migrations
 
-# Configure logging
+# Get settings to configure logging
+settings = get_settings()
+
+# Configure logging with environment-based level
+log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
@@ -84,7 +88,7 @@ async def lifespan(app: FastAPI):
         logger.exception("Migration failed")
         # Continue startup - this ensures backward compatibility
 
-    print("📊 Debug logging enabled for AI and metadata services")
+    logger.info(f"Logging level: {settings.LOG_LEVEL}")
     yield
     # Shutdown
     print("👋 Shutting down QBox API...")
@@ -97,9 +101,6 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-
-# Get settings
-settings = get_settings()
 
 # Configure CORS
 app.add_middleware(

@@ -19,17 +19,28 @@ const config: ForgeConfig = {
       path.resolve(__dirname, '..', 'backend', 'dist'),
     ],
     // Code signing configuration for macOS
-    // Environment variables must be set: APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID, APPLE_IDENTITY
-    // In GitHub Actions, these are set via repository secrets
-    osxSign: process.env.APPLE_IDENTITY ? {
-      identity: process.env.APPLE_IDENTITY,
-    } : undefined,
-    osxNotarize: process.env.APPLE_ID ? {
-      tool: 'notarytool',
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD || '',
-      teamId: process.env.APPLE_TEAM_ID || '',
-    } : undefined,
+    // Environment variables (set in GitHub Actions):
+    // - CSC_LINK: Base64-encoded .p12 certificate
+    // - CSC_KEY_PASSWORD: Certificate password
+    // - APPLE_ID: Apple ID email
+    // - APPLE_PASSWORD: App-specific password
+    // - APPLE_TEAM_ID: Apple Team ID
+    ...(process.env.CSC_LINK && process.env.APPLE_ID ? {
+      osxSign: {
+        identity: process.env.APPLE_IDENTITY,
+        optionsForFile: () => ({
+          hardenedRuntime: true,
+          entitlements: undefined,
+          'entitlements-inherit': undefined,
+        }),
+      },
+      osxNotarize: {
+        tool: 'notarytool',
+        appleId: process.env.APPLE_ID,
+        appleIdPassword: process.env.APPLE_PASSWORD || '',
+        teamId: process.env.APPLE_TEAM_ID || '',
+      },
+    } : {}),
   },
   rebuildConfig: {},
   makers: [

@@ -5,6 +5,10 @@ import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import path from 'path';
+import { importSigningCertificate } from './scripts/import-signing-cert';
+
+// Import certificate from CSC_LINK if provided (for CI/CD)
+const { identity: signingIdentity, keychain: keychainPath } = importSigningCertificate();
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -19,27 +23,24 @@ const config: ForgeConfig = {
       path.resolve(__dirname, '..', 'backend', 'dist'),
     ],
     // Code signing configuration for macOS
-    // Environment variables (set in GitHub Actions):
-    // - CSC_LINK: Base64-encoded .p12 certificate
-    // - CSC_KEY_PASSWORD: Certificate password
-    // - APPLE_ID: Apple ID email
-    // - APPLE_PASSWORD: App-specific password
-    // - APPLE_TEAM_ID: Apple Team ID
-    ...(process.env.CSC_LINK && process.env.APPLE_ID ? {
+    // Uses certificate from CSC_LINK (imported above) or from local Keychain
+    ...(signingIdentity ? {
       osxSign: {
-        identity: process.env.APPLE_IDENTITY,
+        identity: signingIdentity,
+        keychain: keychainPath,
         optionsForFile: () => ({
           hardenedRuntime: true,
-          entitlements: undefined,
-          'entitlements-inherit': undefined,
+          entitlements: path.resolve(__dirname, 'entitlements.plist'),
+          'entitlements-inherit': path.resolve(__dirname, 'entitlements.plist'),
         }),
       },
-      osxNotarize: {
-        tool: 'notarytool',
-        appleId: process.env.APPLE_ID,
-        appleIdPassword: process.env.APPLE_PASSWORD || '',
-        teamId: process.env.APPLE_TEAM_ID || '',
-      },
+      ...(process.env.APPLE_ID ? {
+        osxNotarize: {
+          appleId: process.env.APPLE_ID,
+          appleIdPassword: process.env.APPLE_PASSWORD || '',
+          teamId: process.env.APPLE_TEAM_ID || '',
+        },
+      } : {}),
     } : {}),
   },
   rebuildConfig: {},

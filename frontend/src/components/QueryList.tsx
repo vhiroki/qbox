@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { FileCode } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SettingsModal from "./SettingsModal";
+import SupportDialog from "./SupportDialog";
 import { useQueryStore } from "../stores";
 
 interface QueryListProps {
@@ -84,9 +85,10 @@ export default function QueryList({
         </div>
       </div>
 
-      {/* Settings Button at Bottom */}
-      <div className="p-3 border-t">
+      {/* Settings and Support Buttons at Bottom */}
+      <div className="p-3 border-t space-y-2">
         <SettingsModal onDataCleared={handleDataCleared} />
+        <SupportDialog />
       </div>
     </div>
   );

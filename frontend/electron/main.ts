@@ -1,8 +1,10 @@
-import { app, BrowserWindow, dialog, Notification } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell } from 'electron';
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { autoUpdater } from 'electron-updater';
 import { config } from './config';
+import { logger } from './logger';
+import { reportIssue } from './diagnostics';
 // @ts-expect-error - electron-squirrel-startup doesn't have type definitions but will be bundled
 import squirrelStartup from 'electron-squirrel-startup';
 
@@ -34,17 +36,17 @@ if (!gotTheLock) {
  */
 async function startBackend(): Promise<void> {
   if (config.isDevelopment) {
-    console.log('Development mode: Expecting backend to be started separately');
+    logger.info('Development mode: Expecting backend to be started separately');
     return;
   }
 
   const backendPath = config.getBackendExecutablePath();
-  
+
   if (!backendPath) {
     throw new Error('Backend executable path not configured');
   }
 
-  console.log('Starting backend process:', backendPath);
+  logger.info(`Starting backend process: ${backendPath}`);
 
   return new Promise((resolve, reject) => {
     try {
@@ -58,23 +60,23 @@ async function startBackend(): Promise<void> {
 
       if (backendProcess.stdout) {
         backendProcess.stdout.on('data', (data) => {
-          console.log('Backend:', data.toString());
+          logger.backend(data.toString());
         });
       }
 
       if (backendProcess.stderr) {
         backendProcess.stderr.on('data', (data) => {
-          console.error('Backend error:', data.toString());
+          logger.backend(data.toString(), true);
         });
       }
 
       backendProcess.on('error', (error) => {
-        console.error('Failed to start backend:', error);
+        logger.error('Failed to start backend', error as Error);
         reject(error);
       });
 
       backendProcess.on('exit', (code, signal) => {
-        console.log(`Backend process exited with code ${code} and signal ${signal}`);
+        logger.info(`Backend process exited with code ${code} and signal ${signal}`);
         if (code !== 0 && code !== null) {
           reject(new Error(`Backend exited with code ${code}`));
         }
@@ -83,7 +85,7 @@ async function startBackend(): Promise<void> {
       // Wait for backend to be healthy
       waitForBackendHealth()
         .then(() => {
-          console.log('Backend is healthy');
+          logger.info('Backend is healthy');
           resolve();
         })
         .catch(reject);
@@ -106,10 +108,10 @@ async function waitForBackendHealth(): Promise<void> {
     try {
       const response = await fetch(healthUrl);
       if (response.ok) {
-        console.log('Backend health check passed, verifying API readiness...');
+        logger.info('Backend health check passed, verifying API readiness...');
         break;
       }
-    } catch (error) {
+    } catch {
       // Backend not ready yet, continue waiting
     }
     await new Promise((resolve) => setTimeout(resolve, config.backend.healthCheckInterval));
@@ -119,22 +121,23 @@ async function waitForBackendHealth(): Promise<void> {
   // This ensures all services (database, etc.) are initialized
   let apiReady = false;
   const apiCheckStart = Date.now();
-  while (Date.now() - apiCheckStart < 10000) { // 10 second timeout for API check
+  while (Date.now() - apiCheckStart < 10000) {
+    // 10 second timeout for API check
     try {
       const response = await fetch(apiUrl);
       if (response.ok || response.status === 200) {
         apiReady = true;
-        console.log('Backend API is ready');
+        logger.info('Backend API is ready');
         break;
       }
-    } catch (error) {
+    } catch {
       // API not ready yet
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
   if (!apiReady) {
-    console.warn('Backend API check timed out, proceeding anyway...');
+    logger.warn('Backend API check timed out, proceeding anyway...');
   }
 }
 
@@ -143,7 +146,7 @@ async function waitForBackendHealth(): Promise<void> {
  */
 function stopBackend(): void {
   if (backendProcess) {
-    console.log('Stopping backend process...');
+    logger.info('Stopping backend process...');
     backendProcess.kill();
     backendProcess = null;
   }
@@ -154,14 +157,14 @@ function stopBackend(): void {
  */
 function setupAutoUpdater(): void {
   if (!config.autoUpdate.enabled || config.isDevelopment) {
-    console.log('Auto-update disabled (development mode or disabled in config)');
+    logger.info('Auto-update disabled (development mode or disabled in config)');
     return;
   }
 
   // Configure auto-updater
   // Priority: GitHub > Generic server URL
   const { github, serverUrl } = config.autoUpdate;
-  
+
   if (github.owner && github.repo) {
     // Use GitHub releases
     autoUpdater.setFeedURL({
@@ -169,27 +172,29 @@ function setupAutoUpdater(): void {
       owner: github.owner,
       repo: github.repo,
     });
-    console.log(`Auto-updater configured for GitHub: ${github.owner}/${github.repo}`);
+    logger.info(`Auto-updater configured for GitHub: ${github.owner}/${github.repo}`);
   } else if (serverUrl) {
     // Fall back to generic server
     autoUpdater.setFeedURL({
       provider: 'generic',
       url: serverUrl,
     });
-    console.log(`Auto-updater configured for generic server: ${serverUrl}`);
+    logger.info(`Auto-updater configured for generic server: ${serverUrl}`);
   } else {
-    console.log('Auto-updater not configured: set GITHUB_OWNER/GITHUB_REPO or UPDATE_SERVER_URL');
+    logger.info(
+      'Auto-updater not configured: set GITHUB_OWNER/GITHUB_REPO or UPDATE_SERVER_URL'
+    );
     return;
   }
 
   // Auto-updater event handlers
   autoUpdater.on('checking-for-update', () => {
-    console.log('Checking for updates...');
+    logger.info('Checking for updates...');
   });
 
   autoUpdater.on('update-available', (info) => {
-    console.log('Update available:', info);
-    
+    logger.info(`Update available: ${info.version}`);
+
     // Show notification
     if (Notification.isSupported()) {
       const notification = new Notification({
@@ -201,21 +206,22 @@ function setupAutoUpdater(): void {
   });
 
   autoUpdater.on('update-not-available', (info) => {
-    console.log('Update not available:', info);
+    logger.info(`Update not available: current version ${info.version}`);
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('Error in auto-updater:', err);
+    logger.error('Error in auto-updater', err);
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
-    const logMessage = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`;
-    console.log(logMessage);
+    logger.info(
+      `Download progress: ${progressObj.percent.toFixed(1)}% (${progressObj.transferred}/${progressObj.total})`
+    );
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('Update downloaded:', info);
-    
+    logger.info(`Update downloaded: ${info.version}`);
+
     // Show dialog asking user to restart
     const result = dialog.showMessageBoxSync({
       type: 'info',
@@ -234,14 +240,14 @@ function setupAutoUpdater(): void {
 
   // Check for updates now
   autoUpdater.checkForUpdates().catch((err) => {
-    console.error('Failed to check for updates:', err);
+    logger.error('Failed to check for updates', err);
   });
 
   // Setup periodic update checks
   if (config.autoUpdate.checkInterval > 0) {
     updateCheckInterval = setInterval(() => {
       autoUpdater.checkForUpdates().catch((err) => {
-        console.error('Failed to check for updates:', err);
+        logger.error('Failed to check for updates', err);
       });
     }, config.autoUpdate.checkInterval);
   }
@@ -319,35 +325,154 @@ function loadMainApp(): void {
 }
 
 /**
+ * Setup IPC handlers for renderer process communication
+ */
+function setupIpcHandlers(): void {
+  // Handle report issue request from renderer
+  ipcMain.handle('report-issue', async () => {
+    await reportIssue();
+  });
+
+  // Handle open logs folder request from renderer
+  ipcMain.handle('open-logs-folder', async () => {
+    await shell.openPath(logger.getLogDir());
+  });
+}
+
+/**
+ * Setup application menu with Help > Report Issue
+ */
+function setupMenu(): void {
+  const isMac = process.platform === 'darwin';
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App menu (macOS only)
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const },
+            ],
+          },
+        ]
+      : []),
+    // Edit menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    // View menu
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    // Window menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac
+          ? [{ type: 'separator' as const }, { role: 'front' as const }]
+          : [{ role: 'close' as const }]),
+      ],
+    },
+    // Help menu
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Report Issue...',
+          click: () => {
+            reportIssue();
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'View Logs Folder',
+          click: () => {
+            shell.openPath(logger.getLogDir());
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Learn More',
+          click: () => {
+            shell.openExternal('https://github.com/vhiroki/qbox');
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
+/**
  * Initialize the application
  */
 async function initialize(): Promise<void> {
+  // Initialize logger first
+  logger.init();
+
+  // Setup IPC handlers and application menu
+  setupIpcHandlers();
+  setupMenu();
+
   try {
     // Create window immediately and show loading screen
     createWindow();
-    
+
     // In production, show loading screen while backend starts
     if (!config.isDevelopment) {
       loadLoadingScreen();
     }
-    
+
     // Start backend (this waits for it to be ready)
     await startBackend();
-    
+
     // Backend is ready, load the main app
     loadMainApp();
-    
+
     // Setup auto-updater after app is loaded
     setupAutoUpdater();
   } catch (error) {
-    console.error('Failed to initialize app:', error);
-    
+    logger.error('Failed to initialize app', error as Error);
+
     // Show error dialog
     dialog.showErrorBox(
       'Failed to Start QBox',
       `Could not start the application: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`
     );
-    
+
     // Quit the app
     app.quit();
   }
@@ -373,6 +498,7 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
+  logger.info('Application quitting...');
   cleanupAutoUpdater();
   stopBackend();
 });
@@ -380,11 +506,12 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   cleanupAutoUpdater();
   stopBackend();
+  logger.close();
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
+  logger.error('Uncaught exception', error);
   dialog.showErrorBox('Unexpected Error', `An unexpected error occurred: ${error.message}`);
 });
 

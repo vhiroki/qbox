@@ -2,6 +2,8 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # Fix SSL certificates and HTTP compression for PyInstaller bundles
 # This must be done before any imports that use SSL/HTTP (httpx, openai, litellm, etc.)
@@ -49,11 +51,34 @@ settings = get_settings()
 
 # Configure logging with environment-based level
 log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
-logging.basicConfig(
-    level=log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+log_datefmt = "%Y-%m-%d %H:%M:%S"
+
+# Setup log directory
+log_dir = Path.home() / ".qbox" / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "qbox.log"
+
+# Configure root logger with both console and file handlers
+root_logger = logging.getLogger()
+root_logger.setLevel(log_level)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(log_level)
+console_handler.setFormatter(logging.Formatter(log_format, datefmt=log_datefmt))
+root_logger.addHandler(console_handler)
+
+# File handler with rotation (5MB per file, keep 3 backups)
+file_handler = RotatingFileHandler(
+    log_file,
+    maxBytes=5 * 1024 * 1024,  # 5MB
+    backupCount=3,
+    encoding="utf-8",
 )
+file_handler.setLevel(log_level)
+file_handler.setFormatter(logging.Formatter(log_format, datefmt=log_datefmt))
+root_logger.addHandler(file_handler)
 
 # Set specific loggers to appropriate levels
 logging.getLogger("uvicorn").setLevel(logging.INFO)

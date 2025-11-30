@@ -281,3 +281,17 @@ export interface FileMetadata {
   columns: ColumnMetadata[];
   row_count?: number;
 }
+
+// Electron API (exposed via preload.ts)
+
+export interface ElectronAPI {
+  platform: string;
+  reportIssue: () => Promise<void>;
+  openLogsFolder: () => Promise<void>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}

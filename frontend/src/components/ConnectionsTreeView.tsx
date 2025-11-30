@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useConnectionStore } from "@/stores/useConnectionStore";
 import { api } from "@/services/api";
+import { SOURCE_TYPE_ICON_COLORS } from "@/constants/connectionColors";
 import type { ConnectionMetadata, SchemaMetadata, TableMetadata, QueryTableSelection } from "@/types";
 
 interface ConnectionsTreeViewProps {
@@ -422,10 +423,7 @@ export default function ConnectionsTreeView({
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
-                    <Database
-                      className={`h-4 w-4 flex-shrink-0 ${hasSelectedTables ? "text-primary" : "text-muted-foreground"
-                        }`}
-                    />
+                    <Database className={`h-4 w-4 flex-shrink-0 ${SOURCE_TYPE_ICON_COLORS.connection}`} />
                     <span className="text-sm font-medium truncate flex-1 text-left">
                       {connection.connection_name}
                     </span>

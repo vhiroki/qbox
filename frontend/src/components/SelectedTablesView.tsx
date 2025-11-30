@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api } from "@/services/api";
+import { getSourceTypeIconColor } from "@/constants/connectionColors";
 import type { QueryTableSelection, ColumnMetadata } from "@/types";
 
 interface SelectedTablesViewProps {
@@ -38,31 +39,44 @@ interface TableDetails {
 
 /**
  * Generate a view name for an S3 file (matches backend logic in s3_service.py).
+ * Format: {schema_identifier}.{table_name}
+ * Example: my_s3_bucket.sales_2024
  */
-function getS3ViewName(filePath: string): string {
+function getS3ViewName(filePath: string, connectionName: string): string {
+  // Generate schema identifier from connection name (same as backend)
+  const schemaIdentifier = generateDuckDBIdentifier(connectionName);
+
+  // Extract file name without extension and sanitize
   let fileName = filePath.split("/").pop() || filePath;
   if (fileName.includes(".")) {
     const parts = fileName.split(".");
     parts.pop();
     fileName = parts.join(".");
   }
-  const fileNameSafe = fileName.replace(/[^a-zA-Z0-9_]/g, "_");
-  return `s3_${fileNameSafe}`;
+  const fileNameSafe = fileName.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^_+|_+$/g, "");
+
+  // Ensure table name doesn't start with a digit
+  const tableName = fileNameSafe && /^\d/.test(fileNameSafe)
+    ? `file_${fileNameSafe}`
+    : fileNameSafe;
+
+  return `${schemaIdentifier}.${tableName}`;
 }
 
 /**
  * Get source type icon
  */
 function SourceTypeIcon({ sourceType }: { sourceType: string }) {
+  const colorClass = getSourceTypeIconColor(sourceType);
   switch (sourceType) {
     case "connection":
-      return <Database className="h-4 w-4 text-blue-500" />;
+      return <Database className={`h-4 w-4 ${colorClass}`} />;
     case "s3":
-      return <Cloud className="h-4 w-4 text-orange-500" />;
+      return <Cloud className={`h-4 w-4 ${colorClass}`} />;
     case "file":
-      return <FileText className="h-4 w-4 text-green-500" />;
+      return <FileText className={`h-4 w-4 ${colorClass}`} />;
     default:
-      return <Database className="h-4 w-4 text-muted-foreground" />;
+      return <Database className={`h-4 w-4 ${colorClass}`} />;
   }
 }
 
@@ -105,7 +119,9 @@ export default function SelectedTablesView({
       const fileInfo = fileInfoMap.get(selection.connection_id);
       return fileInfo?.viewName || selection.table_name;
     } else if (selection.source_type === "s3") {
-      return getS3ViewName(selection.table_name);
+      const connectionInfo = connectionInfoMap.get(selection.connection_id);
+      const connectionName = connectionInfo?.name || selection.connection_id;
+      return getS3ViewName(selection.table_name, connectionName);
     } else {
       const connectionInfo = connectionInfoMap.get(selection.connection_id);
       const identifier = connectionInfo?.name ? generateDuckDBIdentifier(connectionInfo.name) : selection.connection_id.replace(/-/g, "_");

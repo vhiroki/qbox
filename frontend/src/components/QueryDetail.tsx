@@ -189,13 +189,16 @@ export default function QueryDetail({
     loadFileInfo();
   }, [query, selections]);
 
-  // Load connection info for database selections to get identifiers
+  // Load connection info for database and S3 selections to get identifiers
   useEffect(() => {
     // Don't run if query doesn't exist (e.g., after deletion)
     if (!query) return;
 
     const loadConnectionInfo = async () => {
-      const connectionSelections = selections.filter((s) => s.source_type === "connection");
+      // Include both "connection" (databases) and "s3" selections
+      const connectionSelections = selections.filter(
+        (s) => s.source_type === "connection" || s.source_type === "s3"
+      );
       if (connectionSelections.length === 0) {
         setConnectionInfoMap(new Map());
         return;
@@ -216,7 +219,7 @@ export default function QueryDetail({
           console.error(`Failed to load connection info for ${connectionId}:`, err);
         }
       }
-      
+
       setConnectionInfoMap(newConnectionInfoMap);
     };
 

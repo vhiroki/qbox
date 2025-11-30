@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api } from "@/services/api";
+import { SOURCE_TYPE_ICON_COLORS } from "@/constants/connectionColors";
 import type { FileInfo, FileMetadata } from "@/types";
 
 interface FileManagerProps {
@@ -337,8 +338,8 @@ export default function FileManager({ queryId, selectedFiles, onSelectionChange,
                       )}
                     </button>
                   )}
-                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  
+                  <FileText className={`h-4 w-4 ${SOURCE_TYPE_ICON_COLORS.file} flex-shrink-0`} />
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium truncate">{file.name}</span>

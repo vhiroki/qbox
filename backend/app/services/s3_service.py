@@ -277,8 +277,20 @@ class S3Service:
         """
         Generate a view name for an S3 file.
 
-        Format: s3_{sanitized_file_name}
+        Format: {schema_identifier}.{table_name}
+        Where:
+          - schema_identifier is the S3 connection identifier
+          - table_name is sanitized from the file name without extension
+
+        For example:
+          - Connection: "My S3 Bucket" → my_s3_bucket
+          - File: "data/sales_2024.parquet" → my_s3_bucket.sales_2024
         """
+        # Get the schema identifier for this connection
+        schema_identifier = self.duckdb_manager.get_attached_identifier(connection_id)
+        if not schema_identifier:
+            raise ValueError(f"S3 connection {connection_id} not configured in DuckDB")
+
         # Get file name without extension and sanitize
         file_name = file_path.split('/')[-1]
         if '.' in file_name:
@@ -287,7 +299,14 @@ class S3Service:
         # Sanitize file name (keep only alphanumeric and underscores)
         file_name_safe = ''.join(c if c.isalnum() or c == '_' else '_' for c in file_name)
 
-        return f"s3_{file_name_safe}"
+        # Remove leading/trailing underscores
+        file_name_safe = file_name_safe.strip('_')
+
+        # Ensure it doesn't start with a digit
+        if file_name_safe and file_name_safe[0].isdigit():
+            file_name_safe = f"file_{file_name_safe}"
+
+        return f"{schema_identifier}.{file_name_safe}"
 
     async def create_file_view(
         self,

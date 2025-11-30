@@ -219,7 +219,7 @@ class DuckDBManager:
         config: S3ConnectionConfig,
         force_recreate: bool = False,
     ) -> str:
-        """Configure S3 credentials as a DuckDB secret.
+        """Configure S3 credentials as a DuckDB secret and create schema for views.
 
         Args:
             connection_id: Unique identifier for this connection
@@ -228,24 +228,31 @@ class DuckDBManager:
             force_recreate: If True, drops and recreates the secret even if it exists
 
         Returns:
-            The secret name that was created
+            The schema/secret identifier that was created
         """
         # Check if already configured (unless forced to recreate)
         if not force_recreate and connection_id in self._attached_connections:
-            cached_secret = self._attached_connections[connection_id]
-            logger.debug(f"S3 secret for connection {connection_id} already exists: '{cached_secret}'")
-            return cached_secret
+            cached_identifier = self._attached_connections[connection_id]
+            logger.debug(f"S3 connection {connection_id} already configured with schema '{cached_identifier}'")
+            return cached_identifier
 
         conn = self.connect()
-        # Generate identifier from connection name
-        secret_name = self._generate_duckdb_identifier(connection_name)
+        # Generate identifier from connection name (used for both secret and schema)
+        identifier = self._generate_duckdb_identifier(connection_name)
 
         # Drop secret if it exists (in case of recreate)
         try:
-            conn.execute(f"DROP SECRET IF EXISTS {secret_name}")
-            logger.debug(f"Dropped existing secret: {secret_name}")
+            conn.execute(f"DROP SECRET IF EXISTS {identifier}")
+            logger.debug(f"Dropped existing secret: {identifier}")
         except Exception:
             pass  # Ignore errors
+
+        # Create schema for S3 views
+        try:
+            conn.execute(f"CREATE SCHEMA IF NOT EXISTS {identifier}")
+            logger.debug(f"Created schema for S3 views: {identifier}")
+        except Exception as e:
+            logger.warning(f"Could not create schema {identifier}: {e}")
 
         # Create S3 secret based on credential type
         try:
@@ -279,11 +286,11 @@ class DuckDBManager:
                         secret_params.append("USE_SSL false")
 
                 create_secret_query = f"""
-                    CREATE OR REPLACE SECRET {secret_name} (
+                    CREATE OR REPLACE SECRET {identifier} (
                         {', '.join(secret_params)}
                     )
                 """
-                logger.debug(f"Creating S3 secret with manual credentials: {secret_name}")
+                logger.debug(f"Creating S3 secret with manual credentials: {identifier}")
             else:
                 # Use default credential provider chain
                 secret_params = [
@@ -309,17 +316,17 @@ class DuckDBManager:
                         secret_params.append("USE_SSL false")
 
                 create_secret_query = f"""
-                    CREATE OR REPLACE SECRET {secret_name} (
+                    CREATE OR REPLACE SECRET {identifier} (
                         {', '.join(secret_params)}
                     )
                 """
-                logger.debug(f"Creating S3 secret with credential chain: {secret_name}")
-            
+                logger.debug(f"Creating S3 secret with credential chain: {identifier}")
+
             conn.execute(create_secret_query)
-            # Cache the secret name
-            self._attached_connections[connection_id] = secret_name
-            logger.info(f"Created S3 secret: '{secret_name}' (cached)")
-            return secret_name
+            # Cache the identifier
+            self._attached_connections[connection_id] = identifier
+            logger.info(f"Created S3 secret and schema: '{identifier}' (cached)")
+            return identifier
         except Exception as e:
             logger.error(f"Failed to create S3 secret: {e}")
             raise

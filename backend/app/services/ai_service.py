@@ -201,8 +201,8 @@ INSTRUCTIONS:
 3. Reference data sources correctly:
    - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
    - For CSV/Excel files: use ONLY the view name listed after "File:" (e.g., file_sales or file_duplicatedstudentids)
-   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., s3_filename)
-   - IMPORTANT: The "Original File" line is just for reference - DO NOT use it in SQL queries
+   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., my_s3_bucket.sales_2024)
+   - IMPORTANT: The "Original File" and "S3 Path" lines are just for reference - DO NOT use them in SQL queries
 4. Be precise with column names and data types
 5. Add appropriate WHERE clauses, JOINs, GROUP BY, and ORDER BY as needed
 6. Optimize for readability and performance
@@ -259,8 +259,8 @@ INSTRUCTIONS:
 5. Reference data sources correctly:
    - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
    - For CSV/Excel files: use ONLY the view name listed after "File:" (e.g., file_sales or file_duplicatedstudentids)
-   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., s3_filename)
-   - IMPORTANT: The "Original File" line is just for reference - DO NOT use it in SQL queries
+   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., my_s3_bucket.sales_2024)
+   - IMPORTANT: The "Original File" and "S3 Path" lines are just for reference - DO NOT use them in SQL queries
 6. Preserve the user's manual edits unless they ask you to change them
 7. Return the COMPLETE updated SQL query, not just the changes
 

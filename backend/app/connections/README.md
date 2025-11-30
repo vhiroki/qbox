@@ -138,14 +138,21 @@ Your new connection type will automatically:
 ## Example Connections
 
 ### PostgreSQL (`app/connections/postgres/`)
-- Attaches to DuckDB using the postgres extension
+- **DuckDB Integration**: Attaches to DuckDB using the postgres extension (`ATTACH ... AS identifier`)
+- **Namespace**: Tables referenced as `identifier.schema.table`
+- **Example**: Connection "Production DB" → `production_db.public.users`
 - Supports multiple schemas
 - Full database operations
 
 ### S3 (`app/connections/s3/`)
-- Configures AWS credentials as DuckDB secrets
-- Files queried directly using `s3://` paths
+- **DuckDB Integration**:
+  - Creates a DuckDB secret for credentials (`CREATE SECRET identifier`)
+  - Creates a schema for organizing file views (`CREATE SCHEMA identifier`)
+  - Each file registered as a schema-qualified view (`CREATE VIEW identifier.filename`)
+- **Namespace**: Files referenced as `identifier.table_name`
+- **Example**: Connection "Data Lake" + file "sales_2024.parquet" → `data_lake.sales_2024`
 - Supports both manual and credential chain authentication
+- Files queried directly using `s3://bucket/path` internally
 
 ## Connection Lifecycle
 

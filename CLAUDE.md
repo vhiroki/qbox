@@ -201,12 +201,16 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 
 **DuckDB Manager (Persistent Query Engine):**
 - Single persistent instance at `~/.qbox/qbox.duckdb`
-- Attaches PostgreSQL databases with identifiers derived from connection names
-- Registers CSV/Excel files as views
-- Attaches S3 buckets with httpfs extension
+- **PostgreSQL**: Attaches databases with identifiers derived from connection names
+  - Example: Connection "My Database" → `ATTACH AS my_database`
+  - Tables referenced as: `my_database.schema.table`
+- **S3**: Creates schema and secret for each connection
+  - Example: Connection "Production S3" → `CREATE SCHEMA production_s3` + `CREATE SECRET production_s3`
+  - Files referenced as: `production_s3.sales_2024` (schema-qualified views)
+- **CSV/Excel files**: Registered as flat views without schema prefix
+  - Example: `file_sales_data`
 - Uses system functions for metadata: `duckdb_schemas()`, `duckdb_tables()`, `duckdb_columns()`
 - Important: Identifiers use underscores (not hyphens) to avoid SQL identifier errors
-- Example: Connection "My Database" → identifier `my_database`
 
 **Repository Pattern:**
 - Separate repositories for connections, queries, and files

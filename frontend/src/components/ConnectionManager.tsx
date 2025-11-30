@@ -3,6 +3,7 @@ import type { SavedConnection, PostgresConfig, S3Config, ConnectionConfig, Conne
 import { api } from '../services/api';
 import { useConnectionStore } from '../stores';
 import { generateDuckDBIdentifier } from '../utils/identifier';
+import { getConnectionTypeBadgeClasses } from '@/constants/connectionColors';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -102,17 +103,6 @@ export default function ConnectionManager() {
     return prefixMap[type] || "db";
   };
 
-  // Helper function to get connection type badge variant
-  const getTypeBadgeVariant = (type: string): "default" | "secondary" | "destructive" | "outline" => {
-    const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      postgres: "default",
-      s3: "secondary",
-      mysql: "outline",
-      oracle: "outline",
-      dynamodb: "outline",
-    };
-    return variantMap[type] || "outline";
-  };
 
   // Filter connections by type
   const filteredConnections = typeFilter === "all"
@@ -160,10 +150,24 @@ export default function ConnectionManager() {
   const handleCreateSubmit = async () => {
     setCreateError(null);
     try {
+      // Clean up the config before sending
+      let cleanedConfig = { ...createFormData };
+
+      // For S3 connections with 'default' credential type, remove manual credential fields
+      if (createConnectionType === 's3' && 'credential_type' in cleanedConfig) {
+        const s3Config = cleanedConfig as S3Config;
+        if (s3Config.credential_type === 'default') {
+          // Remove credential fields when using default credential chain
+          delete s3Config.aws_access_key_id;
+          delete s3Config.aws_secret_access_key;
+          delete s3Config.aws_session_token;
+        }
+      }
+
       const config: ConnectionConfig = {
         name: createConnectionName,
         type: createConnectionType,
-        config: createFormData,
+        config: cleanedConfig,
       };
 
       await createConnection(config);
@@ -204,15 +208,22 @@ export default function ConnectionManager() {
           schemas: schemasValue,
         });
       } else if (fullConfig.type === 's3') {
-        setEditFormData({
+        // Only include credential fields if credential_type is 'manual'
+        const s3FormData: S3Config = {
           bucket: fullConfig.config.bucket || '',
           credential_type: fullConfig.config.credential_type || 'default',
           endpoint_url: fullConfig.config.endpoint_url || '', // Preserve endpoint URL
-          aws_access_key_id: '', // Don't populate credentials
-          aws_secret_access_key: '', // Don't populate credentials
-          aws_session_token: '', // Don't populate credentials
           region: fullConfig.config.region || 'us-east-1',
-        });
+        };
+
+        // Only add credential fields if using manual credentials
+        if (fullConfig.config.credential_type === 'manual') {
+          s3FormData.aws_access_key_id = ''; // Don't populate credentials
+          s3FormData.aws_secret_access_key = ''; // Don't populate credentials
+          s3FormData.aws_session_token = ''; // Don't populate credentials
+        }
+
+        setEditFormData(s3FormData);
       }
       
       setEditError(null);
@@ -228,14 +239,28 @@ export default function ConnectionManager() {
 
     setEditError(null);
     try {
+      // Clean up the config before sending
+      let cleanedConfig = { ...editFormData };
+
+      // For S3 connections with 'default' credential type, remove manual credential fields
+      if (editingConnection.type === 's3' && 'credential_type' in cleanedConfig) {
+        const s3Config = cleanedConfig as S3Config;
+        if (s3Config.credential_type === 'default') {
+          // Remove credential fields when using default credential chain
+          delete s3Config.aws_access_key_id;
+          delete s3Config.aws_secret_access_key;
+          delete s3Config.aws_session_token;
+        }
+      }
+
       const updateConfig: ConnectionConfig = {
         name: editConnectionName,
         type: editingConnection.type as ConnectionType,
-        config: editFormData,
+        config: cleanedConfig,
       };
 
       await updateConnection(editingConnection.id, updateConfig);
-      
+
       setEditDialogOpen(false);
       setEditingConnection(null);
     } catch (err: any) {
@@ -343,7 +368,7 @@ export default function ConnectionManager() {
                   <TableRow key={connection.id}>
                     <TableCell className="font-medium">{connection.name}</TableCell>
                     <TableCell>
-                      <Badge variant={getTypeBadgeVariant(connection.type)}>
+                      <Badge variant="outline" className={getConnectionTypeBadgeClasses(connection.type)}>
                         {connection.type}
                       </Badge>
                     </TableCell>

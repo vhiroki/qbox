@@ -69,10 +69,16 @@ export default function ConnectionFormFields({
           onChange={(e) => onNameChange(e.target.value)}
           required={nameRequired}
           placeholder={connectionType === 's3' ? 'My S3 Bucket' : 'My Database'}
+          disabled={typeReadOnly}
         />
         {identifierPreview && (
           <p className="text-xs text-muted-foreground">
             SQL identifier: <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">{identifierPreview}</code>
+          </p>
+        )}
+        {typeReadOnly && (
+          <p className="text-xs text-yellow-600 dark:text-yellow-500">
+            Connection name cannot be changed as it would break existing queries that reference this connection.
           </p>
         )}
       </div>

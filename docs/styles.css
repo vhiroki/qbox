@@ -1,22 +1,22 @@
-/* QBox Landing Page - Distinctive dark theme with amber accents */
+/* QBox Landing Page - Warm dark theme with amber accents (Cursor-inspired) */
 
 :root {
-    --bg-primary: #0a0a0b;
-    --bg-secondary: #111113;
-    --bg-tertiary: #18181b;
-    --bg-card: #141416;
-    
-    --text-primary: #fafafa;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
-    
+    --bg-primary: #14120b;
+    --bg-secondary: #1b1913;
+    --bg-tertiary: #201e18;
+    --bg-card: #1d1b15;
+
+    --text-primary: #edecec;
+    --text-secondary: #d7d6d5;
+    --text-muted: #a8a7a5;
+
     --accent: #f59e0b;
     --accent-light: #fbbf24;
     --accent-dark: #d97706;
     --accent-glow: rgba(245, 158, 11, 0.15);
-    
-    --border: rgba(255, 255, 255, 0.08);
-    --border-light: rgba(255, 255, 255, 0.12);
+
+    --border: #26241e;
+    --border-light: #2e2c25;
     
     --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
@@ -103,7 +103,7 @@ body {
     z-index: 100;
     padding: 1rem 2rem;
     backdrop-filter: blur(12px);
-    background: rgba(10, 10, 11, 0.8);
+    background: rgba(20, 18, 11, 0.8);
     border-bottom: 1px solid var(--border);
 }
 

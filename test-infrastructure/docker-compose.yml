@@ -1,0 +1,71 @@
+version: '3.8'
+
+# QBox Test Infrastructure
+# Purpose: Simulate data sources (PostgreSQL databases and S3) for testing QBox connections
+# Usage: docker compose up -d
+
+services:
+  # PostgreSQL database for testing
+  postgres:
+    image: postgres:16-alpine
+    container_name: qbox-test-postgres
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Second PostgreSQL instance for multi-connection testing
+  postgres2:
+    image: postgres:16-alpine
+    container_name: qbox-test-postgres2
+    environment:
+      POSTGRES_USER: testuser2
+      POSTGRES_PASSWORD: testpass2
+      POSTGRES_DB: testdb2
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres2_data:/var/lib/postgresql/data
+      - ./init-scripts/init-postgres2.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser2 -d testdb2"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # LocalStack for S3 testing
+  localstack:
+    image: localstack/localstack:latest
+    container_name: qbox-test-localstack
+    ports:
+      - "4566:4566"  # LocalStack gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - SERVICES=s3
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ./init-scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "awslocal", "s3", "ls"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  postgres2_data:

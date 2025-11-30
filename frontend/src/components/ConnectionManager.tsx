@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import type { SavedConnection, PostgresConfig, S3Config, ConnectionConfig, ConnectionType } from '../types';
 import { api } from '../services/api';
 import { useConnectionStore } from '../stores';
+import { generateDuckDBIdentifier } from '../utils/identifier';
+import { getConnectionTypeBadgeClasses } from '@/constants/connectionColors';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,8 +64,6 @@ export default function ConnectionManager() {
     schemas: 'public',
   });
   const [createConnectionName, setCreateConnectionName] = useState('');
-  const [createConnectionAlias, setCreateConnectionAlias] = useState('');
-  const [isCreateAliasValid, setIsCreateAliasValid] = useState(true);
   const [createError, setCreateError] = useState<string | null>(null);
   
   // Edit dialog state
@@ -78,7 +78,6 @@ export default function ConnectionManager() {
     schemas: 'public',
   });
   const [editConnectionName, setEditConnectionName] = useState('');
-  const [editConnectionAlias, setEditConnectionAlias] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
 
   // Delete dialog state
@@ -104,17 +103,6 @@ export default function ConnectionManager() {
     return prefixMap[type] || "db";
   };
 
-  // Helper function to get connection type badge variant
-  const getTypeBadgeVariant = (type: string): "default" | "secondary" | "destructive" | "outline" => {
-    const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      postgres: "default",
-      s3: "secondary",
-      mysql: "outline",
-      oracle: "outline",
-      dynamodb: "outline",
-    };
-    return variantMap[type] || "outline";
-  };
 
   // Filter connections by type
   const filteredConnections = typeFilter === "all"
@@ -123,7 +111,6 @@ export default function ConnectionManager() {
 
   const handleCreate = () => {
     setCreateConnectionName('');
-    setCreateConnectionAlias('');
     setCreateConnectionType('postgres');
     setCreateFormData({
       host: 'localhost',
@@ -163,11 +150,24 @@ export default function ConnectionManager() {
   const handleCreateSubmit = async () => {
     setCreateError(null);
     try {
+      // Clean up the config before sending
+      let cleanedConfig = { ...createFormData };
+
+      // For S3 connections with 'default' credential type, remove manual credential fields
+      if (createConnectionType === 's3' && 'credential_type' in cleanedConfig) {
+        const s3Config = cleanedConfig as S3Config;
+        if (s3Config.credential_type === 'default') {
+          // Remove credential fields when using default credential chain
+          delete s3Config.aws_access_key_id;
+          delete s3Config.aws_secret_access_key;
+          delete s3Config.aws_session_token;
+        }
+      }
+
       const config: ConnectionConfig = {
         name: createConnectionName,
         type: createConnectionType,
-        config: createFormData,
-        alias: createConnectionAlias || undefined,
+        config: cleanedConfig,
       };
 
       await createConnection(config);
@@ -182,11 +182,9 @@ export default function ConnectionManager() {
   const handleEdit = async (connection: SavedConnection) => {
     try {
       const fullConfig = await api.getSavedConnection(connection.id);
-      
+
       setEditingConnection(connection);
       setEditConnectionName(fullConfig.name);
-      // Show the actual alias (should always exist after creation)
-      setEditConnectionAlias(fullConfig.alias || '');
       
       // Set form data based on connection type
       if (fullConfig.type === 'postgres') {
@@ -210,14 +208,22 @@ export default function ConnectionManager() {
           schemas: schemasValue,
         });
       } else if (fullConfig.type === 's3') {
-        setEditFormData({
+        // Only include credential fields if credential_type is 'manual'
+        const s3FormData: S3Config = {
           bucket: fullConfig.config.bucket || '',
           credential_type: fullConfig.config.credential_type || 'default',
-          aws_access_key_id: '', // Don't populate credentials
-          aws_secret_access_key: '', // Don't populate credentials
-          aws_session_token: '', // Don't populate credentials
+          endpoint_url: fullConfig.config.endpoint_url || '', // Preserve endpoint URL
           region: fullConfig.config.region || 'us-east-1',
-        });
+        };
+
+        // Only add credential fields if using manual credentials
+        if (fullConfig.config.credential_type === 'manual') {
+          s3FormData.aws_access_key_id = ''; // Don't populate credentials
+          s3FormData.aws_secret_access_key = ''; // Don't populate credentials
+          s3FormData.aws_session_token = ''; // Don't populate credentials
+        }
+
+        setEditFormData(s3FormData);
       }
       
       setEditError(null);
@@ -233,15 +239,28 @@ export default function ConnectionManager() {
 
     setEditError(null);
     try {
+      // Clean up the config before sending
+      let cleanedConfig = { ...editFormData };
+
+      // For S3 connections with 'default' credential type, remove manual credential fields
+      if (editingConnection.type === 's3' && 'credential_type' in cleanedConfig) {
+        const s3Config = cleanedConfig as S3Config;
+        if (s3Config.credential_type === 'default') {
+          // Remove credential fields when using default credential chain
+          delete s3Config.aws_access_key_id;
+          delete s3Config.aws_secret_access_key;
+          delete s3Config.aws_session_token;
+        }
+      }
+
       const updateConfig: ConnectionConfig = {
         name: editConnectionName,
         type: editingConnection.type as ConnectionType,
-        config: editFormData,
-        alias: editConnectionAlias || undefined,
+        config: cleanedConfig,
       };
 
       await updateConnection(editingConnection.id, updateConfig);
-      
+
       setEditDialogOpen(false);
       setEditingConnection(null);
     } catch (err: any) {
@@ -337,7 +356,7 @@ export default function ConnectionManager() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Alias</TableHead>
+                  <TableHead>SQL Identifier</TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Last Updated</TableHead>
@@ -349,18 +368,14 @@ export default function ConnectionManager() {
                   <TableRow key={connection.id}>
                     <TableCell className="font-medium">{connection.name}</TableCell>
                     <TableCell>
-                      <Badge variant={getTypeBadgeVariant(connection.type)}>
+                      <Badge variant="outline" className={getConnectionTypeBadgeClasses(connection.type)}>
                         {connection.type}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      {connection.alias ? (
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                          {getTypePrefix(connection.type)}_{connection.alias}
-                        </code>
-                      ) : (
-                        <span className="text-muted-foreground italic">auto</span>
-                      )}
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {generateDuckDBIdentifier(connection.name)}
+                      </code>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {connection.id.substring(0, 8)}...
@@ -401,25 +416,22 @@ export default function ConnectionManager() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Edit Connection</DialogTitle>
             <DialogDescription>
               Update the connection details. Leave sensitive fields blank to keep existing values.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
             <ConnectionFormFields
               connectionType={editingConnection?.type as ConnectionType}
               connectionName={editConnectionName}
-              connectionAlias={editConnectionAlias}
               formData={editFormData}
               onNameChange={setEditConnectionName}
-              onAliasChange={setEditConnectionAlias}
               onFormDataChange={(updates) => setEditFormData({ ...editFormData, ...updates })}
               showPasswordPlaceholder={true}
-              aliasReadOnly={true}
               typeReadOnly={true}
             />
 
@@ -430,7 +442,7 @@ export default function ConnectionManager() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
@@ -443,25 +455,22 @@ export default function ConnectionManager() {
 
       {/* Create Connection Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Create New Connection</DialogTitle>
             <DialogDescription>
               Configure a new data source connection.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
             <ConnectionFormFields
               connectionType={createConnectionType}
               connectionName={createConnectionName}
-              connectionAlias={createConnectionAlias}
               formData={createFormData}
               onTypeChange={handleConnectionTypeChange}
               onNameChange={setCreateConnectionName}
-              onAliasChange={setCreateConnectionAlias}
               onFormDataChange={(updates) => setCreateFormData({ ...createFormData, ...updates })}
-              onValidationChange={setIsCreateAliasValid}
             />
 
             {createError && (
@@ -471,11 +480,11 @@ export default function ConnectionManager() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateSubmit} disabled={isLoading || !isCreateAliasValid}>
+            <Button onClick={handleCreateSubmit} disabled={isLoading}>
               Create Connection
             </Button>
           </DialogFooter>

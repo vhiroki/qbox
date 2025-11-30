@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Trash2, Save } from "lucide-react";
+import { Settings, Trash2, Save, Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTheme } from "@/components/theme-provider";
 import { api } from "../services/api";
 import type { AISettings, AISettingsUpdate } from "../types";
 
@@ -36,6 +38,7 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const { theme, setTheme } = useTheme();
   
   // AI Settings state
   const [aiSettings, setAISettings] = useState<AISettings>({
@@ -142,7 +145,7 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
             Settings
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
           <DialogHeader>
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
@@ -150,20 +153,72 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert className="border-green-500 bg-green-500/10 text-green-600">
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
+          <Tabs defaultValue="appearance" className="py-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
+              <TabsTrigger value="ai">AI Configuration</TabsTrigger>
+              <TabsTrigger value="data">Data Management</TabsTrigger>
+            </TabsList>
 
-            {/* AI Configuration Section */}
-            <div className="space-y-4">
+            {/* Appearance Tab */}
+            <TabsContent value="appearance" className="space-y-4 mt-4">
+              <div>
+                <h3 className="text-sm font-medium mb-1">Appearance</h3>
+                <p className="text-sm text-muted-foreground">
+                  Customize how QBox looks on your device.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Theme</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={theme === "light" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("light")}
+                    className="flex-1"
+                  >
+                    <Sun className="h-4 w-4 mr-2" />
+                    Light
+                  </Button>
+                  <Button
+                    variant={theme === "dark" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("dark")}
+                    className="flex-1"
+                  >
+                    <Moon className="h-4 w-4 mr-2" />
+                    Dark
+                  </Button>
+                  <Button
+                    variant={theme === "system" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTheme("system")}
+                    className="flex-1"
+                  >
+                    <Monitor className="h-4 w-4 mr-2" />
+                    System
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Select your preferred theme or use system settings.
+                </p>
+              </div>
+            </TabsContent>
+
+            {/* AI Configuration Tab */}
+            <TabsContent value="ai" className="space-y-4 mt-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              {success && (
+                <Alert className="border-green-500 bg-green-500/10 text-green-600">
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
+
               <div>
                 <h3 className="text-sm font-medium mb-1">AI Configuration</h3>
                 <p className="text-sm text-muted-foreground">
@@ -262,25 +317,47 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
                   </Button>
                 </div>
               )}
-            </div>
+            </TabsContent>
 
-            {/* Data Management Section */}
-            <div className="space-y-2 pt-4 border-t">
-              <h3 className="text-sm font-medium">Data Management</h3>
-              <p className="text-sm text-muted-foreground">
-                Clear all data to reset the application to its initial state.
-              </p>
-              <Button
-                variant="destructive"
-                onClick={() => setConfirmOpen(true)}
-                disabled={loading}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Clear All Data
-              </Button>
-            </div>
-          </div>
+            {/* Data Management Tab */}
+            <TabsContent value="data" className="space-y-4 mt-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div>
+                <h3 className="text-sm font-medium mb-1">Data Management</h3>
+                <p className="text-sm text-muted-foreground">
+                  Clear all data to reset the application to its initial state.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-3">
+                <h4 className="text-sm font-medium text-destructive">Danger Zone</h4>
+                <p className="text-sm text-muted-foreground">
+                  This action will permanently delete all your data including:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
+                  <li>All queries and their SQL</li>
+                  <li>All database connections</li>
+                  <li>All table selections</li>
+                  <li>All chat history</li>
+                  <li>All cached data</li>
+                </ul>
+                <Button
+                  variant="destructive"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={loading}
+                  className="w-full mt-4"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All Data
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

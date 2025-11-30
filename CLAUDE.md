@@ -2,6 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Important Development Guidelines](#important-development-guidelines)
+- [Common Commands](#common-commands)
+  - [Development](#development)
+  - [Linting and Formatting](#linting-and-formatting)
+  - [Ports (Development Mode)](#ports-development-mode)
+  - [Troubleshooting](#troubleshooting)
+- [Architecture](#architecture)
+  - [Backend Structure (Python + FastAPI)](#backend-structure-python--fastapi)
+  - [Frontend Structure (React + TypeScript + Electron)](#frontend-structure-react--typescript--electron)
+  - [Core Architectural Patterns](#core-architectural-patterns)
+  - [Extensible Data Sources](#extensible-data-sources)
+- [Code Style Standards](#code-style-standards)
+  - [Python](#python)
+  - [TypeScript/React/Electron](#typescriptreactelectron)
+  - [Prefer](#prefer)
+  - [Avoid](#avoid)
+- [Error Handling](#error-handling)
+- [Security](#security)
+- [Performance](#performance)
+- [Electron Desktop Architecture](#electron-desktop-architecture)
+
 ## Project Overview
 
 QBox is an Electron desktop application for building and managing SQL queries across multiple data sources. It features PostgreSQL connections, AI-powered chat for SQL building, table selection with metadata, and query execution using DuckDB. The app runs locally with a bundled Python backend - no external servers required.
@@ -10,10 +34,25 @@ QBox is an Electron desktop application for building and managing SQL queries ac
 
 **Tech Stack:**
 - **Desktop**: Electron 39+ with Electron Forge, auto-update support, bundled backend
-- **Backend**: Python 3.13+, FastAPI, DuckDB, SQLite, uvicorn, uv
+- **Backend**: Python 3.11+, FastAPI, DuckDB, SQLite, uvicorn, uv
 - **Frontend**: React 18, TypeScript 5+, Vite, TailwindCSS 4, shadcn/ui, Zustand
 - **Build**: PyInstaller for backend bundling, Electron Forge for packaging
 - **Platform**: macOS (Intel + Apple Silicon), Windows (x64), Linux (x64)
+
+## Important Development Guidelines
+
+**Build and Testing:**
+- **DO NOT** attempt to build the backend or frontend after making changes
+- The user will test all changes independently
+- Focus on making code changes without running build commands
+
+**Documentation Updates:**
+- **ALWAYS** update relevant documentation when making major changes
+- Update both [CLAUDE.md](CLAUDE.md) (development guide) and [README.md](README.md) (user-facing documentation)
+- Update specialized README files when changing those areas:
+  - [frontend/assets/icons/README.md](frontend/assets/icons/README.md) for icon changes
+  - [backend/app/connections/README.md](backend/app/connections/README.md) for connection system changes
+- Keep documentation in sync with code changes to maintain accuracy
 
 ## Common Commands
 
@@ -76,7 +115,7 @@ ruff check app/                       # Lint code
 **TypeScript:**
 ```bash
 cd frontend
-pnpm lint                             # Run ESLint
+npm run lint                          # Run ESLint
 ```
 
 ### Ports (Development Mode)
@@ -124,7 +163,7 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 
 **Persistent Storage:**
 - `~/.qbox/connections.db` - SQLite database with:
-  - `connections` table: Connection configurations (id, name, type, config JSON, alias, timestamps)
+  - `connections` table: Connection configurations (id, name, type, config JSON, timestamps)
   - `queries` table: Query definitions (id, name, sql_text, created_at, updated_at)
   - `query_selections` table: Selected tables (query_id, connection_id, schema_name, table_name, source_type)
   - `query_chat_history` table: Chat messages (id, query_id, role, message, created_at)
@@ -162,12 +201,16 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 
 **DuckDB Manager (Persistent Query Engine):**
 - Single persistent instance at `~/.qbox/qbox.duckdb`
-- Attaches PostgreSQL databases with aliases: `pg_{connection_id_with_underscores}`
-- Registers CSV/Excel files as views
-- Attaches S3 buckets with httpfs extension
+- **PostgreSQL**: Attaches databases with identifiers derived from connection names
+  - Example: Connection "My Database" → `ATTACH AS my_database`
+  - Tables referenced as: `my_database.schema.table`
+- **S3**: Creates schema and secret for each connection
+  - Example: Connection "Production S3" → `CREATE SCHEMA production_s3` + `CREATE SECRET production_s3`
+  - Files referenced as: `production_s3.sales_2024` (schema-qualified views)
+- **CSV/Excel files**: Registered as flat views without schema prefix
+  - Example: `file_sales_data`
 - Uses system functions for metadata: `duckdb_schemas()`, `duckdb_tables()`, `duckdb_columns()`
-- Important: Aliases must use underscores (not hyphens) to avoid SQL identifier errors
-- Example: Connection ID `abc123-def456` → alias `pg_abc123_def456`
+- Important: Identifiers use underscores (not hyphens) to avoid SQL identifier errors
 
 **Repository Pattern:**
 - Separate repositories for connections, queries, and files

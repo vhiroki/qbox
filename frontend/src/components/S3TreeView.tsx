@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useConnectionStore } from "@/stores/useConnectionStore";
 import { api } from "@/services/api";
+import { SOURCE_TYPE_ICON_COLORS } from "@/constants/connectionColors";
 import type { QueryTableSelection } from "@/types";
 
 interface S3TreeViewProps {
@@ -79,13 +80,17 @@ export default function S3TreeView({
   const loadedFoldersRef = useRef<Set<string>>(new Set());
   // Debounce timer for prefix filter
   const filterTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track if we've already attempted to load connections
+  const hasAttemptedLoadRef = useRef(false);
 
   // Load connections on mount if not already loaded
   useEffect(() => {
-    if (connections.length === 0 && !isLoadingConnections) {
+    if (!hasAttemptedLoadRef.current && connections.length === 0 && !isLoadingConnections) {
+      hasAttemptedLoadRef.current = true;
       loadConnections();
     }
-  }, [connections.length, isLoadingConnections, loadConnections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections.length, isLoadingConnections]);
 
   // Auto-expand connections with selected files
   useEffect(() => {
@@ -471,9 +476,7 @@ export default function S3TreeView({
             className="flex-shrink-0"
           />
           
-          <FileText className={`h-3.5 w-3.5 flex-shrink-0 ${
-            node.is_structured ? "text-blue-500" : "text-muted-foreground"
-          }`} />
+          <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
           
           <span className={`text-sm truncate ${!node.is_structured && "text-muted-foreground"}`}>
             {node.name}
@@ -575,7 +578,7 @@ export default function S3TreeView({
                     <div key={connection.id} className="mb-4">
                       {/* Connection header - not expandable in filtered view */}
                       <div className="flex items-center gap-2 py-2 px-2 rounded font-medium bg-accent/50">
-                        <Cloud className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                        <Cloud className={`h-4 w-4 flex-shrink-0 ${SOURCE_TYPE_ICON_COLORS.s3}`} />
                         <span className="text-sm truncate flex-1">{connection.name}</span>
                         {selectedCount > 0 && (
                           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex-shrink-0">
@@ -624,7 +627,7 @@ export default function S3TreeView({
                     ) : (
                       <ChevronRight className="h-4 w-4 flex-shrink-0" />
                     )}
-                    <Cloud className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                    <Cloud className={`h-4 w-4 flex-shrink-0 ${SOURCE_TYPE_ICON_COLORS.s3}`} />
                     <span className="text-sm truncate flex-1">{connection.name}</span>
                     {selectedCount > 0 && (
                       <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex-shrink-0">

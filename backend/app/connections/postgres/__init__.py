@@ -166,13 +166,12 @@ class PostgresConnection(BaseConnection):
         
         return metadata
 
-    def attach_to_duckdb(self, duckdb_manager, custom_alias: Optional[str] = None) -> str:
+    def attach_to_duckdb(self, duckdb_manager) -> str:
         """Attach PostgreSQL connection to DuckDB for query execution."""
         return duckdb_manager.attach_postgres(
             connection_id=self.connection_id,
             connection_name=self.connection_name,
             config=self.postgres_config,
-            custom_alias=custom_alias,
         )
 
     async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
@@ -199,7 +198,7 @@ class PostgresConnection(BaseConnection):
     async def cleanup(self, duckdb_manager) -> None:
         """Cleanup PostgreSQL connection from DuckDB."""
         # For PostgreSQL, we detach from the persistent DuckDB instance
-        identifier = duckdb_manager.get_attached_alias(self.connection_id)
+        identifier = duckdb_manager.get_attached_identifier(self.connection_id)
         if identifier:
             duckdb_manager.detach_source(identifier)
             duckdb_manager.remove_connection_from_cache(self.connection_id)

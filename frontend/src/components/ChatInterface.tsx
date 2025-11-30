@@ -1,43 +1,97 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import type { Query } from "../types";
 import { useQueryStore } from "../stores";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { ScrollArea } from "./ui/scroll-area";
-import { AlertCircle, Loader2, Send, RotateCcw, Copy, Check, ChevronRight } from "lucide-react";
+import { AlertCircle, Loader2, Send, RotateCcw, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
 interface ChatInterfaceProps {
   query: Query;
   onSQLChange?: (sqlText: string) => void;
-  onCollapse?: () => void;
+  pendingMessage?: string | null;
+  onMessageSent?: () => void;
 }
 
-export default function ChatInterface({
+export interface ChatInterfaceRef {
+  sendMessage: (message: string) => void;
+}
+
+const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   query,
   onSQLChange,
-  onCollapse,
-}: ChatInterfaceProps) {
-  // Zustand store
+  pendingMessage,
+  onMessageSent,
+}, ref) => {
+  // Zustand store - only use chat-specific state, not global error
   const sendChatMessage = useQueryStore((state) => state.sendChatMessage);
   const retryChatMessage = useQueryStore((state) => state.retryChatMessage);
   const loadChatHistory = useQueryStore((state) => state.loadChatHistory);
   const clearChatHistory = useQueryStore((state) => state.clearChatHistory);
   const queryChatHistory = useQueryStore((state) => state.queryChatHistory);
-  const isLoading = useQueryStore((state) => state.isLoading);
-  const storeError = useQueryStore((state) => state.error);
+  const setDraftMessage = useQueryStore((state) => state.setDraftMessage);
+  const queryDraftMessages = useQueryStore((state) => state.queryDraftMessages);
 
-  const [userMessage, setUserMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const loadedChatForQueryRef = useRef<string | null>(null);
 
   const chatHistory = queryChatHistory.get(query.id) || [];
+  const userMessage = queryDraftMessages.get(query.id) || '';
 
-  // Load chat history on mount
+  // Load chat history on mount or when switching queries
   useEffect(() => {
-    loadChatHistory(query.id);
+    // Only load if we haven't loaded for this query yet
+    if (loadedChatForQueryRef.current !== query.id) {
+      loadedChatForQueryRef.current = query.id;
+      loadChatHistory(query.id);
+    }
   }, [query.id, loadChatHistory]);
+
+  // Handle pending messages from parent
+  useEffect(() => {
+    if (pendingMessage && !isSending) {
+      setDraftMessage(query.id, pendingMessage);
+      // Auto-send the message
+      const sendPendingMessage = async () => {
+        const messageText = pendingMessage;
+        setError(null);
+        setDraftMessage(query.id, ""); // Clear input
+        setIsSending(true);
+
+        try {
+          const response = await sendChatMessage(query.id, messageText);
+
+          // Notify parent of SQL change if callback provided
+          if (onSQLChange) {
+            onSQLChange(response.updatedSQL);
+          }
+
+          // Notify parent that message was sent
+          onMessageSent?.();
+        } catch (err: any) {
+          const errorMessage = err.response?.data?.detail || err.message || "Failed to process message. Please try again.";
+          setError(errorMessage);
+          // On error, restore the message so user can edit/retry
+          setDraftMessage(query.id, messageText);
+        } finally {
+          setIsSending(false);
+        }
+      };
+
+      sendPendingMessage();
+    }
+  }, [pendingMessage, isSending, sendChatMessage, query.id, onSQLChange, onMessageSent, setDraftMessage]);
+
+  // Expose method to parent component
+  useImperativeHandle(ref, () => ({
+    sendMessage: (message: string) => {
+      setDraftMessage(query.id, message);
+    },
+  }), [query.id, setDraftMessage]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -49,7 +103,8 @@ export default function ChatInterface({
 
     const messageText = userMessage;
     setError(null);
-    setUserMessage(""); // Clear input immediately for better UX
+    setDraftMessage(query.id, ""); // Clear input immediately for better UX
+    setIsSending(true);
 
     try {
       const response = await sendChatMessage(query.id, messageText);
@@ -60,12 +115,16 @@ export default function ChatInterface({
       }
     } catch (err: any) {
       // Don't restore message - retry button will be shown in chat history
-      setError(storeError || "Failed to process message. Please try again.");
+      const errorMessage = err.response?.data?.detail || err.message || "Failed to process message. Please try again.";
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleRetry = async (messageId: string) => {
     setError(null);
+    setIsSending(true);
     try {
       const response = await retryChatMessage(query.id, messageId);
 
@@ -74,7 +133,10 @@ export default function ChatInterface({
         onSQLChange(response.updatedSQL);
       }
     } catch (err: any) {
-      setError(storeError || "Failed to retry message. Please try again.");
+      const errorMessage = err.response?.data?.detail || err.message || "Failed to retry message. Please try again.";
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -84,7 +146,8 @@ export default function ChatInterface({
     try {
       await clearChatHistory(query.id);
     } catch (err: any) {
-      setError(storeError || "Failed to clear chat history. Please try again.");
+      const errorMessage = err.response?.data?.detail || err.message || "Failed to clear chat history. Please try again.";
+      setError(errorMessage);
     }
   };
 
@@ -104,31 +167,18 @@ export default function ChatInterface({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <h3 className="text-sm font-medium">Chat with AI</h3>
-        <div className="flex items-center gap-2">
-          {chatHistory.length > 0 && (
-            <Button
-              onClick={handleClearChat}
-              size="sm"
-              variant="ghost"
-              className="text-xs"
-            >
-              Clear History
-            </Button>
-          )}
-          {onCollapse && (
-            <Button
-              onClick={onCollapse}
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0"
-              title="Collapse chat panel"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        {chatHistory.length > 0 && (
+          <Button
+            onClick={handleClearChat}
+            size="sm"
+            variant="ghost"
+            className="text-xs"
+          >
+            Clear History
+          </Button>
+        )}
       </div>
 
       {/* Messages */}
@@ -214,7 +264,7 @@ export default function ChatInterface({
       <div className="flex gap-2 flex-shrink-0">
         <Textarea
           value={userMessage}
-          onChange={(e) => setUserMessage(e.target.value)}
+          onChange={(e) => setDraftMessage(query.id, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -223,15 +273,15 @@ export default function ChatInterface({
           }}
           placeholder="Ask AI to modify your SQL query... (Shift+Enter for new line)"
           className="flex-1 min-h-[60px] max-h-[120px] resize-none"
-          disabled={isLoading}
+          disabled={isSending}
         />
         <Button
           onClick={handleSendMessage}
-          disabled={isLoading || !userMessage.trim()}
+          disabled={isSending || !userMessage.trim()}
           size="icon"
           className="h-[60px] w-[60px]"
         >
-          {isLoading ? (
+          {isSending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />
@@ -240,4 +290,8 @@ export default function ChatInterface({
       </div>
     </div>
   );
-}
+});
+
+ChatInterface.displayName = "ChatInterface";
+
+export default ChatInterface;

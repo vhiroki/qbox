@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown, Pencil, Play, History, X, Copy, Check, ChevronLeft } from "lucide-react";
-import Editor, { type OnMount } from "@monaco-editor/react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Trash2, ChevronDown, Pencil, Play, History, PanelRightClose, PanelRight } from "lucide-react";
+import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
+import { useTheme } from "./theme-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -26,50 +25,28 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useQueryStore } from "../stores";
 import { api } from "../services/api";
-import ChatInterface from "./ChatInterface";
 import QueryResults from "./QueryResults";
 import SQLHistoryModal from "./SQLHistoryModal";
-import DataSourcesPanel from "./DataSourcesPanel";
+import RightSidePanel, { type RightSidePanelRef } from "./RightSidePanel";
 
 interface QueryDetailProps {
   queryId: string;
   onQueryDeleted: () => void;
+  autoFocusRename?: boolean;
+  onRenameComplete?: () => void;
 }
 
-/**
- * Generate a view name for an S3 file (matches backend logic in s3_service.py).
- * Format: s3_{sanitized_file_name}
- */
-function getS3ViewName(filePath: string): string {
-  // Get file name without extension
-  let fileName = filePath.split('/').pop() || filePath;
-  if (fileName.includes('.')) {
-    const parts = fileName.split('.');
-    parts.pop(); // Remove extension
-    fileName = parts.join('.');
-  }
-
-  // Sanitize file name (keep only alphanumeric and underscores)
-  const fileNameSafe = fileName.replace(/[^a-zA-Z0-9_]/g, '_');
-
-  return `s3_${fileNameSafe}`;
-}
+const HORIZONTAL_LAYOUT_KEY = 'qbox-query-horizontal-layout';
+const VERTICAL_LAYOUT_KEY = 'qbox-query-vertical-layout';
 
 export default function QueryDetail({
   queryId,
   onQueryDeleted,
+  autoFocusRename = false,
+  onRenameComplete,
 }: QueryDetailProps) {
   // Zustand stores
   const queries = useQueryStore((state) => state.queries);
@@ -79,9 +56,17 @@ export default function QueryDetail({
   const deleteQuery = useQueryStore((state) => state.deleteQuery);
   const loadQuerySelections = useQueryStore((state) => state.loadQuerySelections);
   const querySelections = useQueryStore((state) => state.querySelections);
-  const queryError = useQueryStore((state) => state.error);
   const isQueryLoading = useQueryStore((state) => state.isLoading);
-  const setQueryError = useQueryStore((state) => state.setError);
+  
+  // Local error state for query detail operations (rename, delete, selection changes)
+  const [localError, setLocalError] = useState<string | null>(null);
+  
+  // Theme for Monaco editor
+  const { theme } = useTheme();
+  const resolvedTheme = theme === "system" 
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme;
+  const monacoTheme = resolvedTheme === "dark" ? "qbox-dark" : "qbox-light";
 
   // Query execution state from store
   const getQueryExecutionState = useQueryStore((state) => state.getQueryExecutionState);
@@ -90,7 +75,8 @@ export default function QueryDetail({
 
   // Local UI state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const [removeSelectionDialogOpen, setRemoveSelectionDialogOpen] = useState(false);
   const [selectionToRemove, setSelectionToRemove] = useState<{
     connectionId: string;
@@ -99,18 +85,36 @@ export default function QueryDetail({
     sourceType: string;
     label: string;
   } | null>(null);
-  const [newQueryName, setNewQueryName] = useState("");
   const [sqlText, setSqlText] = useState("");
   const [sqlHistoryModalOpen, setSqlHistoryModalOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isChatPanelCollapsed, setIsChatPanelCollapsed] = useState(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
-  // Monaco Editor ref for keyboard shortcuts
+  // Load saved panel layouts
+  const savedHorizontalLayout = localStorage.getItem(HORIZONTAL_LAYOUT_KEY);
+  const defaultHorizontalSizes = savedHorizontalLayout ? JSON.parse(savedHorizontalLayout) : [60, 40];
+  const savedVerticalLayout = localStorage.getItem(VERTICAL_LAYOUT_KEY);
+  const defaultVerticalSizes = savedVerticalLayout ? JSON.parse(savedVerticalLayout) : [60, 40];
+
+  // Save panel layouts on resize
+  const handleHorizontalLayoutChange = useCallback((sizes: number[]) => {
+    localStorage.setItem(HORIZONTAL_LAYOUT_KEY, JSON.stringify(sizes));
+  }, []);
+
+  const handleVerticalLayoutChange = useCallback((sizes: number[]) => {
+    localStorage.setItem(VERTICAL_LAYOUT_KEY, JSON.stringify(sizes));
+  }, []);
+
+  // Refs
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
   const isExecutingRef = useRef(isExecuting);
   const sqlTextRef = useRef(sqlText);
   const handleExecuteQueryRef = useRef<(() => void) | null>(null);
+  const lastAutoFocusedQueryIdRef = useRef<string | null>(null);
+  const rightSidePanelRef = useRef<RightSidePanelRef>(null);
+  const loadedSelectionsForQueryRef = useRef<string | null>(null);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -138,14 +142,17 @@ export default function QueryDetail({
   const [fileInfoMap, setFileInfoMap] = useState<Map<string, { name: string; viewName: string }>>(new Map());
   
   // Store connection info for displaying full qualified names
-  const [connectionInfoMap, setConnectionInfoMap] = useState<Map<string, { name: string; alias: string }>>(new Map());
+  const [connectionInfoMap, setConnectionInfoMap] = useState<Map<string, { name: string }>>(new Map());
   
-  // Track which badge was copied (for showing checkmark feedback)
-  const [copiedBadge, setCopiedBadge] = useState<string | null>(null);
-
   useEffect(() => {
+    setLocalError(null); // Clear local error when switching queries
     selectQuery(queryId);
-    loadQuerySelections(queryId);
+
+    // Only load selections if we haven't loaded them for this query yet
+    if (loadedSelectionsForQueryRef.current !== queryId) {
+      loadedSelectionsForQueryRef.current = queryId;
+      loadQuerySelections(queryId);
+    }
   }, [queryId, selectQuery, loadQuerySelections]);
 
   // Load file info for file selections to get view names
@@ -182,35 +189,37 @@ export default function QueryDetail({
     loadFileInfo();
   }, [query, selections]);
 
-  // Load connection info for database selections to get aliases
+  // Load connection info for database and S3 selections to get identifiers
   useEffect(() => {
     // Don't run if query doesn't exist (e.g., after deletion)
     if (!query) return;
 
     const loadConnectionInfo = async () => {
-      const connectionSelections = selections.filter((s) => s.source_type === "connection");
+      // Include both "connection" (databases) and "s3" selections
+      const connectionSelections = selections.filter(
+        (s) => s.source_type === "connection" || s.source_type === "s3"
+      );
       if (connectionSelections.length === 0) {
         setConnectionInfoMap(new Map());
         return;
       }
 
-      const newConnectionInfoMap = new Map<string, { name: string; alias: string }>();
-      
+      const newConnectionInfoMap = new Map<string, { name: string }>();
+
       // Get unique connection IDs
       const uniqueConnectionIds = [...new Set(connectionSelections.map((s) => s.connection_id))];
-      
+
       for (const connectionId of uniqueConnectionIds) {
         try {
           const connectionInfo = await api.getSavedConnection(connectionId);
           newConnectionInfoMap.set(connectionId, {
             name: connectionInfo.name,
-            alias: connectionInfo.alias || connectionInfo.name,
           });
         } catch (err) {
           console.error(`Failed to load connection info for ${connectionId}:`, err);
         }
       }
-      
+
       setConnectionInfoMap(newConnectionInfoMap);
     };
 
@@ -222,6 +231,34 @@ export default function QueryDetail({
       setSqlText(query.sql_text);
     }
   }, [query?.sql_text]);
+
+  // Auto-focus rename input when autoFocusRename is true (after creating a new query)
+  useEffect(() => {
+    // Only trigger if:
+    // 1. autoFocusRename is true (URL has ?rename=true)
+    // 2. query is loaded
+    // 3. We haven't already auto-focused this specific query
+    if (autoFocusRename && query && lastAutoFocusedQueryIdRef.current !== queryId) {
+      lastAutoFocusedQueryIdRef.current = queryId;
+      setEditedName(query.name);
+      setIsEditingName(true);
+      // Focus will happen via the other effect when isEditingName becomes true
+    }
+  }, [autoFocusRename, query, queryId]);
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditingName) {
+      // Use a small timeout to ensure the input is rendered and ready
+      const timer = setTimeout(() => {
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+          nameInputRef.current.select();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditingName]);
 
   // Auto-save SQL with debouncing (1 second after user stops typing)
   useEffect(() => {
@@ -240,17 +277,6 @@ export default function QueryDetail({
     return () => clearTimeout(timeoutId);
   }, [sqlText, query, updateQuerySQL]);
 
-  const handleCopyToClipboard = async (label: string, badgeKey: string) => {
-    try {
-      await navigator.clipboard.writeText(label);
-      setCopiedBadge(badgeKey);
-      // Reset after 2 seconds
-      setTimeout(() => setCopiedBadge(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
-    }
-  };
-
   const handleSelectionChange = async (
     connectionId: string,
     schemaName: string,
@@ -259,6 +285,7 @@ export default function QueryDetail({
     sourceType: string
   ) => {
     try {
+      setLocalError(null);
       if (checked) {
         // Add table
         await api.addQuerySelection(queryId, {
@@ -280,7 +307,7 @@ export default function QueryDetail({
       await loadQuerySelections(queryId);
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || "Failed to update table selection";
-      setQueryError(errorMsg);
+      setLocalError(errorMsg);
     }
   };
 
@@ -343,18 +370,47 @@ export default function QueryDetail({
     }
   };
 
+  const startEditing = () => {
+    if (query) {
+      setEditedName(query.name);
+      setIsEditingName(true);
+    }
+  };
+
+  const cancelEditing = () => {
+    setIsEditingName(false);
+    setEditedName("");
+    onRenameComplete?.();
+  };
+
   const handleRenameQuery = async () => {
-    if (!newQueryName.trim()) {
-      setQueryError("Query name cannot be empty");
+    if (!editedName.trim()) {
+      // If empty, revert to original name
+      cancelEditing();
       return;
     }
 
-    try {
-      await updateQueryName(queryId, newQueryName.trim());
-      setRenameDialogOpen(false);
-      setNewQueryName("");
-    } catch (err: any) {
-      // Error is already set in store
+    // Only update if name actually changed
+    if (query && editedName.trim() !== query.name) {
+      try {
+        await updateQueryName(queryId, editedName.trim());
+      } catch (err: any) {
+        // Error is already set in store
+      }
+    }
+    
+    setIsEditingName(false);
+    setEditedName("");
+    onRenameComplete?.();
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleRenameQuery();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEditing();
     }
   };
 
@@ -478,6 +534,75 @@ export default function QueryDetail({
     }
   };
 
+  const handleFixWithAI = (error: string) => {
+    // Expand right panel if collapsed
+    if (isRightPanelCollapsed) {
+      setIsRightPanelCollapsed(false);
+    }
+
+    // Send error message to chat with helpful context
+    const errorMessage = `I'm getting this error when running my query:\n\n${error}\n\nCan you help me fix it?`;
+    rightSidePanelRef.current?.sendChatMessage(errorMessage);
+  };
+
+  // Define custom themes before the editor mounts
+  const handleEditorWillMount: BeforeMount = (monaco) => {
+    // Define custom warm dark theme to match our app's aesthetic
+    monaco.editor.defineTheme('qbox-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: 'c678dd' },
+        { token: 'keyword.sql', foreground: 'c678dd' },
+        { token: 'string', foreground: '98c379' },
+        { token: 'string.sql', foreground: '98c379' },
+        { token: 'number', foreground: 'd19a66' },
+        { token: 'comment', foreground: '5c6370' },
+        { token: 'operator', foreground: '56b6c2' },
+        { token: 'identifier', foreground: 'e5c07b' },
+      ],
+      colors: {
+        'editor.background': '#1b1913',
+        'editor.foreground': '#edecec',
+        'editor.lineHighlightBackground': '#201e18',
+        'editor.selectionBackground': '#3a3830',
+        'editor.inactiveSelectionBackground': '#2a2820',
+        'editorCursor.foreground': '#f59e0b',
+        'editorLineNumber.foreground': '#5c5a52',
+        'editorLineNumber.activeForeground': '#a8a7a5',
+        'editorIndentGuide.background': '#26241e',
+        'editorIndentGuide.activeBackground': '#3a3830',
+        'editorGutter.background': '#1b1913',
+      },
+    });
+
+    // Define custom warm light theme
+    monaco.editor.defineTheme('qbox-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: 'a626a4' },
+        { token: 'keyword.sql', foreground: 'a626a4' },
+        { token: 'string', foreground: '50a14f' },
+        { token: 'string.sql', foreground: '50a14f' },
+        { token: 'number', foreground: '986801' },
+        { token: 'comment', foreground: 'a0a1a7' },
+        { token: 'operator', foreground: '0184bc' },
+        { token: 'identifier', foreground: 'c18401' },
+      ],
+      colors: {
+        'editor.background': '#fafafa',
+        'editor.foreground': '#0a0a0b',
+        'editor.lineHighlightBackground': '#f0f0f0',
+        'editor.selectionBackground': '#d0d0d0',
+        'editorCursor.foreground': '#b45309',
+        'editorLineNumber.foreground': '#a0a1a7',
+        'editorLineNumber.activeForeground': '#52525b',
+        'editorGutter.background': '#fafafa',
+      },
+    });
+  };
+
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
 
@@ -519,286 +644,175 @@ export default function QueryDetail({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="border-b bg-muted/10 p-4">
-        <div className="flex items-start justify-between">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <h2 className="text-2xl font-bold">{query.name}</h2>
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem
-                onClick={() => {
-                  setNewQueryName(query.name);
-                  setRenameDialogOpen(true);
-                }}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Rename Query
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setDeleteDialogOpen(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Query
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className="border-b p-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {isEditingName ? (
+              <Input
+                ref={nameInputRef}
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={handleRenameQuery}
+                onKeyDown={handleNameKeyDown}
+                className="text-sm font-semibold h-8 py-1 px-2 w-[250px]"
+                placeholder="Query name"
+                autoFocus
+              />
+            ) : (
+              <>
+                <h2 
+                  className="text-sm font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={startEditing}
+                  title="Click to rename"
+                >
+                  {query.name}
+                </h2>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-0.5 rounded hover:bg-muted transition-colors">
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={startEditing}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Rename Query
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setDeleteDialogOpen(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Query
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {localError && (
+              <Alert variant="destructive" className="py-1 px-2 text-xs">
+                <AlertDescription>{localError}</AlertDescription>
+              </Alert>
+            )}
+            <Button
+              onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              title={isRightPanelCollapsed ? "Show Tables & AI panel" : "Hide Tables & AI panel"}
+            >
+              {isRightPanelCollapsed ? (
+                <PanelRight className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
-
-        {queryError && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{queryError}</AlertDescription>
-          </Alert>
-        )}
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-4 relative">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* Left Panel - Tabs for SQL and Tables */}
-          <ResizablePanel defaultSize={isChatPanelCollapsed ? 100 : 65} minSize={40}>
+      <div className="flex-1 overflow-hidden p-4">
+        <ResizablePanelGroup direction="horizontal" className="h-full" onLayout={handleHorizontalLayoutChange}>
+          {/* Left Panel - SQL Editor and Results */}
+          <ResizablePanel defaultSize={isRightPanelCollapsed ? 100 : defaultHorizontalSizes[0]} minSize={40}>
             <div className="h-full pr-3">
-              <Tabs defaultValue="sql" className="h-full flex flex-col">
-                <TabsList className="w-full justify-start mb-4 flex-shrink-0">
-                  <TabsTrigger value="sql">SQL Query</TabsTrigger>
-                  <TabsTrigger value="tables">
-                    Tables ({selections.length})
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* SQL Query Tab */}
-                <TabsContent value="sql" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
-                  <ResizablePanelGroup direction="vertical" className="h-full">
-                    {/* SQL Editor Panel */}
-                    <ResizablePanel defaultSize={50} minSize={30}>
-                      <div className="h-full flex flex-col">
-                        <div className="flex items-center gap-3 mb-2 flex-shrink-0">
-                          <Button
-                            onClick={handleExecuteQuery}
-                            size="sm"
-                            disabled={isExecuting || !sqlText.trim()}
-                          >
-                            <Play className="h-3 w-3 mr-2" />
-                            Run Query
-                          </Button>
-                          <span className="text-xs text-muted-foreground">
-                            {window.navigator.platform.match("Mac") ? "⌘" : "Ctrl"}+Enter
-                          </span>
-                          <div className="flex-1" />
-                          <Button
-                            onClick={() => setSqlHistoryModalOpen(true)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <History className="h-3 w-3 mr-2" />
-                            History
-                          </Button>
-                        </div>
-                        <div className="flex-1 border rounded-md overflow-hidden">
-                          <Editor
-                            defaultLanguage="sql"
-                            value={sqlText}
-                            onChange={handleSQLChange}
-                            onMount={handleEditorDidMount}
-                            theme="vs-dark"
-                            options={{
-                              minimap: { enabled: false },
-                              fontSize: 14,
-                              lineNumbers: "on",
-                              scrollBeyondLastLine: false,
-                              automaticLayout: true,
-                              tabSize: 2,
-                              wordWrap: "on",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </ResizablePanel>
-
-                    <ResizableHandle withHandle />
-
-                    {/* Query Results Panel */}
-                    <ResizablePanel defaultSize={50} minSize={20}>
-                      <div className="h-full pt-2">
-                        <QueryResults
-                          result={executionState.result}
-                          isLoading={isExecuting}
-                          error={executionState.error}
-                          onPageChange={handlePageChange}
-                          onPageSizeChange={handlePageSizeChange}
-                          onExport={handleExportToCSV}
-                          isExporting={isExporting}
-                        />
-                      </div>
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
-                </TabsContent>
-
-                {/* Tables Tab - Tree View */}
-                <TabsContent value="tables" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
-                  <div className="h-full flex flex-col overflow-hidden">
-                    <div className="mb-3 flex-shrink-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">
-                          {selections.length} {selections.length === 1 ? "table" : "tables"} selected
-                        </h3>
-                      </div>
-                      {selections.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {selections.map((selection) => {
-                            let label: string;
-                            if (selection.source_type === "file") {
-                              const fileInfo = fileInfoMap.get(selection.connection_id);
-                              label = fileInfo?.viewName || selection.table_name;
-                            } else if (selection.source_type === "s3") {
-                              // Use S3 view name instead of full path
-                              label = getS3ViewName(selection.table_name);
-                            } else {
-                              // Database connection - use DuckDB alias format: pg_{sanitized_alias}
-                              const connectionInfo = connectionInfoMap.get(selection.connection_id);
-                              const alias = connectionInfo?.alias || selection.connection_id;
-                              const duckdbAlias = `pg_${alias.replace(/-/g, '_')}`;
-                              label = `${duckdbAlias}.${selection.schema_name}.${selection.table_name}`;
-                            }
-                            
-                            const badgeKey = `${selection.source_type}-${selection.connection_id}-${selection.schema_name}-${selection.table_name}`;
-                            const isCopied = copiedBadge === badgeKey;
-                            
-                            return (
-                              <Badge
-                                key={badgeKey}
-                                variant="secondary"
-                                className="pl-2 pr-1 py-0.5 text-xs gap-1"
-                              >
-                                <span className="truncate max-w-[400px]">{label}</span>
-                                <button
-                                  onClick={() => handleCopyToClipboard(label, badgeKey)}
-                                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
-                                  aria-label={`Copy ${label}`}
-                                  title="Copy to clipboard"
-                                >
-                                  {isCopied ? (
-                                    <Check className="h-3 w-3 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-3 w-3" />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleRemoveSelectionClick(
-                                      selection.connection_id,
-                                      selection.schema_name,
-                                      selection.table_name,
-                                      selection.source_type,
-                                      label
-                                    )
-                                  }
-                                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
-                                  aria-label={`Remove ${label}`}
-                                  title="Remove table"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      )}
+              <ResizablePanelGroup direction="vertical" className="h-full" onLayout={handleVerticalLayoutChange}>
+                {/* SQL Editor Panel */}
+                <ResizablePanel defaultSize={defaultVerticalSizes[0]} minSize={25}>
+                  <div className="h-full flex flex-col">
+                    <div className="flex items-center gap-3 mb-2 flex-shrink-0">
+                      <Button
+                        onClick={handleExecuteQuery}
+                        size="sm"
+                        disabled={isExecuting || !sqlText.trim()}
+                      >
+                        <Play className="h-3 w-3 mr-2" />
+                        Run Query
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {window.navigator.platform.match("Mac") ? "⌘" : "Ctrl"}+Enter
+                      </span>
+                      <div className="flex-1" />
+                      <Button
+                        onClick={() => setSqlHistoryModalOpen(true)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <History className="h-3 w-3 mr-2" />
+                        History
+                      </Button>
                     </div>
-                    <div className="flex-1 overflow-hidden">
-                      <DataSourcesPanel
-                        queryId={queryId}
-                        selections={selections}
-                        onSelectionChange={handleSelectionChange}
-                        onFileDeleted={handleFileDeleted}
+                    <div className="flex-1 border rounded-md overflow-hidden">
+                      <Editor
+                        defaultLanguage="sql"
+                        value={sqlText}
+                        onChange={handleSQLChange}
+                        beforeMount={handleEditorWillMount}
+                        onMount={handleEditorDidMount}
+                        theme={monacoTheme}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 13,
+                          lineNumbers: "on",
+                          scrollBeyondLastLine: false,
+                          automaticLayout: true,
+                          tabSize: 2,
+                          wordWrap: "on",
+                        }}
                       />
                     </div>
                   </div>
-                </TabsContent>
-              </Tabs>
+                </ResizablePanel>
+
+                <ResizableHandle withHandle />
+
+                {/* Query Results Panel */}
+                <ResizablePanel defaultSize={defaultVerticalSizes[1]} minSize={20}>
+                  <div className="h-full pt-2">
+                    <QueryResults
+                      result={executionState.result}
+                      isLoading={isExecuting}
+                      error={executionState.error}
+                      onPageChange={handlePageChange}
+                      onPageSizeChange={handlePageSizeChange}
+                      onExport={handleExportToCSV}
+                      isExporting={isExporting}
+                      onFixWithAI={handleFixWithAI}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </div>
           </ResizablePanel>
 
-          {!isChatPanelCollapsed && (
+          {!isRightPanelCollapsed && (
             <>
               <ResizableHandle withHandle />
 
-              {/* Right Panel - Chat */}
-              <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+              {/* Right Panel - Tables & AI Chat */}
+              <ResizablePanel defaultSize={defaultHorizontalSizes[1]} minSize={25} maxSize={55}>
                 <div className="h-full pl-3">
-                  <ChatInterface
+                  <RightSidePanel
+                    ref={rightSidePanelRef}
                     query={query}
-                    onSQLChange={(sql) => {
-                      setSqlText(sql);
-                    }}
-                    onCollapse={() => setIsChatPanelCollapsed(true)}
+                    queryId={queryId}
+                    selections={selections}
+                    onSQLChange={(sql) => setSqlText(sql)}
+                    onSelectionChange={handleSelectionChange}
+                    onFileDeleted={handleFileDeleted}
+                    onRemoveSelection={handleRemoveSelectionClick}
+                    fileInfoMap={fileInfoMap}
+                    connectionInfoMap={connectionInfoMap}
                   />
                 </div>
               </ResizablePanel>
             </>
           )}
         </ResizablePanelGroup>
-
-        {/* Floating expand button when chat is collapsed */}
-        {isChatPanelCollapsed && (
-          <Button
-            onClick={() => setIsChatPanelCollapsed(false)}
-            size="sm"
-            className="absolute top-4 right-4 z-10 shadow-lg"
-            title="Expand chat panel"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Chat with AI
-          </Button>
-        )}
       </div>
-
-      {/* Rename Dialog */}
-      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Query</DialogTitle>
-            <DialogDescription>
-              Enter a new name for this query.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="query-name">Query Name</Label>
-              <Input
-                id="query-name"
-                value={newQueryName}
-                onChange={(e) => setNewQueryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleRenameQuery();
-                  }
-                }}
-                placeholder="Enter query name"
-                autoFocus
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRenameDialogOpen(false);
-                setNewQueryName("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleRenameQuery} disabled={isQueryLoading || !newQueryName.trim()}>
-              Rename
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Query Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

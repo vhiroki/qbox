@@ -2,6 +2,8 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # Fix SSL certificates and HTTP compression for PyInstaller bundles
 # This must be done before any imports that use SSL/HTTP (httpx, openai, litellm, etc.)
@@ -42,13 +44,41 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import connections, files, metadata, query, s3
 from app.api import settings as settings_api
 from app.config.settings import get_settings
+from app.services.migration_service import run_migrations
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+# Get settings to configure logging
+settings = get_settings()
+
+# Configure logging with environment-based level
+log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+log_datefmt = "%Y-%m-%d %H:%M:%S"
+
+# Setup log directory
+log_dir = Path.home() / ".qbox" / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "qbox.log"
+
+# Configure root logger with both console and file handlers
+root_logger = logging.getLogger()
+root_logger.setLevel(log_level)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(log_level)
+console_handler.setFormatter(logging.Formatter(log_format, datefmt=log_datefmt))
+root_logger.addHandler(console_handler)
+
+# File handler with rotation (5MB per file, keep 3 backups)
+file_handler = RotatingFileHandler(
+    log_file,
+    maxBytes=5 * 1024 * 1024,  # 5MB
+    backupCount=3,
+    encoding="utf-8",
 )
+file_handler.setLevel(log_level)
+file_handler.setFormatter(logging.Formatter(log_format, datefmt=log_datefmt))
+root_logger.addHandler(file_handler)
 
 # Set specific loggers to appropriate levels
 logging.getLogger("uvicorn").setLevel(logging.INFO)
@@ -60,13 +90,30 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+# Create logger for main module
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     # Startup
     print("🚀 Starting QBox API...")
-    print("📊 Debug logging enabled for AI and metadata services")
+
+    # Run database migrations
+    print("🔄 Checking database migrations...")
+    try:
+        applied = run_migrations()
+        if applied > 0:
+            print(f"✅ Applied {applied} database migration(s)")
+        else:
+            print("✅ Database schema is up to date")
+    except Exception as e:
+        print(f"⚠️  WARNING: Migration error: {e}")
+        logger.exception("Migration failed")
+        # Continue startup - this ensures backward compatibility
+
+    logger.info(f"Logging level: {settings.LOG_LEVEL}")
     yield
     # Shutdown
     print("👋 Shutting down QBox API...")
@@ -79,9 +126,6 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-
-# Get settings
-settings = get_settings()
 
 # Configure CORS
 app.add_middleware(

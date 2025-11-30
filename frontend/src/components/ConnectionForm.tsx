@@ -23,13 +23,11 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
     schemas: '',
   });
   const [connectionName, setConnectionName] = useState('');
-  const [connectionAlias, setConnectionAlias] = useState('');
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [saveConnection, setSaveConnection] = useState(true);
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
   const [selectedSavedConnection, setSelectedSavedConnection] = useState<string>('');
-  const [isAliasValid, setIsAliasValid] = useState(true);
 
   // Load saved connections on mount
   useEffect(() => {
@@ -85,7 +83,6 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
         name: connectionName,
         type: 'postgres',
         config: formData,
-        alias: connectionAlias || undefined, // Send undefined if empty
       });
       setStatus(result);
       if (result.success && result.connection_id) {
@@ -97,7 +94,6 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
 
         // Reset form on success
         setConnectionName('');
-        setConnectionAlias('');
         setFormData({
           host: 'localhost',
           port: 5432,
@@ -147,13 +143,10 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
           <form onSubmit={handleSubmit} className="space-y-4">
             <ConnectionFormFields
               connectionName={connectionName}
-              connectionAlias={connectionAlias}
               formData={formData}
               onNameChange={setConnectionName}
-              onAliasChange={setConnectionAlias}
               onFormDataChange={(updates) => setFormData({ ...formData, ...updates })}
               nameRequired={true}
-              onValidationChange={setIsAliasValid}
             />
 
             <div className="flex items-center space-x-2">
@@ -167,7 +160,7 @@ export default function ConnectionForm({ onConnectionSuccess }: ConnectionFormPr
               </Label>
             </div>
 
-            <Button type="submit" disabled={loading || !isAliasValid} className="w-full">
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Connecting...' : 'Connect'}
             </Button>
           </form>

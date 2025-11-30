@@ -1,0 +1,7 @@
+campaign_id,campaign_name,start_date,end_date,budget,spent,leads_generated,conversions,roi_pct
+1,Spring Sale 2024,2024-03-01,2024-03-31,50000,48500,2500,450,185.5
+2,Email Nurture Q1,2024-01-01,2024-03-31,25000,24800,1200,280,210.3
+3,Social Media Boost,2024-02-01,2024-02-28,30000,29500,1800,320,195.8
+4,Partner Referral,2024-01-15,2024-04-15,40000,38900,950,420,325.7
+5,Product Launch,2024-03-15,2024-04-15,75000,73200,3200,580,165.2
+6,Retargeting Campaign,2024-02-01,2024-03-31,20000,19500,800,210,245.6

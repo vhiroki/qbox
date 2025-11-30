@@ -2,6 +2,27 @@
 
 This directory contains modular connection implementations for QBox. Each connection type is self-contained and automatically registered with the system.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Adding a New Connection Type](#adding-a-new-connection-type)
+  - [1. Create a new directory](#1-create-a-new-directory)
+  - [2. Create __init__.py with your connection class](#2-create-__init__py-with-your-connection-class)
+  - [3. Register your connection module](#3-register-your-connection-module)
+  - [4. Add the connection type to models](#4-add-the-connection-type-to-models)
+  - [5. That's it!](#5-thats-it)
+- [Example Connections](#example-connections)
+  - [PostgreSQL (app/connections/postgres/)](#postgresql-appconnectionspostgres)
+  - [S3 (app/connections/s3/)](#s3-appconnectionss3)
+- [Connection Lifecycle](#connection-lifecycle)
+- [Key Methods](#key-methods)
+  - [connect() -> bool](#connect---bool)
+  - [disconnect() -> None](#disconnect---none)
+  - [execute_query(query: str) -> tuple[list[str], list[dict]]](#execute_queryquery-str---tupleliststr-listdict)
+  - [get_schema() -> list[TableSchema]](#get_schema---listtableschema)
+  - [cleanup(duckdb_manager) -> None](#cleanupduckdb_manager---none)
+- [Best Practices](#best-practices)
+
 ## Architecture
 
 The connection system uses a **plugin-like architecture** with these components:
@@ -117,14 +138,21 @@ Your new connection type will automatically:
 ## Example Connections
 
 ### PostgreSQL (`app/connections/postgres/`)
-- Attaches to DuckDB using the postgres extension
+- **DuckDB Integration**: Attaches to DuckDB using the postgres extension (`ATTACH ... AS identifier`)
+- **Namespace**: Tables referenced as `identifier.schema.table`
+- **Example**: Connection "Production DB" → `production_db.public.users`
 - Supports multiple schemas
 - Full database operations
 
 ### S3 (`app/connections/s3/`)
-- Configures AWS credentials as DuckDB secrets
-- Files queried directly using `s3://` paths
+- **DuckDB Integration**:
+  - Creates a DuckDB secret for credentials (`CREATE SECRET identifier`)
+  - Creates a schema for organizing file views (`CREATE SCHEMA identifier`)
+  - Each file registered as a schema-qualified view (`CREATE VIEW identifier.filename`)
+- **Namespace**: Files referenced as `identifier.table_name`
+- **Example**: Connection "Data Lake" + file "sales_2024.parquet" → `data_lake.sales_2024`
 - Supports both manual and credential chain authentication
+- Files queried directly using `s3://bucket/path` internally
 
 ## Connection Lifecycle
 

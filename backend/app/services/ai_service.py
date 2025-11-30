@@ -201,8 +201,8 @@ INSTRUCTIONS:
 3. Reference data sources correctly:
    - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
    - For CSV/Excel files: use ONLY the view name listed after "File:" (e.g., file_sales or file_duplicatedstudentids)
-   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., s3_filename)
-   - IMPORTANT: The "Original File" line is just for reference - DO NOT use it in SQL queries
+   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., my_s3_bucket.sales_2024)
+   - IMPORTANT: The "Original File" and "S3 Path" lines are just for reference - DO NOT use them in SQL queries
 4. Be precise with column names and data types
 5. Add appropriate WHERE clauses, JOINs, GROUP BY, and ORDER BY as needed
 6. Optimize for readability and performance
@@ -259,8 +259,8 @@ INSTRUCTIONS:
 5. Reference data sources correctly:
    - For database tables: use full schema-qualified names (e.g., pg_connection_alias.schema_name.table_name)
    - For CSV/Excel files: use ONLY the view name listed after "File:" (e.g., file_sales or file_duplicatedstudentids)
-   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., s3_filename)
-   - IMPORTANT: The "Original File" line is just for reference - DO NOT use it in SQL queries
+   - For S3 files: use ONLY the view name listed after "S3 File:" (e.g., my_s3_bucket.sales_2024)
+   - IMPORTANT: The "Original File" and "S3 Path" lines are just for reference - DO NOT use them in SQL queries
 6. Preserve the user's manual edits unless they ask you to change them
 7. Return the COMPLETE updated SQL query, not just the changes
 
@@ -329,6 +329,11 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                         break
                 sql = "\n".join(sql_lines).strip()
 
+        # Final fallback: if no explanation was found but we have content,
+        # treat the entire response as the explanation (e.g., answering questions about results)
+        if not explanation and not sql and content.strip():
+            explanation = content.strip()
+
         return sql, explanation
 
     def _format_schema_context(self, query_metadata: list[dict[str, Any]]) -> str:
@@ -386,10 +391,10 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                 schema_name = table_meta.get("schema_name", "public")
                 table_name = table_meta.get("table_name", "unknown")
                 
-                # Get the DuckDB alias (now human-readable from connection name)
-                alias = table_meta.get("alias", f"pg_{connection_id.replace('-', '_')}")
+                # Get the DuckDB identifier (generated from connection name)
+                identifier = table_meta.get("alias", connection_id.replace('-', '_'))
                 
-                table_info = f"\nTable: {alias}.{schema_name}.{table_name}"
+                table_info = f"\nTable: {identifier}.{schema_name}.{table_name}"
                 table_info += f"\nConnection: {connection_name}"
                 table_info += f"\nRow Count: {row_count}"
                 table_info += "\nColumns:"

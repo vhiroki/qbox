@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Database, ChevronRight, ChevronDown, Table as TableIcon, Loader2, RefreshCw, Filter, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { generateDuckDBIdentifier } from "../utils/identifier";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useConnectionStore } from "@/stores/useConnectionStore";
 import { api } from "@/services/api";
+import { SOURCE_TYPE_ICON_COLORS } from "@/constants/connectionColors";
 import type { ConnectionMetadata, SchemaMetadata, TableMetadata, QueryTableSelection } from "@/types";
 
 interface ConnectionsTreeViewProps {
@@ -44,8 +46,8 @@ export default function ConnectionsTreeView({
   // Track which table was copied (for showing checkmark feedback)
   const [copiedTable, setCopiedTable] = useState<string | null>(null);
 
-  // Store connection aliases for full qualified names
-  const [connectionAliases, setConnectionAliases] = useState<Map<string, string>>(new Map());
+  // Store connection names for full qualified names
+  const [connectionNames, setConnectionNames] = useState<Map<string, string>>(new Map());
 
   // Filter and display options
   const [tableFilter, setTableFilter] = useState("");
@@ -72,18 +74,18 @@ export default function ConnectionsTreeView({
         const databaseMetadata = metadata.filter((conn) => conn.source_type !== "s3");
         setAllMetadata(databaseMetadata);
 
-        // Load connection aliases (only for database connections)
-        const aliasMap = new Map<string, string>();
+        // Load connection names (only for database connections)
+        const nameMap = new Map<string, string>();
         for (const conn of databaseMetadata) {
           try {
             const connectionInfo = await api.getSavedConnection(conn.connection_id);
-            aliasMap.set(conn.connection_id, connectionInfo.alias || connectionInfo.name);
+            nameMap.set(conn.connection_id, connectionInfo.name);
           } catch (err) {
-            // Fallback to connection name if we can't fetch the saved connection
-            aliasMap.set(conn.connection_id, conn.connection_name);
+            // Fallback to connection name from metadata if we can't fetch the saved connection
+            nameMap.set(conn.connection_id, conn.connection_name);
           }
         }
-        setConnectionAliases(aliasMap);
+        setConnectionNames(nameMap);
         hasFetchedRef.current = true;
       } catch (err: any) {
         setError(err.message || "Failed to load connections");
@@ -258,14 +260,14 @@ export default function ConnectionsTreeView({
   const handleCopyTableName = async (connectionId: string, schemaName: string, tableName: string, event: React.MouseEvent) => {
     event.stopPropagation();
 
-    // Get the connection alias (or use connection_id as fallback)
-    const alias = connectionAliases.get(connectionId) || connectionId;
+    // Get the connection name (or use connection_id as fallback)
+    const connectionName = connectionNames.get(connectionId) || connectionId;
 
-    // Build DuckDB alias: pg_{sanitized_alias} where hyphens are replaced with underscores
-    const duckdbAlias = `pg_${alias.replace(/-/g, '_')}`;
+    // Generate DuckDB identifier from connection name
+    const identifier = generateDuckDBIdentifier(connectionName);
 
-    // Build the full qualified name: pg_alias.schema.table
-    const fullQualifiedName = `${duckdbAlias}.${schemaName}.${tableName}`;
+    // Build the full qualified name: identifier.schema.table
+    const fullQualifiedName = `${identifier}.${schemaName}.${tableName}`;
 
     const tableKey = getTableKey(connectionId, schemaName, tableName);
 
@@ -421,10 +423,7 @@ export default function ConnectionsTreeView({
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
-                    <Database
-                      className={`h-4 w-4 flex-shrink-0 ${hasSelectedTables ? "text-primary" : "text-muted-foreground"
-                        }`}
-                    />
+                    <Database className={`h-4 w-4 flex-shrink-0 ${SOURCE_TYPE_ICON_COLORS.connection}`} />
                     <span className="text-sm font-medium truncate flex-1 text-left">
                       {connection.connection_name}
                     </span>

@@ -61,7 +61,7 @@ class ConnectionManager:
                 try:
                     connection_repository.save(connection_id, config)
                 except ValueError as e:
-                    # Validation error (e.g., duplicate alias)
+                    # Validation error (e.g., duplicate name or identifier collision)
                     # Disconnect the connection since we can't save it
                     await datasource.disconnect()
                     del self.connections[connection_id]
@@ -187,12 +187,12 @@ class ConnectionManager:
         safe_config = config.config.copy()
         connection_class = ConnectionRegistry.get(config.type)
         if connection_class:
-            # Create a temporary instance to access the mask_sensitive_fields method
-            temp_instance = connection_class(
-                connection_id=connection_id,
-                connection_name=config.name,
-                config=safe_config
-            )
+            # Create a minimal temporary instance just to call the method
+            # We use object.__new__() to bypass __init__ and avoid Pydantic validation
+            temp_instance = object.__new__(connection_class)
+            temp_instance.connection_id = connection_id
+            temp_instance.connection_name = config.name
+            temp_instance.config = {}
             safe_config = temp_instance.mask_sensitive_fields(safe_config)
 
         return {
@@ -200,7 +200,6 @@ class ConnectionManager:
             "name": config.name,
             "type": config.type.value,
             "config": safe_config,
-            "alias": config.alias,
         }
 
     async def update_saved_connection(
@@ -211,22 +210,27 @@ class ConnectionManager:
         if not existing:
             return False, "Connection not found"
 
+        # Prevent connection name changes as it would break SQL identifier references
+        if config.name != existing.name:
+            return False, "Connection name cannot be changed as it would break existing queries. Please create a new connection instead."
+
         # Preserve sensitive fields using connection type-specific logic
         connection_class = ConnectionRegistry.get(config.type)
         if connection_class:
-            # Create a temporary instance to access the preserve_sensitive_fields method
-            temp_instance = connection_class(
-                connection_id=connection_id,
-                connection_name=config.name,
-                config=config.config
-            )
+            # First, preserve sensitive fields before creating instance to avoid validation errors
+            # Create a minimal temporary instance just to call the method
+            # We use object.__new__() to bypass __init__ and avoid Pydantic validation
+            temp_instance = object.__new__(connection_class)
+            temp_instance.connection_id = connection_id
+            temp_instance.connection_name = config.name
+            temp_instance.config = {}
             config.config = temp_instance.preserve_sensitive_fields(config.config, existing.config)
 
         # Save the updated config
         try:
             connection_repository.save(connection_id, config)
         except ValueError as e:
-            # Validation error (e.g., duplicate alias)
+            # Validation error (e.g., duplicate name or identifier collision)
             return False, str(e)
 
         # If the connection is currently active, disconnect and cleanup

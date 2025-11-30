@@ -16,32 +16,50 @@ class S3Service:
         self.connection_repo = ConnectionRepository()
         self.duckdb_manager = get_duckdb_manager()
 
+
     def _get_s3_client(self, connection_id: str):
         """Get boto3 S3 client configured with connection credentials."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Load connection config
         connection_config = self.connection_repo.get(connection_id)
         if not connection_config:
             raise ValueError(f"Connection {connection_id} not found")
-        
+
         if connection_config.type != DataSourceType.S3:
             raise ValueError(f"Connection {connection_id} is not an S3 connection")
-        
+
         config = connection_config.config
-        
-        # Configure boto3 client
+
+        # Configure boto3 session
         session_kwargs: dict[str, Any] = {
             'region_name': config.get('region', 'us-east-1')
         }
-        
+
         # Use manual credentials if specified
         if config.get('credential_type') == 'manual':
             session_kwargs['aws_access_key_id'] = config.get('aws_access_key_id')
             session_kwargs['aws_secret_access_key'] = config.get('aws_secret_access_key')
             if config.get('aws_session_token'):
                 session_kwargs['aws_session_token'] = config.get('aws_session_token')
-        
+
         session = boto3.Session(**session_kwargs)
-        return session.client('s3'), config.get('bucket')
+
+        # Configure S3 client with optional custom endpoint
+        client_kwargs: dict[str, Any] = {}
+        if config.get('endpoint_url'):
+            from botocore.client import Config
+            import re
+            # Strip whitespace and remove all invisible/non-printable characters from endpoint URL
+            endpoint_url = config.get('endpoint_url').strip()
+            # Remove invisible Unicode characters (zero-width space, etc.)
+            endpoint_url = re.sub(r'[\u200B-\u200D\uFEFF\u2060]', '', endpoint_url)
+            client_kwargs['endpoint_url'] = endpoint_url
+            # Use path-style addressing for custom endpoints (required for LocalStack)
+            client_kwargs['config'] = Config(s3={'addressing_style': 'path'})
+
+        return session.client('s3', **client_kwargs), config.get('bucket')
 
     async def list_files(
         self,
@@ -170,21 +188,26 @@ class S3Service:
                 raise ValueError(f"Connection {connection_id} not found")
             
             bucket = connection_config.config.get('bucket')
-            
+
             # Determine file type
             file_ext = file_path.split('.')[-1].lower()
-            
+
             if file_ext not in ['parquet', 'csv', 'xlsx', 'xls', 'json', 'jsonl']:
                 raise ValueError(f"Unsupported file type: {file_ext}")
-            
+
             # Construct S3 path
             s3_path = f"s3://{bucket}/{file_path}"
-            
-            # Use DuckDB to read file schema
-            # Get the secret name for this connection
-            secret_name = self.duckdb_manager.get_attached_alias(connection_id)
+
+            # Ensure S3 secret is configured in DuckDB
+            secret_name = self.duckdb_manager.get_attached_identifier(connection_id)
             if not secret_name:
-                raise ValueError(f"S3 connection {connection_id} not configured in DuckDB")
+                from app.models.schemas import S3ConnectionConfig
+                s3_config = S3ConnectionConfig(**connection_config.config)
+                secret_name = self.duckdb_manager.configure_s3_secret(
+                    connection_id,
+                    connection_config.name,
+                    s3_config,
+                )
             
             # Build query based on file type (secret is auto-used by DuckDB)
             if file_ext == 'parquet':
@@ -254,8 +277,20 @@ class S3Service:
         """
         Generate a view name for an S3 file.
 
-        Format: s3_{sanitized_file_name}
+        Format: {schema_identifier}.{table_name}
+        Where:
+          - schema_identifier is the S3 connection identifier
+          - table_name is sanitized from the file name without extension
+
+        For example:
+          - Connection: "My S3 Bucket" → my_s3_bucket
+          - File: "data/sales_2024.parquet" → my_s3_bucket.sales_2024
         """
+        # Get the schema identifier for this connection
+        schema_identifier = self.duckdb_manager.get_attached_identifier(connection_id)
+        if not schema_identifier:
+            raise ValueError(f"S3 connection {connection_id} not configured in DuckDB")
+
         # Get file name without extension and sanitize
         file_name = file_path.split('/')[-1]
         if '.' in file_name:
@@ -264,7 +299,14 @@ class S3Service:
         # Sanitize file name (keep only alphanumeric and underscores)
         file_name_safe = ''.join(c if c.isalnum() or c == '_' else '_' for c in file_name)
 
-        return f"s3_{file_name_safe}"
+        # Remove leading/trailing underscores
+        file_name_safe = file_name_safe.strip('_')
+
+        # Ensure it doesn't start with a digit
+        if file_name_safe and file_name_safe[0].isdigit():
+            file_name_safe = f"file_{file_name_safe}"
+
+        return f"{schema_identifier}.{file_name_safe}"
 
     async def create_file_view(
         self,
@@ -297,15 +339,15 @@ class S3Service:
             
             # Determine file type
             file_ext = file_path.split('.')[-1].lower()
-            
+
             # Construct S3 path
             s3_path = f"s3://{bucket}/{file_path}"
-            
+
             # Get the secret name for this connection
-            secret_name = self.duckdb_manager.get_attached_alias(connection_id)
+            secret_name = self.duckdb_manager.get_attached_identifier(connection_id)
             if not secret_name:
                 raise ValueError(f"S3 connection {connection_id} not configured in DuckDB")
-            
+
             # Build CREATE VIEW query based on file type (secret is auto-used by DuckDB)
             if file_ext == 'parquet':
                 create_query = f"CREATE OR REPLACE VIEW {view_name} AS SELECT * FROM read_parquet('{s3_path}')"

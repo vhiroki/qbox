@@ -2,6 +2,56 @@
 
 AI-powered data query desktop application for building and managing SQL queries across multiple data sources.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Setup and Run](#setup-and-run)
+  - [What setup.sh Does](#what-setupsh-does)
+- [Building for Distribution](#building-for-distribution)
+  - [Quick Build](#quick-build)
+  - [Manual Build Steps](#manual-build-steps)
+  - [Output](#output)
+  - [Platform Notes](#platform-notes)
+- [Project Structure](#project-structure)
+- [Key Features](#key-features)
+  - [Database Connections](#database-connections)
+  - [AI-Powered Query Building](#ai-powered-query-building)
+  - [Data Sources](#data-sources)
+  - [DuckDB Integration](#duckdb-integration)
+  - [User Interface](#user-interface)
+- [Data Storage](#data-storage)
+- [Development](#development)
+  - [Available Commands](#available-commands)
+  - [Development Mode](#development-mode)
+  - [Backend Development](#backend-development)
+  - [Frontend Development](#frontend-development)
+- [Configuration](#configuration)
+  - [OpenAI API Key](#openai-api-key)
+  - [Backend Environment (Optional)](#backend-environment-optional)
+  - [Application Icons](#application-icons)
+- [Auto-Updates](#auto-updates)
+- [Building Production Apps](#building-production-apps)
+  - [Code Signing (Recommended)](#code-signing-recommended)
+  - [Distribution Checklist](#distribution-checklist)
+- [Troubleshooting](#troubleshooting)
+  - [Setup Issues](#setup-issues)
+  - [Runtime Issues](#runtime-issues)
+  - [Build Issues](#build-issues)
+- [Performance](#performance)
+- [Tech Stack Details](#tech-stack-details)
+  - [Backend](#backend)
+  - [Frontend](#frontend)
+  - [Desktop](#desktop)
+- [Project Philosophy](#project-philosophy)
+  - [Architecture Principles](#architecture-principles)
+  - [Code Style](#code-style)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
+
 ## Overview
 
 QBox is an Electron desktop application that lets you:
@@ -151,7 +201,7 @@ qbox/
 - Cross-source queries (join PostgreSQL with CSV, etc.)
 - Persistent storage at `~/.qbox/qbox.duckdb`
 - Single writer mode to avoid concurrency issues
-- Connections attached with `pg_` prefix aliases
+- Connections attached with identifiers derived from connection names
 
 ### User Interface
 - **Dark theme** design for comfortable use

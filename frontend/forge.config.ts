@@ -5,6 +5,10 @@ import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import path from 'path';
+import { importSigningCertificate } from './scripts/import-signing-cert';
+
+// Import certificate from CSC_LINK if provided (for CI/CD)
+const { identity: signingIdentity, keychain: keychainPath } = importSigningCertificate();
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -12,23 +16,32 @@ const config: ForgeConfig = {
     executableName: 'qbox',
     appBundleId: 'com.qbox.app',
     appCategoryType: 'public.app-category.developer-tools',
-    // icon: path.resolve(__dirname, 'assets', 'icons', 'icon'), // TODO: Add icons
+    icon: path.resolve(__dirname, 'assets', 'icons', 'icon'),
     asar: true,
     extraResource: [
       // Backend executable will be placed here by the build script
       path.resolve(__dirname, '..', 'backend', 'dist'),
     ],
-    // Code signing disabled for development builds
-    // To enable, uncomment and provide proper credentials:
-    // osxSign: {
-    //   identity: 'Developer ID Application: Your Name (TEAM_ID)',
-    // },
-    // osxNotarize: {
-    //   tool: 'notarytool',
-    //   appleId: process.env.APPLE_ID || '',
-    //   appleIdPassword: process.env.APPLE_PASSWORD || '',
-    //   teamId: process.env.APPLE_TEAM_ID || '',
-    // },
+    // Code signing configuration for macOS
+    // Uses certificate from CSC_LINK (imported above) or from local Keychain
+    ...(signingIdentity ? {
+      osxSign: {
+        identity: signingIdentity,
+        keychain: keychainPath,
+        optionsForFile: () => ({
+          hardenedRuntime: true,
+          entitlements: path.resolve(__dirname, 'entitlements.plist'),
+          'entitlements-inherit': path.resolve(__dirname, 'entitlements.plist'),
+        }),
+      },
+      ...(process.env.APPLE_ID ? {
+        osxNotarize: {
+          appleId: process.env.APPLE_ID,
+          appleIdPassword: process.env.APPLE_PASSWORD || '',
+          teamId: process.env.APPLE_TEAM_ID || '',
+        },
+      } : {}),
+    } : {}),
   },
   rebuildConfig: {},
   makers: [
@@ -45,7 +58,7 @@ const config: ForgeConfig = {
     // macOS DMG
     new MakerDMG({
       name: 'QBox',
-      // icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'), // TODO: Add icons
+      icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'),
       background: undefined,
       format: 'ULFO',
     }),

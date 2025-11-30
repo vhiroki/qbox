@@ -15,14 +15,9 @@ class Settings(BaseSettings):
         env_file=str(ENV_FILE), env_file_encoding="utf-8", extra="ignore"
     )
 
-    # Application Configuration
-    BACKEND_PORT: int = 8080
-    FRONTEND_PORT: int = 5173
-
     # CORS Configuration
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
-        "http://localhost:3000",
     ]
 
     # AI Provider Configuration (via LiteLLM)
@@ -52,6 +47,10 @@ class Settings(BaseSettings):
     
     # AI Generation Settings
     AI_TEMPERATURE: float = 0.1  # Lower = more deterministic (0.0 - 2.0)
+
+    # Logging Configuration
+    # Valid levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_LEVEL: str = "INFO"
 
 
 @lru_cache

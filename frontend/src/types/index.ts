@@ -4,7 +4,6 @@ export interface ConnectionConfig {
   name: string;
   type: ConnectionType;
   config: Record<string, any>;
-  alias?: string;
 }
 
 export interface PostgresConfig {
@@ -23,6 +22,7 @@ export interface S3Config {
   aws_secret_access_key?: string;
   aws_session_token?: string;
   region?: string;
+  endpoint_url?: string;
 }
 
 export interface ConnectionStatus {
@@ -40,7 +40,6 @@ export interface SavedConnection {
   id: string;
   name: string;
   type: string;
-  alias?: string;
   created_at: string;
   updated_at: string;
 }
@@ -281,4 +280,18 @@ export interface FileMetadata {
   view_name: string;
   columns: ColumnMetadata[];
   row_count?: number;
+}
+
+// Electron API (exposed via preload.ts)
+
+export interface ElectronAPI {
+  platform: string;
+  reportIssue: () => Promise<void>;
+  openLogsFolder: () => Promise<void>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
 }

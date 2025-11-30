@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   QBox Theme - Amber/Gold with Light & Dark modes
+   
+   Color Palette:
+   Dark Mode:
+   - Background: #0a0a0b (primary), #111113 (secondary), #18181b (tertiary)
+   - Text: #fafafa (primary), #a1a1aa (secondary), #71717a (muted)
+   - Accent: #f59e0b (amber-500) - bright amber for dark backgrounds
+   
+   Light Mode:
+   - Background: #ffffff (primary), #fafafa (secondary), #f5f5f5 (tertiary)
+   - Text: #0a0a0b (primary), #52525b (secondary), #71717a (muted)
+   - Accent: #b45309 (amber-700) - darker amber for better contrast
+   
+   Typography:
+   - Sans: Instrument Sans
+   - Mono: JetBrains Mono
+   ========================================================================== */
+
 @layer base {
+  /* =========================================
+     Restore pointer cursor for buttons
+     (Tailwind v4 changed default to arrow)
+     Official shadcn/ui recommendation
+     ========================================= */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* =========================================
+     Set default border color to theme border
+     (Tailwind defaults to currentColor)
+     ========================================= */
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
+
   :root {
+    /* Typography */
+    --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    
+    /* Sizing */
     --radius: 0.5rem;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
     
     /* Reduced spacing scale */
     --spacing-0: 0;
@@ -33,29 +59,132 @@
     --spacing-8: 1.5rem;
   }
 
+  /* =========================================
+     LIGHT THEME (default)
+     Using darker amber (#b45309) for contrast
+     ========================================= */
+  :root, .light {
+    /* Background hierarchy - clean whites */
+    --background: #ffffff;
+    --foreground: #0a0a0b;
+    
+    /* Cards and elevated surfaces */
+    --card: #fafafa;
+    --card-foreground: #0a0a0b;
+    
+    /* Popovers and dropdowns */
+    --popover: #ffffff;
+    --popover-foreground: #0a0a0b;
+    
+    /* Primary action color - Darker Amber for contrast */
+    --primary: #b45309;
+    --primary-foreground: #ffffff;
+    
+    /* Secondary/tertiary surfaces */
+    --secondary: #f5f5f5;
+    --secondary-foreground: #0a0a0b;
+    
+    /* Muted elements */
+    --muted: #f5f5f5;
+    --muted-foreground: #71717a;
+    
+    /* Accent - amber tint for highlights */
+    --accent: rgba(180, 83, 9, 0.1);
+    --accent-foreground: #b45309;
+    
+    /* Destructive actions */
+    --destructive: #dc2626;
+    
+    /* Borders and inputs */
+    --border: #e5e5e5;
+    --input: #e5e5e5;
+    --ring: #b45309;
+    
+    /* Extended palette for custom use */
+    --surface-elevated: #fafafa;
+    --surface-header: #f5f5f5;
+    --text-secondary: #52525b;
+    --text-muted: #71717a;
+    --amber-400: #fbbf24;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --amber-glow: rgba(180, 83, 9, 0.1);
+    --border-light: #d4d4d4;
+    
+    /* Code syntax highlighting (light theme) */
+    --syntax-keyword: #a626a4;
+    --syntax-function: #4078f2;
+    --syntax-number: #986801;
+    --syntax-string: #50a14f;
+    --syntax-comment: #a0a1a7;
+  }
+
+  /* =========================================
+     DARK THEME
+     Warm blacks inspired by Cursor IDE
+     Using bright amber (#f59e0b) that glows
+     ========================================= */
   .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    /* Background hierarchy - warm blacks (Cursor-inspired) */
+    --background: #14120b;
+    --foreground: #edecec;
+    
+    /* Cards and elevated surfaces - warm tones */
+    --card: #1b1913;
+    --card-foreground: #edecec;
+    
+    /* Popovers and dropdowns */
+    --popover: #1d1b15;
+    --popover-foreground: #edecec;
+    
+    /* Primary action color - Bright Amber */
+    --primary: #f59e0b;
+    --primary-foreground: #14120b;
+    
+    /* Secondary/tertiary surfaces - warm grays */
+    --secondary: #201e18;
+    --secondary-foreground: #d7d6d5;
+    
+    /* Muted elements */
+    --muted: #1d1b15;
+    --muted-foreground: #a8a7a5;
+    
+    /* Accent - amber glow for highlights */
+    --accent: rgba(245, 158, 11, 0.12);
+    --accent-foreground: #f59e0b;
+    
+    /* Destructive actions */
+    --destructive: #ef4444;
+    
+    /* Borders and inputs - warm solid colors */
+    --border: #26241e;
+    --input: #26241e;
+    --ring: #f59e0b;
+    
+    /* Extended palette for custom use */
+    --surface-elevated: #1d1b15;
+    --surface-header: #201e18;
+    --text-secondary: #d7d6d5;
+    --text-muted: #a8a7a5;
+    --amber-400: #fbbf24;
+    --amber-500: #f59e0b;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --amber-glow: rgba(245, 158, 11, 0.15);
+    --border-light: #2e2c25;
+    
+    /* Code syntax highlighting (dark theme) */
+    --syntax-keyword: #c678dd;
+    --syntax-function: #61afef;
+    --syntax-number: #d19a66;
+    --syntax-string: #98c379;
+    --syntax-comment: #5c6370;
   }
 }
 
 @theme inline {
+  /* Color mappings for Tailwind */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -74,6 +203,165 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  
+  /* Extended colors */
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-header: var(--surface-header);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+  --color-amber-600: var(--amber-600);
+  --color-amber-700: var(--amber-700);
+  --color-amber-glow: var(--amber-glow);
+  --color-border-light: var(--border-light);
+  
+  /* Syntax highlighting colors */
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-comment: var(--syntax-comment);
+  
+  /* Typography */
+  --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 }
 
+/* Base typography styles */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.5;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  
+  h1 {
+    font-weight: 700;
+  }
+  
+  /* Monospace elements */
+  code, kbd, pre, samp, .font-mono {
+    font-family: var(--font-mono);
+  }
+  
+  /* Input and textarea inherit sans */
+  input, textarea, select, button {
+    font-family: inherit;
+  }
+}
 
+/* Custom utility classes */
+@layer utilities {
+  /* Amber glow effect for special elements */
+  .glow-amber {
+    box-shadow: 0 0 20px var(--amber-glow),
+                0 0 40px var(--amber-glow);
+  }
+  
+  /* Subtle amber border glow on focus */
+  .focus-glow:focus {
+    box-shadow: 0 0 0 2px var(--amber-glow);
+  }
+  
+  /* Text gradient for special headings */
+  .text-gradient-amber {
+    background: linear-gradient(135deg, var(--amber-400) 0%, var(--amber-500) 50%, var(--amber-600) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Surface variations */
+  .surface-elevated {
+    background-color: var(--surface-elevated);
+  }
+  
+  .surface-header {
+    background-color: var(--surface-header);
+  }
+  
+  /* Border light variant */
+  .border-light {
+    border-color: var(--border-light);
+  }
+}
+
+/* Scrollbar styling - theme aware */
+@layer base {
+  * {
+    scrollbar-width: thin;
+  }
+  
+  /* Light theme scrollbar */
+  :root *, .light * {
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+  
+  :root *::-webkit-scrollbar, .light *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  :root *::-webkit-scrollbar-track, .light *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  :root *::-webkit-scrollbar-thumb, .light *::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  :root *::-webkit-scrollbar-thumb:hover, .light *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Dark theme scrollbar */
+  .dark * {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+  
+  .dark *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .dark *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .dark *::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+  
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Selection styling - theme aware */
+@layer base {
+  /* Light theme selection */
+  :root ::selection, .light ::selection {
+    background-color: rgba(180, 83, 9, 0.25);
+    color: #0a0a0b;
+  }
+  
+  /* Dark theme selection */
+  .dark ::selection {
+    background-color: rgba(245, 158, 11, 0.3);
+    color: #fafafa;
+  }
+}

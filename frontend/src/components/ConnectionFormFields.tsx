@@ -3,72 +3,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PostgresConfig, S3Config, ConnectionType } from '../types';
+import { generateDuckDBIdentifier } from '../utils/identifier';
 
 interface ConnectionFormFieldsProps {
   connectionType?: ConnectionType;
   connectionName: string;
-  connectionAlias: string;
   formData: PostgresConfig | S3Config;
   onTypeChange?: (type: ConnectionType) => void;
   onNameChange: (name: string) => void;
-  onAliasChange: (alias: string) => void;
   onFormDataChange: (data: Partial<PostgresConfig | S3Config>) => void;
   showPasswordPlaceholder?: boolean;
   nameRequired?: boolean;
-  aliasReadOnly?: boolean;
   typeReadOnly?: boolean;
-  onValidationChange?: (isValid: boolean) => void;
-}
-
-export function validateAlias(alias: string): { isValid: boolean; error: string | null } {
-  if (!alias || alias.trim() === '') {
-    return { isValid: true, error: null }; // Empty is allowed (auto-generate)
-  }
-
-  // Must be 3-50 characters
-  if (alias.length < 3) {
-    return { isValid: false, error: 'Alias must be at least 3 characters long' };
-  }
-  if (alias.length > 50) {
-    return { isValid: false, error: 'Alias cannot exceed 50 characters' };
-  }
-
-  // Must start with a letter
-  if (!/^[a-zA-Z]/.test(alias)) {
-    return { isValid: false, error: 'Alias must start with a letter' };
-  }
-
-  // Must contain only alphanumeric characters and underscores
-  if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(alias)) {
-    return { isValid: false, error: 'Alias can only contain letters, numbers, and underscores' };
-  }
-
-  return { isValid: true, error: null };
 }
 
 export default function ConnectionFormFields({
   connectionType = 'postgres',
   connectionName,
-  connectionAlias,
   formData,
   onTypeChange,
   onNameChange,
-  onAliasChange,
   onFormDataChange,
   showPasswordPlaceholder = false,
   nameRequired = false,
-  aliasReadOnly = false,
   typeReadOnly = false,
-  onValidationChange,
 }: ConnectionFormFieldsProps) {
-  const aliasValidation = validateAlias(connectionAlias);
-
-  // Notify parent of validation status changes
-  React.useEffect(() => {
-    if (onValidationChange) {
-      onValidationChange(aliasValidation.isValid);
-    }
-  }, [aliasValidation.isValid, onValidationChange]);
+  const identifierPreview = React.useMemo(() => generateDuckDBIdentifier(connectionName), [connectionName]);
 
   // Type guards for form data
   const isPostgresConfig = (_data: PostgresConfig | S3Config): _data is PostgresConfig => {
@@ -109,50 +69,16 @@ export default function ConnectionFormFields({
           onChange={(e) => onNameChange(e.target.value)}
           required={nameRequired}
           placeholder={connectionType === 's3' ? 'My S3 Bucket' : 'My Database'}
+          disabled={typeReadOnly}
         />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="connection-alias">
-          Connection Alias {!aliasReadOnly && '(Optional)'}
-          <span className="ml-2 text-xs text-muted-foreground font-normal">
-            Used in SQL queries (e.g., <code className="text-xs">pg_production</code>)
-          </span>
-        </Label>
-        <Input
-          id="connection-alias"
-          type="text"
-          value={connectionAlias}
-          onChange={(e) => onAliasChange(e.target.value)}
-          placeholder="production"
-          readOnly={aliasReadOnly}
-          disabled={aliasReadOnly}
-          className={
-            aliasReadOnly
-              ? 'bg-muted cursor-not-allowed'
-              : !aliasValidation.isValid && connectionAlias
-              ? 'border-destructive focus-visible:ring-destructive'
-              : ''
-          }
-        />
-        {!showPasswordPlaceholder && !aliasReadOnly && !connectionAlias && (
+        {identifierPreview && (
           <p className="text-xs text-muted-foreground">
-            Leave empty to auto-generate from connection name
+            SQL identifier: <code className="px-1.5 py-0.5 rounded bg-muted text-foreground">{identifierPreview}</code>
           </p>
         )}
-        {!aliasReadOnly && connectionAlias && !aliasValidation.isValid && (
-          <p className="text-xs text-destructive">
-            {aliasValidation.error}
-          </p>
-        )}
-        {!aliasReadOnly && connectionAlias && aliasValidation.isValid && (
-          <p className="text-xs text-green-600 dark:text-green-400">
-            ✓ Valid alias format
-          </p>
-        )}
-        {aliasReadOnly && (
-          <p className="text-xs text-muted-foreground">
-            Alias cannot be changed after creation to prevent breaking existing queries
+        {typeReadOnly && (
+          <p className="text-xs text-yellow-600 dark:text-yellow-500">
+            Connection name cannot be changed as it would break existing queries that reference this connection.
           </p>
         )}
       </div>
@@ -263,6 +189,22 @@ export default function ConnectionFormFields({
               onChange={(e) => onFormDataChange({ region: e.target.value })}
               placeholder="us-east-1"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="endpoint-url">
+              Endpoint URL <span className="text-muted-foreground font-normal">(Optional)</span>
+            </Label>
+            <Input
+              id="endpoint-url"
+              type="text"
+              value={formData.endpoint_url || ''}
+              onChange={(e) => onFormDataChange({ endpoint_url: e.target.value })}
+              placeholder="http://localhost:4566"
+            />
+            <p className="text-xs text-muted-foreground">
+              Custom S3 endpoint for LocalStack or S3-compatible services. Leave blank for AWS S3.
+            </p>
           </div>
 
           <div className="space-y-2">

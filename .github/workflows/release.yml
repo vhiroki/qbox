@@ -80,6 +80,8 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           APPLE_IDENTITY: ${{ vars.APPLE_IDENTITY }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # ========== Generate Update Metadata ==========
       - name: Generate update metadata

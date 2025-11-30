@@ -89,8 +89,8 @@ export default function FileManager({ queryId, selectedFiles, onSelectionChange,
         
         // Validate file type
         const ext = file.name.split(".").pop()?.toLowerCase();
-        if (!ext || !["csv", "xlsx", "xls"].includes(ext)) {
-          throw new Error(`Unsupported file type: ${file.name}. Only CSV and XLSX files are supported.`);
+        if (!ext || !["csv"].includes(ext)) {
+          throw new Error(`Unsupported file type: ${file.name}. Only CSV files are supported.`);
         }
 
         const uploadResponse = await api.uploadFile(file, queryId);
@@ -253,7 +253,7 @@ export default function FileManager({ queryId, selectedFiles, onSelectionChange,
           <input
             type="file"
             multiple
-            accept=".csv,.xlsx,.xls"
+            accept=".csv"
             onChange={(e) => handleFileUpload(e.target.files)}
             disabled={isUploading}
             className="hidden"
@@ -279,7 +279,7 @@ export default function FileManager({ queryId, selectedFiles, onSelectionChange,
           </Button>
         </label>
         <p className="text-xs text-muted-foreground mt-3">
-          Supports CSV and XLSX files (max 100MB)
+          Supports CSV files (max 100MB)
         </p>
       </div>
 

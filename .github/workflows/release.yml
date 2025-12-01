@@ -131,12 +131,8 @@ jobs:
             ' sh {} +
 
             # Find and copy ZIP files (required for auto-updates)
-            find "$dir" -name "*.zip" -exec sh -c '
-              for f; do
-                base=$(basename "$f" .zip)
-                cp "$f" "release-files/${base}-'$arch'.zip"
-              done
-            ' sh {} +
+            # Note: ZIP files already include architecture in their name from Forge
+            find "$dir" -name "*.zip" -exec cp {} release-files/ \;
 
             # Copy YML files (use arm64 version as the main one)
             if [ "$arch" = "arm64" ]; then

@@ -159,7 +159,12 @@ export const useUpdateStore = create<UpdateStoreState>()(
             error: error.message,
             isUpdateBannerVisible: false,
           });
-          toast.error(`Update failed: ${error.message}`);
+          // Truncate long error messages for the toast
+          const maxLength = 100;
+          const message = error.message.length > maxLength
+            ? `${error.message.substring(0, maxLength)}...`
+            : error.message;
+          toast.error(`Update failed: ${message}`);
         });
 
         // Listen for manual check request from menu

@@ -27,6 +27,12 @@ datas += duckdb_datas
 binaries += duckdb_binaries
 hiddenimports += duckdb_hidden
 
+# pytz is required by DuckDB for timezone-aware datetime operations
+pytz_datas, pytz_binaries, pytz_hidden = collect_all('pytz')
+datas += pytz_datas
+binaries += pytz_binaries
+hiddenimports += pytz_hidden
+
 # SQLAlchemy and psycopg
 hiddenimports += collect_submodules('sqlalchemy')
 hiddenimports += collect_submodules('psycopg')

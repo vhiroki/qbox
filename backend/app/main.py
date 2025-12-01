@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="QBox API",
-    description="AI-powered data query application",
+    description="Build SQL queries across multiple data sources - all locally",
     version="0.1.0",
     lifespan=lifespan,
 )

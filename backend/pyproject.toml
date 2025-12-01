@@ -1,7 +1,7 @@
 [project]
 name = "qbox"
 version = "0.1.0"
-description = "AI-powered data query application"
+description = "Build SQL queries across multiple data sources - all locally"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.104.0",

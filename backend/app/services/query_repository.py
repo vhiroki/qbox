@@ -28,7 +28,6 @@ class QueryRepository:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
-
     # Query CRUD operations
 
     def create_query(self, name: str, sql_text: str = "") -> Query:
@@ -108,10 +107,7 @@ class QueryRepository:
 
         with self._get_connection() as conn:
             # Get current SQL to check if it's different
-            cursor = conn.execute(
-                "SELECT sql_text FROM queries WHERE id = ?",
-                (query_id,)
-            )
+            cursor = conn.execute("SELECT sql_text FROM queries WHERE id = ?", (query_id,))
             row = cursor.fetchone()
             current_sql = row[0] if row else ""
 
@@ -157,7 +153,12 @@ class QueryRepository:
     # Table selection operations
 
     def add_table_selection(
-        self, query_id: str, connection_id: str, schema_name: str, table_name: str, source_type: str = "connection"
+        self,
+        query_id: str,
+        connection_id: str,
+        schema_name: str,
+        table_name: str,
+        source_type: str = "connection",
     ) -> None:
         """Add a table to query selections."""
         now = datetime.now().isoformat()
@@ -183,7 +184,12 @@ class QueryRepository:
             conn.commit()
 
     def remove_table_selection(
-        self, query_id: str, connection_id: str, schema_name: str, table_name: str, source_type: str = "connection"
+        self,
+        query_id: str,
+        connection_id: str,
+        schema_name: str,
+        table_name: str,
+        source_type: str = "connection",
     ) -> bool:
         """Remove a table from query selections."""
         now = datetime.now().isoformat()
@@ -260,7 +266,7 @@ class QueryRepository:
 
     def delete_selections_by_connection(self, connection_id: str) -> int:
         """Remove all table selections for a specific connection.
-        
+
         Returns the number of selections deleted.
         """
         with self._get_connection() as conn:
@@ -442,13 +448,13 @@ class QueryRepository:
 
     def duplicate_query(self, source_query_id: str) -> Optional[Query]:
         """Duplicate a query with all its selections (non-file) and chat history.
-        
+
         Creates a new query with the same SQL text and name with '(Copy)' suffix.
         Does NOT duplicate files - that should be handled separately by FileRepository.
-        
+
         Args:
             source_query_id: ID of the query to duplicate
-            
+
         Returns:
             The newly created Query, or None if source query not found
         """
@@ -456,11 +462,11 @@ class QueryRepository:
         source_query = self.get_query(source_query_id)
         if not source_query:
             return None
-        
+
         # Create new query with copied name and SQL
         new_name = f"{source_query.name} (Copy)"
         new_query = self.create_query(new_name, source_query.sql_text)
-        
+
         # Copy non-file selections
         selections = self.get_query_selections(source_query_id)
         for sel in selections:
@@ -472,12 +478,12 @@ class QueryRepository:
                     sel.table_name,
                     sel.source_type,
                 )
-        
+
         # Copy chat history
         chat_messages = self.get_chat_history(source_query_id)
         for msg in chat_messages:
             self.add_chat_message(new_query.id, msg.role, msg.message)
-        
+
         return new_query
 
 

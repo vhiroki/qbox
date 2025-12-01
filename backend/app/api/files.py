@@ -42,7 +42,7 @@ async def upload_file(query_id: str, file: UploadFile = File(...)):
         # Generate unique name if file already exists within this query
         base_name = Path(file.filename or "file").stem
         file_type = "csv" if file_ext == ".csv" else "xlsx"
-        
+
         # Check if name already exists in this query
         existing_file = file_repository.get_file_by_name(base_name, query_id)
         if existing_file:
@@ -52,10 +52,11 @@ async def upload_file(query_id: str, file: UploadFile = File(...)):
                 counter += 1
             base_name = f"{base_name}_{counter}"
 
-        # Save file to disk
+        # Save file to disk in query-specific folder
         file_id = None
-        file_path = file_repository.files_dir / f"{base_name}{file_ext}"
-        
+        query_dir = file_repository.get_query_files_dir(query_id)
+        file_path = query_dir / f"{base_name}{file_ext}"
+
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -68,7 +69,7 @@ async def upload_file(query_id: str, file: UploadFile = File(...)):
             size_bytes=len(content),
             query_id=query_id,
         )
-        
+
         file_id = file_record["id"]
 
         # Register with DuckDB
@@ -76,7 +77,7 @@ async def upload_file(query_id: str, file: UploadFile = File(...)):
         try:
             duckdb = get_duckdb_manager()
             view_name = duckdb.register_file(file_id, base_name, str(file_path), file_type)
-            
+
             # Store the view name in the database
             file_repository.update_view_name(file_id, view_name)
         except Exception as e:
@@ -112,7 +113,7 @@ async def list_files(query_id: Optional[str] = None):
             files = file_repository.get_files_by_query(query_id)
         else:
             files = file_repository.get_all_files()
-        
+
         return [
             FileInfo(
                 id=f["id"],
@@ -159,10 +160,10 @@ async def get_file_metadata(file_id: str):
         view_name = file_info.get("view_name")
         if not view_name:
             raise HTTPException(status_code=500, detail="File view name not found")
-        
+
         duckdb = get_duckdb_manager()
         metadata = duckdb.get_file_metadata_by_view_name(view_name)
-        
+
         return FileMetadata(
             file_id=file_id,
             file_name=file_info["name"],
@@ -173,9 +174,7 @@ async def get_file_metadata(file_id: str):
         )
     except Exception as e:
         logger.error(f"Failed to get file metadata: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get file metadata: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get file metadata: {str(e)}")
 
 
 @router.delete("/{file_id}")
@@ -186,7 +185,7 @@ async def delete_file(file_id: str):
         file_info = file_repository.get_file(file_id)
         if not file_info:
             raise HTTPException(status_code=404, detail="File not found")
-        
+
         # Unregister from DuckDB first
         try:
             view_name = file_info.get("view_name")
@@ -207,4 +206,3 @@ async def delete_file(file_id: str):
     except Exception as e:
         logger.error(f"Failed to delete file: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
-

@@ -45,27 +45,32 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const config = error.config;
-    
+
     // Only retry on network errors (connection refused, etc.)
-    if (!config || !error.message?.includes('Network Error') && error.code !== 'ERR_NETWORK' && error.code !== 'ECONNREFUSED') {
+    if (
+      !config ||
+      (!error.message?.includes("Network Error") &&
+        error.code !== "ERR_NETWORK" &&
+        error.code !== "ECONNREFUSED")
+    ) {
       return Promise.reject(error);
     }
-    
+
     // Initialize retry count
     // @ts-expect-error - Adding custom property for retry tracking
     config._retryCount = config._retryCount || 0;
-    
+
     // @ts-expect-error - Checking custom retry count
     if (config._retryCount >= MAX_RETRIES) {
       return Promise.reject(error);
     }
-    
+
     // @ts-expect-error - Incrementing retry count
     config._retryCount += 1;
-    
+
     // Wait before retrying
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-    
+
     // Retry the request
     return axiosInstance(config);
   }
@@ -99,10 +104,7 @@ export const api = {
     connectionId: string,
     config: ConnectionConfig
   ): Promise<void> {
-    await axiosInstance.put(
-      `/connections/saved/${connectionId}`,
-      config
-    );
+    await axiosInstance.put(`/connections/saved/${connectionId}`, config);
   },
 
   async reconnectConnection(connectionId: string): Promise<ConnectionStatus> {
@@ -135,9 +137,7 @@ export const api = {
   },
 
   async getMetadata(connectionId: string): Promise<ConnectionMetadata> {
-    const response = await axiosInstance.get(
-      `/metadata/${connectionId}`
-    );
+    const response = await axiosInstance.get(`/metadata/${connectionId}`);
     return response.data;
   },
 
@@ -179,18 +179,14 @@ export const api = {
     queryId: string,
     data: QueryUpdateRequest
   ): Promise<Query> {
-    const response = await axiosInstance.patch(
-      `/queries/${queryId}/sql`,
-      data
-    );
+    const response = await axiosInstance.patch(`/queries/${queryId}/sql`, data);
     return response.data;
   },
 
   async updateQueryName(queryId: string, name: string): Promise<Query> {
-    const response = await axiosInstance.patch(
-      `/queries/${queryId}/name`,
-      { name }
-    );
+    const response = await axiosInstance.patch(`/queries/${queryId}/name`, {
+      name,
+    });
     return response.data;
   },
 
@@ -204,9 +200,7 @@ export const api = {
   },
 
   async getQuerySelections(queryId: string): Promise<QuerySelections> {
-    const response = await axiosInstance.get(
-      `/queries/${queryId}/selections`
-    );
+    const response = await axiosInstance.get(`/queries/${queryId}/selections`);
     return response.data;
   },
 
@@ -214,10 +208,7 @@ export const api = {
     queryId: string,
     selection: Omit<QueryTableSelection, "query_id">
   ): Promise<void> {
-    await axiosInstance.post(
-      `/queries/${queryId}/selections`,
-      selection
-    );
+    await axiosInstance.post(`/queries/${queryId}/selections`, selection);
   },
 
   async removeQuerySelection(
@@ -278,9 +269,7 @@ export const api = {
 
   // SQL History endpoints
   async getSQLHistory(queryId: string): Promise<SQLHistoryList> {
-    const response = await axiosInstance.get(
-      `/queries/${queryId}/sql-history`
-    );
+    const response = await axiosInstance.get(`/queries/${queryId}/sql-history`);
     return response.data;
   },
 
@@ -388,12 +377,9 @@ export const api = {
     file_path: string;
     s3_path: string;
   }> {
-    const response = await axiosInstance.get(
-      `/s3/${connectionId}/metadata`,
-      {
-        params: { file_path: filePath },
-      }
-    );
+    const response = await axiosInstance.get(`/s3/${connectionId}/metadata`, {
+      params: { file_path: filePath },
+    });
     return response.data;
   },
 

@@ -230,7 +230,7 @@ export default function AddTableModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
-      <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Tables</DialogTitle>
           <DialogDescription>

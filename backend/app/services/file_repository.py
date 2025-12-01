@@ -28,6 +28,15 @@ class FileRepository:
         self.files_dir = files_dir
         # Note: Schema initialization is now handled by migrations
 
+    def get_query_files_dir(self, query_id: str) -> Path:
+        """Get the directory for storing files for a specific query.
+
+        Creates the directory if it doesn't exist.
+        """
+        query_dir = self.files_dir / query_id
+        query_dir.mkdir(parents=True, exist_ok=True)
+        return query_dir
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get a database connection with foreign keys enabled."""
         conn = sqlite3.connect(self.db_path)
@@ -37,7 +46,13 @@ class FileRepository:
     # File CRUD operations
 
     def create_file(
-        self, name: str, original_filename: str, file_type: str, file_path: str, size_bytes: int, query_id: str
+        self,
+        name: str,
+        original_filename: str,
+        file_type: str,
+        file_path: str,
+        size_bytes: int,
+        query_id: str,
     ) -> dict[str, Any]:
         """Create a new file record scoped to a query."""
         file_id = str(uuid.uuid4())
@@ -49,7 +64,17 @@ class FileRepository:
                 INSERT INTO files (id, name, original_filename, file_type, file_path, size_bytes, query_id, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (file_id, name, original_filename, file_type, file_path, size_bytes, query_id, now, now),
+                (
+                    file_id,
+                    name,
+                    original_filename,
+                    file_type,
+                    file_path,
+                    size_bytes,
+                    query_id,
+                    now,
+                    now,
+                ),
             )
             conn.commit()
 
@@ -122,7 +147,7 @@ class FileRepository:
                 }
                 for row in rows
             ]
-    
+
     def get_files_by_query(self, query_id: str) -> list[dict[str, Any]]:
         """Get all files for a specific query, ordered by most recently created."""
         with self._get_connection() as conn:
@@ -134,7 +159,7 @@ class FileRepository:
                 WHERE query_id = ?
                 ORDER BY created_at DESC
                 """,
-                (query_id,)
+                (query_id,),
             )
             rows = cursor.fetchall()
 
@@ -179,11 +204,13 @@ class FileRepository:
             return Path(file_info["file_path"])
         return None
 
-    def get_file_by_name(self, name: str, query_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+    def get_file_by_name(
+        self, name: str, query_id: Optional[str] = None
+    ) -> Optional[dict[str, Any]]:
         """Get a file by name, optionally scoped to a query."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            
+
             if query_id:
                 cursor = conn.execute(
                     """
@@ -202,7 +229,7 @@ class FileRepository:
                     """,
                     (name,),
                 )
-            
+
             row = cursor.fetchone()
 
             if row:
@@ -234,39 +261,37 @@ class FileRepository:
         self, source_file: dict[str, Any], new_query_id: str
     ) -> Optional[dict[str, Any]]:
         """Duplicate a file record and its physical file for a new query.
-        
+
         Args:
             source_file: The source file record dict
             new_query_id: The query ID to associate the new file with
-            
+
         Returns:
             The new file record dict, or None if duplication failed
         """
         import shutil
-        
+
         source_path = Path(source_file["file_path"])
         if not source_path.exists():
             return None
-        
-        # Generate unique name for the new file
+
+        # Use the same base name - each query has its own folder so no conflicts
         base_name = source_file["name"]
         file_ext = source_path.suffix
-        
-        # Check if name already exists in the new query
-        existing_file = self.get_file_by_name(base_name, new_query_id)
-        if existing_file:
-            counter = 1
-            while self.get_file_by_name(f"{base_name}_{counter}", new_query_id):
-                counter += 1
-            base_name = f"{base_name}_{counter}"
-        
+
+        # Get the query-specific directory for the new query
+        query_dir = self.get_query_files_dir(new_query_id)
+        new_file_path = query_dir / f"{base_name}{file_ext}"
+
         # Copy physical file
-        new_file_path = self.files_dir / f"{base_name}{file_ext}"
         try:
             shutil.copy2(source_path, new_file_path)
-        except Exception:
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).error(f"Failed to copy file: {e}")
             return None
-        
+
         # Create new database record
         new_file = self.create_file(
             name=base_name,
@@ -276,10 +301,9 @@ class FileRepository:
             size_bytes=source_file["size_bytes"],
             query_id=new_query_id,
         )
-        
+
         return new_file
 
 
 # Global file repository instance
 file_repository = FileRepository()
-

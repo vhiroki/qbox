@@ -1,7 +1,12 @@
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import { api } from '../services/api';
-import type { Query, QueryTableSelection, ChatMessage, QueryExecuteResult } from '../types';
+import { create } from "zustand";
+import { devtools } from "zustand/middleware";
+import { api } from "../services/api";
+import type {
+  Query,
+  QueryTableSelection,
+  ChatMessage,
+  QueryExecuteResult,
+} from "../types";
 
 interface QueryExecutionState {
   result: QueryExecuteResult | null;
@@ -35,20 +40,37 @@ interface QueryState {
 
   // Selections
   loadQuerySelections: (queryId: string) => Promise<void>;
-  addQuerySelection: (queryId: string, selection: Omit<QueryTableSelection, 'query_id'>) => Promise<void>;
-  removeQuerySelection: (queryId: string, selection: Omit<QueryTableSelection, 'query_id'>) => Promise<void>;
+  addQuerySelection: (
+    queryId: string,
+    selection: Omit<QueryTableSelection, "query_id">
+  ) => Promise<void>;
+  removeQuerySelection: (
+    queryId: string,
+    selection: Omit<QueryTableSelection, "query_id">
+  ) => Promise<void>;
 
   // Chat
   loadChatHistory: (queryId: string) => Promise<void>;
-  sendChatMessage: (queryId: string, message: string) => Promise<{ updatedSQL: string }>;
-  retryChatMessage: (queryId: string, tempMessageId: string) => Promise<{ updatedSQL: string }>;
+  sendChatMessage: (
+    queryId: string,
+    message: string
+  ) => Promise<{ updatedSQL: string }>;
+  retryChatMessage: (
+    queryId: string,
+    tempMessageId: string
+  ) => Promise<{ updatedSQL: string }>;
   clearChatHistory: (queryId: string) => Promise<void>;
   setDraftMessage: (queryId: string, message: string) => void;
   getDraftMessage: (queryId: string) => string;
 
   // Query Execution Results
   getQueryExecutionState: (queryId: string) => QueryExecutionState | undefined;
-  setQueryResult: (queryId: string, result: QueryExecuteResult | null, error: string | null, executedSqlText?: string) => void;
+  setQueryResult: (
+    queryId: string,
+    result: QueryExecuteResult | null,
+    error: string | null,
+    executedSqlText?: string
+  ) => void;
   setQueryPagination: (queryId: string, page: number, pageSize: number) => void;
   clearQueryResult: (queryId: string) => void;
 
@@ -79,8 +101,8 @@ export const useQueryStore = create<QueryState>()(
           set({ queries, isLoading: false });
         } catch (error: any) {
           set({
-            error: error.response?.data?.detail || 'Failed to load queries',
-            isLoading: false
+            error: error.response?.data?.detail || "Failed to load queries",
+            isLoading: false,
           });
         }
       },
@@ -103,8 +125,8 @@ export const useQueryStore = create<QueryState>()(
           return newQuery;
         } catch (error: any) {
           set({
-            error: error.response?.data?.detail || 'Failed to create query',
-            isLoading: false
+            error: error.response?.data?.detail || "Failed to create query",
+            isLoading: false,
           });
           throw error;
         }
@@ -114,7 +136,9 @@ export const useQueryStore = create<QueryState>()(
       updateQuerySQL: async (queryId, sqlText) => {
         set({ isLoading: true, error: null });
         try {
-          const updatedQuery = await api.updateQuerySQL(queryId, { sql_text: sqlText });
+          const updatedQuery = await api.updateQuerySQL(queryId, {
+            sql_text: sqlText,
+          });
           set((state) => ({
             queries: state.queries.map((q) =>
               q.id === queryId ? updatedQuery : q
@@ -123,8 +147,8 @@ export const useQueryStore = create<QueryState>()(
           }));
         } catch (error: any) {
           set({
-            error: error.response?.data?.detail || 'Failed to update SQL',
-            isLoading: false
+            error: error.response?.data?.detail || "Failed to update SQL",
+            isLoading: false,
           });
           throw error;
         }
@@ -143,8 +167,8 @@ export const useQueryStore = create<QueryState>()(
           }));
         } catch (error: any) {
           set({
-            error: error.response?.data?.detail || 'Failed to rename query',
-            isLoading: false
+            error: error.response?.data?.detail || "Failed to rename query",
+            isLoading: false,
           });
           throw error;
         }
@@ -155,7 +179,12 @@ export const useQueryStore = create<QueryState>()(
         set({ isLoading: true, error: null });
         try {
           await api.deleteQuery(queryId);
-          const { querySelections, queryChatHistory, queryResults, queryDraftMessages } = get();
+          const {
+            querySelections,
+            queryChatHistory,
+            queryResults,
+            queryDraftMessages,
+          } = get();
 
           // Clean up related data
           querySelections.delete(queryId);
@@ -165,7 +194,8 @@ export const useQueryStore = create<QueryState>()(
 
           set((state) => ({
             queries: state.queries.filter((q) => q.id !== queryId),
-            selectedQueryId: state.selectedQueryId === queryId ? null : state.selectedQueryId,
+            selectedQueryId:
+              state.selectedQueryId === queryId ? null : state.selectedQueryId,
             querySelections: new Map(querySelections),
             queryChatHistory: new Map(queryChatHistory),
             queryResults: new Map(queryResults),
@@ -174,8 +204,8 @@ export const useQueryStore = create<QueryState>()(
           }));
         } catch (error: any) {
           set({
-            error: error.response?.data?.detail || 'Failed to delete query',
-            isLoading: false
+            error: error.response?.data?.detail || "Failed to delete query",
+            isLoading: false,
           });
           throw error;
         }
@@ -194,8 +224,8 @@ export const useQueryStore = create<QueryState>()(
           return newQuery;
         } catch (error: any) {
           set({
-            error: error.response?.data?.detail || 'Failed to duplicate query',
-            isLoading: false
+            error: error.response?.data?.detail || "Failed to duplicate query",
+            isLoading: false,
           });
           throw error;
         }
@@ -211,12 +241,12 @@ export const useQueryStore = create<QueryState>()(
 
           set({
             querySelections: new Map(querySelections),
-            isLoading: false
+            isLoading: false,
           });
         } catch (error: any) {
           // Note: We do NOT set global error here - selection errors are handled locally in QueryDetail
           set({ isLoading: false });
-          console.error('Failed to load selections:', error);
+          console.error("Failed to load selections:", error);
         }
       },
 
@@ -227,7 +257,10 @@ export const useQueryStore = create<QueryState>()(
 
           const { querySelections } = get();
           const currentSelections = querySelections.get(queryId) || [];
-          querySelections.set(queryId, [...currentSelections, { ...selection, query_id: queryId }]);
+          querySelections.set(queryId, [
+            ...currentSelections,
+            { ...selection, query_id: queryId },
+          ]);
 
           set({ querySelections: new Map(querySelections) });
         } catch (error: any) {
@@ -270,7 +303,7 @@ export const useQueryStore = create<QueryState>()(
           set({ queryChatHistory: new Map(queryChatHistory) });
         } catch (error: any) {
           // Note: We do NOT set global error here - chat errors are handled locally in ChatInterface
-          console.error('Failed to load chat history:', error);
+          console.error("Failed to load chat history:", error);
         }
       },
 
@@ -284,7 +317,7 @@ export const useQueryStore = create<QueryState>()(
         const tempUserMessage: ChatMessage = {
           id: tempId,
           query_id: queryId,
-          role: 'user',
+          role: "user",
           message,
           created_at: new Date().toISOString(),
           is_pending: true,
@@ -300,10 +333,8 @@ export const useQueryStore = create<QueryState>()(
 
           // Mark user message as sent (no longer pending) and add assistant response
           const updatedHistory = queryChatHistory.get(queryId) || [];
-          const finalHistory = updatedHistory.map(m =>
-            m.id === tempId
-              ? { ...m, is_pending: false }
-              : m
+          const finalHistory = updatedHistory.map((m) =>
+            m.id === tempId ? { ...m, is_pending: false } : m
           );
           // Add assistant message
           queryChatHistory.set(queryId, [...finalHistory, response.message]);
@@ -312,7 +343,9 @@ export const useQueryStore = create<QueryState>()(
           const updatedQuery = await api.getQuery(queryId);
 
           set((state) => ({
-            queries: state.queries.map((q) => (q.id === queryId ? updatedQuery : q)),
+            queries: state.queries.map((q) =>
+              q.id === queryId ? updatedQuery : q
+            ),
             queryChatHistory: new Map(queryChatHistory),
           }));
 
@@ -321,10 +354,8 @@ export const useQueryStore = create<QueryState>()(
           // Mark the temporary message as failed
           // Note: We do NOT set global error here - chat errors are handled locally in ChatInterface
           const failedHistory = queryChatHistory.get(queryId) || [];
-          const markedHistory = failedHistory.map(m =>
-            m.id === tempId
-              ? { ...m, is_pending: false, has_error: true }
-              : m
+          const markedHistory = failedHistory.map((m) =>
+            m.id === tempId ? { ...m, is_pending: false, has_error: true } : m
           );
           queryChatHistory.set(queryId, markedHistory);
 
@@ -339,14 +370,16 @@ export const useQueryStore = create<QueryState>()(
       retryChatMessage: async (queryId, tempMessageId) => {
         const { queryChatHistory } = get();
         const currentHistory = queryChatHistory.get(queryId) || [];
-        const failedMessage = currentHistory.find(m => m.id === tempMessageId);
+        const failedMessage = currentHistory.find(
+          (m) => m.id === tempMessageId
+        );
 
         if (!failedMessage) {
-          throw new Error('Message not found');
+          throw new Error("Message not found");
         }
 
         // Mark as pending again
-        const updatedHistory = currentHistory.map(m =>
+        const updatedHistory = currentHistory.map((m) =>
           m.id === tempMessageId
             ? { ...m, is_pending: true, has_error: false }
             : m
@@ -357,11 +390,13 @@ export const useQueryStore = create<QueryState>()(
         });
 
         try {
-          const response = await api.chatWithAI(queryId, { message: failedMessage.message });
+          const response = await api.chatWithAI(queryId, {
+            message: failedMessage.message,
+          });
 
           // Mark user message as sent and add assistant response
           const retryHistory = queryChatHistory.get(queryId) || [];
-          const finalHistory = retryHistory.map(m =>
+          const finalHistory = retryHistory.map((m) =>
             m.id === tempMessageId
               ? { ...m, is_pending: false, has_error: false }
               : m
@@ -373,7 +408,9 @@ export const useQueryStore = create<QueryState>()(
           const updatedQuery = await api.getQuery(queryId);
 
           set((state) => ({
-            queries: state.queries.map((q) => (q.id === queryId ? updatedQuery : q)),
+            queries: state.queries.map((q) =>
+              q.id === queryId ? updatedQuery : q
+            ),
             queryChatHistory: new Map(queryChatHistory),
           }));
 
@@ -382,7 +419,7 @@ export const useQueryStore = create<QueryState>()(
           // Mark as failed again
           // Note: We do NOT set global error here - chat errors are handled locally in ChatInterface
           const failedAgainHistory = queryChatHistory.get(queryId) || [];
-          const markedHistory = failedAgainHistory.map(m =>
+          const markedHistory = failedAgainHistory.map((m) =>
             m.id === tempMessageId
               ? { ...m, is_pending: false, has_error: true }
               : m
@@ -414,7 +451,7 @@ export const useQueryStore = create<QueryState>()(
       // Draft message management
       setDraftMessage: (queryId, message) => {
         const { queryDraftMessages } = get();
-        if (message.trim() === '') {
+        if (message.trim() === "") {
           queryDraftMessages.delete(queryId);
         } else {
           queryDraftMessages.set(queryId, message);
@@ -424,7 +461,7 @@ export const useQueryStore = create<QueryState>()(
 
       getDraftMessage: (queryId) => {
         const { queryDraftMessages } = get();
-        return queryDraftMessages.get(queryId) || '';
+        return queryDraftMessages.get(queryId) || "";
       },
 
       // Query Execution Results Management
@@ -449,7 +486,10 @@ export const useQueryStore = create<QueryState>()(
           error,
           currentPage: result?.page || currentState.currentPage,
           pageSize: result?.page_size || currentState.pageSize,
-          executedSqlText: executedSqlText !== undefined ? executedSqlText : currentState.executedSqlText,
+          executedSqlText:
+            executedSqlText !== undefined
+              ? executedSqlText
+              : currentState.executedSqlText,
         });
 
         set({ queryResults: new Map(queryResults) });
@@ -488,7 +528,6 @@ export const useQueryStore = create<QueryState>()(
         return queries.find((q) => q.id === selectedQueryId);
       },
     }),
-    { name: 'QueryStore' }
+    { name: "QueryStore" }
   )
 );
-

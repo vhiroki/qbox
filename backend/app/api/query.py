@@ -110,7 +110,7 @@ async def delete_query(query_id: str):
 @router.post("/{query_id}/duplicate", response_model=Query)
 async def duplicate_query(query_id: str):
     """Duplicate a query with all its selections, files, and chat history.
-    
+
     Creates a new query with:
     - Name with '(Copy)' suffix
     - Same SQL text
@@ -119,17 +119,17 @@ async def duplicate_query(query_id: str):
     - All chat history messages
     """
     from app.services.file_repository import file_repository
-    
+
     try:
         # First duplicate the query (copies non-file selections and chat history)
         new_query = query_repository.duplicate_query(query_id)
         if not new_query:
             raise HTTPException(status_code=404, detail="Query not found")
-        
+
         # Get files for source query and duplicate them
         source_files = file_repository.get_files_by_query(query_id)
         duckdb = get_duckdb_manager()
-        
+
         for source_file in source_files:
             # Duplicate the file record and physical file
             new_file = file_repository.duplicate_file(source_file, new_query.id)
@@ -144,7 +144,7 @@ async def duplicate_query(query_id: str):
                     )
                     # Store the view name
                     file_repository.update_view_name(new_file["id"], view_name)
-                    
+
                     # Add file selection to the new query
                     query_repository.add_table_selection(
                         new_query.id,
@@ -157,9 +157,9 @@ async def duplicate_query(query_id: str):
                     logger.warning(f"Failed to register duplicated file with DuckDB: {e}")
                     # Clean up the file if DuckDB registration fails
                     file_repository.delete_file(new_file["id"])
-        
+
         return new_query
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -191,8 +191,8 @@ async def add_query_selection(query_id: str, selection: QueryTableSelectionReque
     try:
         # If it's an S3 file, create a DuckDB view for it
         if selection.source_type == "s3":
-            from app.services.s3_service import get_s3_service
             from app.models.schemas import S3ConnectionConfig
+            from app.services.s3_service import get_s3_service
 
             # First, ensure the S3 secret is configured in DuckDB
             # Get connection config
@@ -218,11 +218,10 @@ async def add_query_selection(query_id: str, selection: QueryTableSelectionReque
             s3_service = get_s3_service()
             # file_path is stored in table_name for S3 files
             view_name = await s3_service.create_file_view(
-                connection_id=selection.connection_id,
-                file_path=selection.table_name
+                connection_id=selection.connection_id, file_path=selection.table_name
             )
             logger.info(f"Created S3 view '{view_name}' for file {selection.table_name}")
-        
+
         query_repository.add_table_selection(
             query_id,
             selection.connection_id,
@@ -247,15 +246,14 @@ async def remove_query_selection(query_id: str, selection: QueryTableSelectionRe
         # If it's an S3 file, drop the DuckDB view
         if selection.source_type == "s3":
             from app.services.s3_service import get_s3_service
-            
+
             s3_service = get_s3_service()
             view_name = s3_service.get_file_view_name(
-                connection_id=selection.connection_id,
-                file_path=selection.table_name
+                connection_id=selection.connection_id, file_path=selection.table_name
             )
             await s3_service.drop_file_view(view_name)
             logger.info(f"Dropped S3 view '{view_name}' for file {selection.table_name}")
-        
+
         success = query_repository.remove_table_selection(
             query_id,
             selection.connection_id,
@@ -319,6 +317,7 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
 
                     # Configure S3 secret in DuckDB
                     from app.models.schemas import S3ConnectionConfig
+
                     s3_config = S3ConnectionConfig(**conn_config.config)
                     duckdb.configure_s3_secret(
                         selection.connection_id,
@@ -328,7 +327,7 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
                     )
                     attached_connections.add(selection.connection_id)
                 continue
-                
+
             if selection.connection_id not in attached_connections:
                 # Get connection config
                 conn_config = connection_repository.get(selection.connection_id)
@@ -342,15 +341,13 @@ async def execute_query(query_id: str, request: QueryExecuteRequest):
                 from app.models.schemas import PostgresConnectionConfig
 
                 pg_config = PostgresConnectionConfig(**conn_config.config)
-                duckdb.attach_postgres(
-                    selection.connection_id, conn_config.name, pg_config
-                )
+                duckdb.attach_postgres(selection.connection_id, conn_config.name, pg_config)
                 attached_connections.add(selection.connection_id)
 
         # Execute query with pagination
         # Strip trailing semicolons from query
         clean_sql = request.sql_text.strip().rstrip(";")
-        
+
         # First, get total count
         count_query = f"SELECT COUNT(*) as total FROM ({clean_sql}) as subquery"
         _, count_result = duckdb.execute_query(count_query)
@@ -438,6 +435,7 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
 
                     # Configure S3 secret in DuckDB
                     from app.models.schemas import S3ConnectionConfig
+
                     s3_config = S3ConnectionConfig(**conn_config.config)
                     duckdb.configure_s3_secret(
                         selection.connection_id,
@@ -447,7 +445,7 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
                     )
                     attached_connections.add(selection.connection_id)
                 continue
-                
+
             if selection.connection_id not in attached_connections:
                 # Get connection config
                 conn_config = connection_repository.get(selection.connection_id)
@@ -461,9 +459,7 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
                 from app.models.schemas import PostgresConnectionConfig
 
                 pg_config = PostgresConnectionConfig(**conn_config.config)
-                duckdb.attach_postgres(
-                    selection.connection_id, conn_config.name, pg_config
-                )
+                duckdb.attach_postgres(selection.connection_id, conn_config.name, pg_config)
                 attached_connections.add(selection.connection_id)
 
         # Execute full query (no pagination)
@@ -489,9 +485,7 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
 
     except Exception as e:
         logger.error(f"Failed to export query {query_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to export query: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to export query: {str(e)}")
 
 
 # Chat interaction endpoints
@@ -501,18 +495,19 @@ async def export_query_to_csv(query_id: str, request: QueryExecuteRequest):
 async def chat_with_ai(query_id: str, request: ChatRequest):
     """Send a chat message to edit the query SQL interactively."""
     import time
+
     request_start = time.time()
-    
+
     logger.debug("=" * 100)
     logger.debug(f"📨 Received chat request for query_id: {query_id}")
     logger.debug(f"User message: {request.message}")
-    
+
     # Verify query exists
     query = query_repository.get_query(query_id)
     if not query:
         logger.error(f"Query {query_id} not found")
         raise HTTPException(status_code=404, detail="Query not found")
-    
+
     logger.debug(f"✓ Query found: {query.name}")
 
     # Get query metadata for context
@@ -521,7 +516,9 @@ async def chat_with_ai(query_id: str, request: ChatRequest):
     try:
         query_metadata = await get_query_metadata(query_id)
         metadata_elapsed = time.time() - metadata_start
-        logger.debug(f"✓ Metadata fetched in {metadata_elapsed:.2f}s - {len(query_metadata)} tables")
+        logger.debug(
+            f"✓ Metadata fetched in {metadata_elapsed:.2f}s - {len(query_metadata)} tables"
+        )
     except Exception as e:
         logger.error(f"Failed to get query metadata: {e}")
         raise HTTPException(
@@ -648,6 +645,4 @@ async def restore_sql_from_history(query_id: str, request: SQLHistoryRestoreRequ
 
     except Exception as e:
         logger.error(f"Failed to restore SQL from history: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to restore SQL: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to restore SQL: {str(e)}")

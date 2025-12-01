@@ -7,6 +7,7 @@ import QueryList from './components/QueryList';
 import QueryDetail from './components/QueryDetail';
 import HomePage from './components/HomePage';
 import UpdateBanner from './components/UpdateBanner';
+import { Toaster } from './components/ui/sonner';
 import { Button } from './components/ui/button';
 import {
   ResizableHandle,
@@ -357,6 +358,7 @@ function App() {
       <HashRouter>
         <AppContent />
       </HashRouter>
+      <Toaster />
     </ThemeProvider>
   );
 }

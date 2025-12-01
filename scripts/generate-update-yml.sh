@@ -15,23 +15,46 @@ echo "Generating update files for version: $VERSION"
 # Get current date in ISO format
 RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 
-# macOS (DMG)
-MAC_DMG="$OUT_DIR/QBox.dmg"
-if [ -f "$MAC_DMG" ]; then
-    MAC_SIZE=$(stat -f%z "$MAC_DMG" 2>/dev/null || stat -c%s "$MAC_DMG" 2>/dev/null)
-    MAC_SHA512=$(shasum -a 512 "$MAC_DMG" | cut -d' ' -f1)
-    
+# macOS (ZIP - required for auto-updates)
+MAC_ZIP="$OUT_DIR/zip/darwin/universal/QBox-darwin-universal-$VERSION.zip"
+if [ -f "$MAC_ZIP" ]; then
+    MAC_SIZE=$(stat -f%z "$MAC_ZIP" 2>/dev/null || stat -c%s "$MAC_ZIP" 2>/dev/null)
+    MAC_SHA512=$(shasum -a 512 "$MAC_ZIP" | cut -d' ' -f1)
+    MAC_FILENAME=$(basename "$MAC_ZIP")
+
     cat > "$OUT_DIR/latest-mac.yml" << EOF
 version: $VERSION
 files:
-  - url: QBox.dmg
+  - url: $MAC_FILENAME
     sha512: $MAC_SHA512
     size: $MAC_SIZE
-path: QBox.dmg
+path: $MAC_FILENAME
 sha512: $MAC_SHA512
 releaseDate: '$RELEASE_DATE'
 EOF
-    echo "✅ Generated $OUT_DIR/latest-mac.yml"
+    echo "✅ Generated $OUT_DIR/latest-mac.yml (points to ZIP for auto-updates)"
+else
+    # Fallback: try to find any ZIP file in the out/make directory
+    MAC_ZIP=$(find "$OUT_DIR" -name "QBox-darwin-*.zip" 2>/dev/null | head -n 1)
+    if [ -f "$MAC_ZIP" ]; then
+        MAC_SIZE=$(stat -f%z "$MAC_ZIP" 2>/dev/null || stat -c%s "$MAC_ZIP" 2>/dev/null)
+        MAC_SHA512=$(shasum -a 512 "$MAC_ZIP" | cut -d' ' -f1)
+        MAC_FILENAME=$(basename "$MAC_ZIP")
+
+        cat > "$OUT_DIR/latest-mac.yml" << EOF
+version: $VERSION
+files:
+  - url: $MAC_FILENAME
+    sha512: $MAC_SHA512
+    size: $MAC_SIZE
+path: $MAC_FILENAME
+sha512: $MAC_SHA512
+releaseDate: '$RELEASE_DATE'
+EOF
+        echo "✅ Generated $OUT_DIR/latest-mac.yml (points to ZIP for auto-updates)"
+    else
+        echo "⚠️  Warning: No ZIP file found for macOS auto-updates"
+    fi
 fi
 
 # Windows (if Squirrel is enabled)
@@ -78,5 +101,8 @@ echo ""
 echo "📦 Upload these files to your GitHub release:"
 ls -la "$OUT_DIR"/*.yml 2>/dev/null || echo "No YML files generated"
 echo ""
-echo "Don't forget to also upload the installer files (DMG, EXE, DEB, etc.)"
+echo "⚠️  IMPORTANT for auto-updates:"
+echo "  - Upload the ZIP files (not DMG) for macOS auto-updates"
+echo "  - Upload the latest-mac.yml metadata file"
+echo "  - DMG files are for manual installation only"
 

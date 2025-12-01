@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { UpdateState, UpdateInfo, ProgressInfo, UpdateStatus } from '../types';
+import { toast } from 'sonner';
 
 interface UpdateStoreState {
   // Update status
@@ -140,17 +141,31 @@ export const useUpdateStore = create<UpdateStoreState>()(
         });
 
         electronAPI.updates.onUpdateNotAvailable(() => {
+          const { isCheckingManually } = get();
           set({
             state: 'idle',
             lastChecked: new Date().toISOString(),
           });
+
+          // Show toast if user manually checked for updates
+          if (isCheckingManually) {
+            toast.info('You have the latest version');
+          }
         });
 
         electronAPI.updates.onUpdateError((error) => {
           set({
             state: 'error',
             error: error.message,
+            isUpdateBannerVisible: false,
           });
+          toast.error(`Update failed: ${error.message}`);
+        });
+
+        // Listen for manual check request from menu
+        electronAPI.updates.onManualCheckRequested(() => {
+          // Call checkForUpdates when menu item is clicked
+          get().checkForUpdates();
         });
       },
 

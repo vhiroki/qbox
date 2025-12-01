@@ -48,6 +48,7 @@ declare global {
         onUpdateError: (callback: (error: Error) => void) => void;
         onCheckingForUpdate: (callback: () => void) => void;
         onUpdateNotAvailable: (callback: () => void) => void;
+        onManualCheckRequested: (callback: () => void) => void;
         removeUpdateListeners: () => void;
       };
     };

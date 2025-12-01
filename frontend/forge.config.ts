@@ -1,9 +1,11 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { PublisherGithub } from '@electron-forge/publisher-github';
 import path from 'path';
 import { importSigningCertificate } from './scripts/import-signing-cert';
 
@@ -21,6 +23,8 @@ const config: ForgeConfig = {
     extraResource: [
       // Backend executable will be placed here by the build script
       path.resolve(__dirname, '..', 'backend', 'dist'),
+      // Update configuration for electron-updater
+      path.resolve(__dirname, 'app-update.yml'),
     ],
     // Code signing configuration for macOS
     // Uses certificate from CSC_LINK (imported above) or from local Keychain
@@ -55,13 +59,15 @@ const config: ForgeConfig = {
     //   loadingGif: undefined,
     //   noMsi: true,
     // }),
-    // macOS DMG
+    // macOS DMG (for manual installation)
     new MakerDMG({
       name: 'QBox',
       icon: path.resolve(__dirname, 'assets', 'icons', 'icon.icns'),
       background: undefined,
       format: 'ULFO',
     }),
+    // macOS ZIP (required for auto-updates)
+    new MakerZIP({}, ['darwin']),
     // Linux Debian package (disabled - add icons first)
     // new MakerDeb({
     //   options: {
@@ -87,6 +93,16 @@ const config: ForgeConfig = {
     //     homepage: 'https://github.com/yourusername/qbox',
     //   },
     // }),
+  ],
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'vhiroki',
+        name: 'qbox',
+      },
+      prerelease: false,
+      draft: true,
+    }),
   ],
   plugins: [
     new VitePlugin({

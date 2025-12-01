@@ -54,6 +54,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('updates:not-available', () => callback());
     },
 
+    onManualCheckRequested: (callback: () => void) => {
+      ipcRenderer.on('updates:manual-check-requested', () => callback());
+    },
+
     // Cleanup listeners
     removeUpdateListeners: () => {
       ipcRenderer.removeAllListeners('updates:available');
@@ -62,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('updates:error');
       ipcRenderer.removeAllListeners('updates:checking');
       ipcRenderer.removeAllListeners('updates:not-available');
+      ipcRenderer.removeAllListeners('updates:manual-check-requested');
     },
   },
 });

@@ -96,6 +96,7 @@ jobs:
           name: qbox-macos-${{ matrix.arch }}
           path: |
             frontend/out/make/**/*.dmg
+            frontend/out/make/**/*.zip
             frontend/out/make/**/*.yml
           if-no-files-found: error
 
@@ -116,11 +117,11 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release-files
-          
-          # Copy all DMG and YML files, renaming to include architecture
+
+          # Copy all DMG, ZIP, and YML files, renaming to include architecture
           for dir in artifacts/qbox-macos-*; do
             arch=$(basename "$dir" | sed 's/qbox-macos-//')
-            
+
             # Find and copy DMG files
             find "$dir" -name "*.dmg" -exec sh -c '
               for f; do
@@ -128,13 +129,21 @@ jobs:
                 cp "$f" "release-files/${base}-'$arch'.dmg"
               done
             ' sh {} +
-            
+
+            # Find and copy ZIP files (required for auto-updates)
+            find "$dir" -name "*.zip" -exec sh -c '
+              for f; do
+                base=$(basename "$f" .zip)
+                cp "$f" "release-files/${base}-'$arch'.zip"
+              done
+            ' sh {} +
+
             # Copy YML files (use arm64 version as the main one)
             if [ "$arch" = "arm64" ]; then
               find "$dir" -name "*.yml" -exec cp {} release-files/ \;
             fi
           done
-          
+
           echo "Files to release:"
           ls -la release-files/
 

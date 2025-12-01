@@ -198,6 +198,11 @@ export const api = {
     await axiosInstance.delete(`/queries/${queryId}`);
   },
 
+  async duplicateQuery(queryId: string): Promise<Query> {
+    const response = await axiosInstance.post(`/queries/${queryId}/duplicate`);
+    return response.data;
+  },
+
   async getQuerySelections(queryId: string): Promise<QuerySelections> {
     const response = await axiosInstance.get(
       `/queries/${queryId}/selections`

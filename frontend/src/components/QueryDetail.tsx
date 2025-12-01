@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Trash2, ChevronDown, Pencil, Play, History, PanelRightClose, PanelRight } from "lucide-react";
+import { Trash2, ChevronDown, Pencil, Play, History, PanelRightClose, PanelRight, Copy } from "lucide-react";
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import { useTheme } from "./theme-provider";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ export default function QueryDetail({
   const updateQuerySQL = useQueryStore((state) => state.updateQuerySQL);
   const updateQueryName = useQueryStore((state) => state.updateQueryName);
   const deleteQuery = useQueryStore((state) => state.deleteQuery);
+  const duplicateQuery = useQueryStore((state) => state.duplicateQuery);
   const loadQuerySelections = useQueryStore((state) => state.loadQuerySelections);
   const querySelections = useQueryStore((state) => state.querySelections);
   const isQueryLoading = useQueryStore((state) => state.isLoading);
@@ -370,6 +371,16 @@ export default function QueryDetail({
     }
   };
 
+  const handleDuplicateQuery = async () => {
+    try {
+      setLocalError(null);
+      await duplicateQuery(queryId);
+      // The store automatically selects the new query
+    } catch (err: any) {
+      setLocalError(err.response?.data?.detail || "Failed to duplicate query");
+    }
+  };
+
   const startEditing = () => {
     if (query) {
       setEditedName(query.name);
@@ -676,6 +687,10 @@ export default function QueryDetail({
                     <DropdownMenuItem onClick={startEditing}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Rename Query
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDuplicateQuery}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Duplicate Query
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setDeleteDialogOpen(true)}

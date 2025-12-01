@@ -230,6 +230,55 @@ class FileRepository:
             conn.commit()
             return cursor.rowcount > 0
 
+    def duplicate_file(
+        self, source_file: dict[str, Any], new_query_id: str
+    ) -> Optional[dict[str, Any]]:
+        """Duplicate a file record and its physical file for a new query.
+        
+        Args:
+            source_file: The source file record dict
+            new_query_id: The query ID to associate the new file with
+            
+        Returns:
+            The new file record dict, or None if duplication failed
+        """
+        import shutil
+        
+        source_path = Path(source_file["file_path"])
+        if not source_path.exists():
+            return None
+        
+        # Generate unique name for the new file
+        base_name = source_file["name"]
+        file_ext = source_path.suffix
+        
+        # Check if name already exists in the new query
+        existing_file = self.get_file_by_name(base_name, new_query_id)
+        if existing_file:
+            counter = 1
+            while self.get_file_by_name(f"{base_name}_{counter}", new_query_id):
+                counter += 1
+            base_name = f"{base_name}_{counter}"
+        
+        # Copy physical file
+        new_file_path = self.files_dir / f"{base_name}{file_ext}"
+        try:
+            shutil.copy2(source_path, new_file_path)
+        except Exception:
+            return None
+        
+        # Create new database record
+        new_file = self.create_file(
+            name=base_name,
+            original_filename=source_file["original_filename"],
+            file_type=source_file["file_type"],
+            file_path=str(new_file_path),
+            size_bytes=source_file["size_bytes"],
+            query_id=new_query_id,
+        )
+        
+        return new_file
+
 
 # Global file repository instance
 file_repository = FileRepository()

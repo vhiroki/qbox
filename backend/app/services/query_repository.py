@@ -440,6 +440,46 @@ class QueryRepository:
 
             return sql_text
 
+    def duplicate_query(self, source_query_id: str) -> Optional[Query]:
+        """Duplicate a query with all its selections (non-file) and chat history.
+        
+        Creates a new query with the same SQL text and name with '(Copy)' suffix.
+        Does NOT duplicate files - that should be handled separately by FileRepository.
+        
+        Args:
+            source_query_id: ID of the query to duplicate
+            
+        Returns:
+            The newly created Query, or None if source query not found
+        """
+        # Get source query
+        source_query = self.get_query(source_query_id)
+        if not source_query:
+            return None
+        
+        # Create new query with copied name and SQL
+        new_name = f"{source_query.name} (Copy)"
+        new_query = self.create_query(new_name, source_query.sql_text)
+        
+        # Copy non-file selections
+        selections = self.get_query_selections(source_query_id)
+        for sel in selections:
+            if sel.source_type != "file":
+                self.add_table_selection(
+                    new_query.id,
+                    sel.connection_id,
+                    sel.schema_name,
+                    sel.table_name,
+                    sel.source_type,
+                )
+        
+        # Copy chat history
+        chat_messages = self.get_chat_history(source_query_id)
+        for msg in chat_messages:
+            self.add_chat_message(new_query.id, msg.role, msg.message)
+        
+        return new_query
+
 
 # Global query repository instance
 query_repository = QueryRepository()

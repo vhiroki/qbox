@@ -107,6 +107,66 @@ async def delete_query(query_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete query: {str(e)}")
 
 
+@router.post("/{query_id}/duplicate", response_model=Query)
+async def duplicate_query(query_id: str):
+    """Duplicate a query with all its selections, files, and chat history.
+    
+    Creates a new query with:
+    - Name with '(Copy)' suffix
+    - Same SQL text
+    - All table selections (connection and S3 sources)
+    - Copies of all uploaded files (with DuckDB views registered)
+    - All chat history messages
+    """
+    from app.services.file_repository import file_repository
+    
+    try:
+        # First duplicate the query (copies non-file selections and chat history)
+        new_query = query_repository.duplicate_query(query_id)
+        if not new_query:
+            raise HTTPException(status_code=404, detail="Query not found")
+        
+        # Get files for source query and duplicate them
+        source_files = file_repository.get_files_by_query(query_id)
+        duckdb = get_duckdb_manager()
+        
+        for source_file in source_files:
+            # Duplicate the file record and physical file
+            new_file = file_repository.duplicate_file(source_file, new_query.id)
+            if new_file:
+                # Register with DuckDB
+                try:
+                    view_name = duckdb.register_file(
+                        new_file["id"],
+                        new_file["name"],
+                        new_file["file_path"],
+                        new_file["file_type"],
+                    )
+                    # Store the view name
+                    file_repository.update_view_name(new_file["id"], view_name)
+                    
+                    # Add file selection to the new query
+                    query_repository.add_table_selection(
+                        new_query.id,
+                        new_file["id"],  # connection_id is file_id for files
+                        "files",  # schema_name
+                        new_file["name"],  # table_name
+                        "file",  # source_type
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to register duplicated file with DuckDB: {e}")
+                    # Clean up the file if DuckDB registration fails
+                    file_repository.delete_file(new_file["id"])
+        
+        return new_query
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to duplicate query: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to duplicate query: {str(e)}")
+
+
 # Table selection endpoints
 
 

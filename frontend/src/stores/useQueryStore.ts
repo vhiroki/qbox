@@ -31,6 +31,7 @@ interface QueryState {
   updateQuerySQL: (queryId: string, sqlText: string) => Promise<void>;
   updateQueryName: (queryId: string, name: string) => Promise<void>;
   deleteQuery: (queryId: string) => Promise<void>;
+  duplicateQuery: (queryId: string) => Promise<Query>;
 
   // Selections
   loadQuerySelections: (queryId: string) => Promise<void>;
@@ -174,6 +175,26 @@ export const useQueryStore = create<QueryState>()(
         } catch (error: any) {
           set({
             error: error.response?.data?.detail || 'Failed to delete query',
+            isLoading: false
+          });
+          throw error;
+        }
+      },
+
+      // Duplicate a query
+      duplicateQuery: async (queryId) => {
+        set({ isLoading: true, error: null });
+        try {
+          const newQuery = await api.duplicateQuery(queryId);
+          set((state) => ({
+            queries: [newQuery, ...state.queries],
+            selectedQueryId: newQuery.id,
+            isLoading: false,
+          }));
+          return newQuery;
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.detail || 'Failed to duplicate query',
             isLoading: false
           });
           throw error;

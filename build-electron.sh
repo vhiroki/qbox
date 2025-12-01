@@ -85,6 +85,40 @@ if [ ! -f "dist/$BACKEND_EXEC" ]; then
     exit 1
 fi
 
+# Code sign the backend executable on macOS (if signing identity is available)
+if [ "$PLATFORM_NAME" == "macOS" ]; then
+    # Check if we have a signing identity
+    SIGNING_IDENTITY="${APPLE_SIGNING_IDENTITY:-}"
+
+    # If not in env var, try to find one in keychain
+    if [ -z "$SIGNING_IDENTITY" ]; then
+        SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n 1 | grep -o '".*"' | tr -d '"' || echo "")
+    fi
+
+    if [ -n "$SIGNING_IDENTITY" ]; then
+        echo "🔐 Code signing backend executable with: $SIGNING_IDENTITY"
+
+        # Sign the backend with deep signing and hardened runtime
+        codesign --force --deep \
+            --options runtime \
+            --entitlements "$BACKEND_DIR/entitlements.plist" \
+            --sign "$SIGNING_IDENTITY" \
+            --timestamp \
+            "dist/$BACKEND_EXEC"
+
+        # Verify the signature
+        if codesign --verify --verbose "dist/$BACKEND_EXEC" 2>&1; then
+            echo "✅ Backend signature verified"
+        else
+            echo "⚠️  Backend signature verification failed, but continuing..."
+        fi
+    else
+        echo "⚠️  No code signing identity found - backend will not be signed"
+        echo "   To sign the backend, set APPLE_SIGNING_IDENTITY environment variable"
+        echo "   or ensure a 'Developer ID Application' certificate is in your keychain"
+    fi
+fi
+
 echo "✅ Backend built successfully"
 echo ""
 

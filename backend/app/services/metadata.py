@@ -272,19 +272,30 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
     for selection in s3_selections:
         connection_id = selection.connection_id  # S3 connection ID
         file_path = selection.table_name  # For S3, file path is stored in table_name
-        
+
         try:
             # Get connection config
             connection_config = connection_repository.get(connection_id)
             if not connection_config:
                 logger.warning(f"S3 Connection {connection_id} not found, skipping")
                 continue
-            
+
             connection_name = connection_config.name
-            
+
+            # Ensure S3 secret is configured in DuckDB (handles app restart case
+            # where the in-memory cache is empty but the secret exists in DuckDB)
+            if not duckdb_manager.get_attached_identifier(connection_id):
+                from app.models.schemas import S3ConnectionConfig
+                s3_config = S3ConnectionConfig(**connection_config.config)
+                duckdb_manager.configure_s3_secret(
+                    connection_id,
+                    connection_name,
+                    s3_config,
+                )
+
             # Get S3 service to retrieve view name
             from app.services.s3_service import get_s3_service
-            
+
             s3_service = get_s3_service()
             view_name = s3_service.get_file_view_name(connection_id, file_path)
             

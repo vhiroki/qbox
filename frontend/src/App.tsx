@@ -6,6 +6,7 @@ import ConnectionManager from './components/ConnectionManager';
 import QueryList from './components/QueryList';
 import QueryDetail from './components/QueryDetail';
 import HomePage from './components/HomePage';
+import UpdateBanner from './components/UpdateBanner';
 import { Button } from './components/ui/button';
 import {
   ResizableHandle,
@@ -18,7 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './components/ui/tooltip';
-import { useQueryStore } from './stores';
+import { useQueryStore, useUpdateStore } from './stores';
 
 const SIDEBAR_COLLAPSED_KEY = 'qbox-sidebar-collapsed';
 const SIDEBAR_LAYOUT_KEY = 'qbox-sidebar-layout';
@@ -104,6 +105,16 @@ function AppContent() {
       loadQueries();
     }
   }, [loadQueries]);
+
+  // Initialize update listeners on mount
+  useEffect(() => {
+    const { initializeListeners, cleanupListeners } = useUpdateStore.getState();
+    initializeListeners();
+
+    return () => {
+      cleanupListeners();
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
@@ -281,9 +292,14 @@ function AppContent() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="h-screen flex bg-background text-foreground">
-        {/* Collapsible Left Sidebar */}
-        {isCollapsed ? (
+      <div className="h-screen flex flex-col bg-background text-foreground">
+        {/* Update Banner */}
+        <UpdateBanner />
+
+        {/* Main Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Collapsible Left Sidebar */}
+          {isCollapsed ? (
           // Collapsed: Just show toolbar icons vertically
           <div className="h-full border-r flex flex-col items-center py-2 px-1 bg-card">
             <Toolbar collapsed />
@@ -319,16 +335,17 @@ function AppContent() {
           </ResizablePanelGroup>
         )}
 
-        {/* When collapsed, main content takes full width */}
-        {isCollapsed && (
-          <div className="flex-1 h-full flex flex-col overflow-hidden">
-            <Routes>
-              <Route path="/" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
-              <Route path="/query/:queryId" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
-              <Route path="/connections" element={<ConnectionsPage />} />
-            </Routes>
-          </div>
-        )}
+          {/* When collapsed, main content takes full width */}
+          {isCollapsed && (
+            <div className="flex-1 h-full flex flex-col overflow-hidden">
+              <Routes>
+                <Route path="/" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
+                <Route path="/query/:queryId" element={<QueryPage onCreateQuery={handleCreateQuery} isCreating={isCreating} />} />
+                <Route path="/connections" element={<ConnectionsPage />} />
+              </Routes>
+            </div>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );

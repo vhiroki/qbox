@@ -282,12 +282,58 @@ export interface FileMetadata {
   row_count?: number;
 }
 
+// Update Types
+
+export interface UpdateInfo {
+  version: string;
+  releaseDate: string;
+  releaseNotes?: string;
+  releaseName?: string;
+}
+
+export interface ProgressInfo {
+  total: number;
+  transferred: number;
+  percent: number;
+  bytesPerSecond: number;
+}
+
+export type UpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+export interface UpdateStatus {
+  state: UpdateState;
+  info?: UpdateInfo;
+  progress?: ProgressInfo;
+  error?: string;
+  lastChecked?: string;
+}
+
 // Electron API (exposed via preload.ts)
 
 export interface ElectronAPI {
   platform: string;
   reportIssue: () => Promise<void>;
   openLogsFolder: () => Promise<void>;
+  updates?: {
+    checkForUpdates: () => Promise<void>;
+    downloadUpdate: () => Promise<void>;
+    installUpdate: () => Promise<void>;
+    dismissUpdate: () => Promise<void>;
+    getUpdateState: () => Promise<UpdateStatus>;
+    onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void;
+    onDownloadProgress: (callback: (progress: ProgressInfo) => void) => void;
+    onUpdateDownloaded: (callback: (info: UpdateInfo) => void) => void;
+    onUpdateError: (callback: (error: Error) => void) => void;
+    onCheckingForUpdate: (callback: () => void) => void;
+    onUpdateNotAvailable: (callback: () => void) => void;
+    removeUpdateListeners: () => void;
+  };
 }
 
 declare global {

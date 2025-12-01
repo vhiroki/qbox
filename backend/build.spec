@@ -62,6 +62,16 @@ datas += tiktoken_ext_datas
 binaries += tiktoken_ext_binaries
 hiddenimports += tiktoken_ext_hidden
 
+# Yoyo migrations - collect all data files and metadata
+yoyo_datas, yoyo_binaries, yoyo_hidden = collect_all('yoyo')
+datas += yoyo_datas
+binaries += yoyo_binaries
+hiddenimports += yoyo_hidden
+
+# Include our migration SQL files
+migrations_dir = os.path.join(os.getcwd(), 'app', 'migrations')
+datas += [(migrations_dir, 'app/migrations')]
+
 # Boto3 for S3 support
 hiddenimports += collect_submodules('boto3')
 hiddenimports += collect_submodules('botocore')

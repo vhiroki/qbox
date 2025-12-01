@@ -17,6 +17,27 @@ let mainWindow: BrowserWindow | null = null;
 let backendProcess: ChildProcess | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
 
+// Update state management
+interface UpdateStatus {
+  state: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error';
+  info?: {
+    version: string;
+    releaseDate: string;
+    releaseNotes?: string;
+    releaseName?: string;
+  };
+  progress?: {
+    total: number;
+    transferred: number;
+    percent: number;
+    bytesPerSecond: number;
+  };
+  error?: string;
+  lastChecked?: string;
+}
+
+let updateState: UpdateStatus = { state: 'idle' };
+
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -153,6 +174,15 @@ function stopBackend(): void {
 }
 
 /**
+ * Send update events to renderer process
+ */
+function sendToRenderer(channel: string, data?: any): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, data);
+  }
+}
+
+/**
  * Setup auto-updater
  */
 function setupAutoUpdater(): void {
@@ -187,68 +217,99 @@ function setupAutoUpdater(): void {
     return;
   }
 
+  // User controls when to download updates
+  autoUpdater.autoDownload = false;
+  // Auto-install on app quit if update is downloaded
+  autoUpdater.autoInstallOnAppQuit = true;
+
   // Auto-updater event handlers
   autoUpdater.on('checking-for-update', () => {
     logger.info('Checking for updates...');
+    updateState = { state: 'checking' };
+    sendToRenderer('updates:checking');
   });
 
   autoUpdater.on('update-available', (info) => {
     logger.info(`Update available: ${info.version}`);
-
-    // Show notification
-    if (Notification.isSupported()) {
-      const notification = new Notification({
-        title: 'Update Available',
-        body: `A new version of QBox (${info.version}) is available. It will be downloaded in the background.`,
-      });
-      notification.show();
-    }
+    updateState = {
+      state: 'available',
+      info: {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: info.releaseNotes,
+        releaseName: info.releaseName,
+      },
+      lastChecked: new Date().toISOString(),
+    };
+    sendToRenderer('updates:available', updateState.info);
   });
 
   autoUpdater.on('update-not-available', (info) => {
     logger.info(`Update not available: current version ${info.version}`);
+    updateState = {
+      state: 'idle',
+      lastChecked: new Date().toISOString(),
+    };
+    sendToRenderer('updates:not-available');
   });
 
   autoUpdater.on('error', (err) => {
     logger.error('Error in auto-updater', err);
+    updateState = {
+      state: 'error',
+      error: err.message,
+    };
+    sendToRenderer('updates:error', { message: err.message });
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
     logger.info(
-      `Download progress: ${progressObj.percent.toFixed(1)}% (${progressObj.transferred}/${progressObj.total})`
+      `Download progress: ${progressObj.percent.toFixed(1)}% (${(progressObj.bytesPerSecond / 1024 / 1024).toFixed(2)} MB/s)`
     );
+    updateState = {
+      ...updateState,
+      state: 'downloading',
+      progress: {
+        total: progressObj.total,
+        transferred: progressObj.transferred,
+        percent: progressObj.percent,
+        bytesPerSecond: progressObj.bytesPerSecond,
+      },
+    };
+    sendToRenderer('updates:progress', updateState.progress);
   });
 
   autoUpdater.on('update-downloaded', (info) => {
     logger.info(`Update downloaded: ${info.version}`);
+    updateState = {
+      ...updateState,
+      state: 'downloaded',
+      info: {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: info.releaseNotes,
+        releaseName: info.releaseName,
+      },
+    };
+    sendToRenderer('updates:downloaded', updateState.info);
+  });
 
-    // Show dialog asking user to restart
-    const result = dialog.showMessageBoxSync({
-      type: 'info',
-      title: 'Update Ready',
-      message: 'A new version has been downloaded. Restart QBox to apply the update?',
-      buttons: ['Restart Now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
+  // Initial check on startup (delayed by 10 seconds to let app fully load)
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      logger.error('Failed initial update check', err);
     });
+  }, 10000);
 
-    if (result === 0) {
-      // User chose to restart
-      autoUpdater.quitAndInstall();
-    }
-  });
-
-  // Check for updates now
-  autoUpdater.checkForUpdates().catch((err) => {
-    logger.error('Failed to check for updates', err);
-  });
-
-  // Setup periodic update checks
+  // Periodic checks (6 hours by default)
   if (config.autoUpdate.checkInterval > 0) {
     updateCheckInterval = setInterval(() => {
-      autoUpdater.checkForUpdates().catch((err) => {
-        logger.error('Failed to check for updates', err);
-      });
+      // Only auto-check if we're idle (not already checking/downloading)
+      if (updateState.state === 'idle') {
+        autoUpdater.checkForUpdates().catch((err) => {
+          logger.error('Failed periodic update check', err);
+        });
+      }
     }, config.autoUpdate.checkInterval);
   }
 }
@@ -337,6 +398,40 @@ function setupIpcHandlers(): void {
   ipcMain.handle('open-logs-folder', async () => {
     await shell.openPath(logger.getLogDir());
   });
+
+  // Update IPC handlers
+  ipcMain.handle('updates:check', async () => {
+    if (!config.autoUpdate.enabled || config.isDevelopment) {
+      throw new Error('Auto-update is disabled');
+    }
+    await autoUpdater.checkForUpdates();
+  });
+
+  ipcMain.handle('updates:download', async () => {
+    if (updateState.state !== 'available') {
+      throw new Error('No update available to download');
+    }
+    await autoUpdater.downloadUpdate();
+  });
+
+  ipcMain.handle('updates:install', () => {
+    if (updateState.state !== 'downloaded') {
+      throw new Error('No update ready to install');
+    }
+    // false = don't force close, true = restart after install
+    autoUpdater.quitAndInstall(false, true);
+  });
+
+  ipcMain.handle('updates:dismiss', () => {
+    // Reset to idle if in 'available' state (user chose "Later")
+    if (updateState.state === 'available') {
+      updateState = { ...updateState, state: 'idle' };
+    }
+  });
+
+  ipcMain.handle('updates:getState', () => {
+    return updateState;
+  });
 }
 
 /**
@@ -408,6 +503,17 @@ function setupMenu(): void {
     {
       label: 'Help',
       submenu: [
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            if (mainWindow) {
+              // Trigger manual update check in renderer
+              mainWindow.webContents.send('updates:manual-check-requested');
+            }
+          },
+          enabled: config.autoUpdate.enabled && !config.isDevelopment,
+        },
+        { type: 'separator' },
         {
           label: 'Report Issue...',
           click: () => {

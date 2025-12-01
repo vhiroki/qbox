@@ -43,6 +43,7 @@ export const config = {
   autoUpdate: {
     enabled: true,
     checkInterval: 6 * 60 * 60 * 1000, // 6 hours in milliseconds
+    autoDownload: false, // User controls when to download updates
     // GitHub repository for updates (owner/repo format)
     // Configure these with your actual GitHub username/org and repo name
     // Example: { owner: 'vhiroki', repo: 'qbox' }

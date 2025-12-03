@@ -23,6 +23,15 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
+} from "@/components/ui/select";
 import { useTheme } from "@/components/theme-provider";
 import { api } from "../services/api";
 import type { AISettings, AISettingsUpdate } from "../types";
@@ -52,6 +61,9 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
   // Track if settings have changed
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Track which API key fields were explicitly modified (to allow clearing)
+  const [modifiedKeys, setModifiedKeys] = useState<Set<string>>(new Set());
+
   // Load settings when modal opens
   useEffect(() => {
     if (open) {
@@ -67,6 +79,7 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
       const settings = await api.getAISettings();
       setAISettings(settings);
       setHasChanges(false);
+      setModifiedKeys(new Set());
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to load settings");
     } finally {
@@ -79,6 +92,11 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
     setHasChanges(true);
     setError(null);
     setSuccess(null);
+
+    // Track if an API key field was modified
+    if (field === 'openai_api_key' || field === 'anthropic_api_key' || field === 'gemini_api_key') {
+      setModifiedKeys(prev => new Set(prev).add(field));
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -86,27 +104,28 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
       setLoading(true);
       setError(null);
       setSuccess(null);
-      
+
       // Prepare update payload (only include changed fields)
       const update: AISettingsUpdate = {
         ai_model: aiSettings.ai_model,
         ai_temperature: aiSettings.ai_temperature,
       };
-      
-      // Only include API keys if they were changed (not masked)
-      if (aiSettings.openai_api_key && !aiSettings.openai_api_key.startsWith("*")) {
-        update.openai_api_key = aiSettings.openai_api_key;
+
+      // Include API keys if they were explicitly modified (allows clearing)
+      if (modifiedKeys.has('openai_api_key')) {
+        update.openai_api_key = aiSettings.openai_api_key?.trim() || '';
       }
-      if (aiSettings.anthropic_api_key && !aiSettings.anthropic_api_key.startsWith("*")) {
-        update.anthropic_api_key = aiSettings.anthropic_api_key;
+      if (modifiedKeys.has('anthropic_api_key')) {
+        update.anthropic_api_key = aiSettings.anthropic_api_key?.trim() || '';
       }
-      if (aiSettings.gemini_api_key && !aiSettings.gemini_api_key.startsWith("*")) {
-        update.gemini_api_key = aiSettings.gemini_api_key;
+      if (modifiedKeys.has('gemini_api_key')) {
+        update.gemini_api_key = aiSettings.gemini_api_key?.trim() || '';
       }
-      
+
       const updated = await api.updateAISettings(update);
       setAISettings(updated);
       setHasChanges(false);
+      setModifiedKeys(new Set());
       setSuccess("Settings saved successfully");
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to save settings");
@@ -232,14 +251,39 @@ export default function SettingsModal({ onDataCleared }: SettingsModalProps) {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="ai-model">AI Model</Label>
-                    <Input
-                      id="ai-model"
-                      type="text"
-                      placeholder="gpt-4o"
+                    <Select
                       value={aiSettings.ai_model}
-                      onChange={(e) => handleSettingsChange("ai_model", e.target.value)}
+                      onValueChange={(value) => handleSettingsChange("ai_model", value)}
                       disabled={loading}
-                    />
+                    >
+                      <SelectTrigger id="ai-model" className="w-full">
+                        <SelectValue placeholder="Select a model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>OpenAI</SelectLabel>
+                          <SelectItem value="o3-mini">o3 mini</SelectItem>
+                          <SelectItem value="o3">o3</SelectItem>
+                          <SelectItem value="o4-mini">o4 mini</SelectItem>
+                          <SelectItem value="gpt-5">GPT-5</SelectItem>
+                          <SelectItem value="gpt-5-mini">GPT-5 mini</SelectItem>
+                          <SelectItem value="gpt-5-nano">GPT-5 nano</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>Anthropic</SelectLabel>
+                          <SelectItem value="claude-sonnet-4-5">Claude Sonnet 4.5</SelectItem>
+                          <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5</SelectItem>
+                          <SelectItem value="claude-opus-4-5">Claude Opus 4.5</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>Google</SelectLabel>
+                          <SelectItem value="gemini-3-pro-preview">Gemini 3 Pro Preview</SelectItem>
+                          <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                          <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                          <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-muted-foreground">
                       Examples: gpt-4o, claude-3-5-sonnet-20241022, gemini/gemini-pro, ollama/llama2
                     </p>

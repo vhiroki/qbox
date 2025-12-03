@@ -17,6 +17,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "boto3>=1.28.0",
     "yoyo-migrations>=8.2.0",
+    "google-auth>=2.0.0",
 ]
 
 [project.optional-dependencies]

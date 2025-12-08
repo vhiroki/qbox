@@ -566,7 +566,7 @@ async def chat_with_ai(query_id: str, request: ChatRequest):
 
     # Only save messages after successful AI generation
     logger.debug("Saving chat messages...")
-    user_message = query_repository.add_chat_message(query_id, "user", request.message)
+    query_repository.add_chat_message(query_id, "user", request.message)
     assistant_message = query_repository.add_chat_message(
         query_id, "assistant", result.get("explanation", "SQL updated")
     )

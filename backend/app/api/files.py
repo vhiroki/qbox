@@ -1,9 +1,8 @@
 """API endpoints for file management."""
 
 import logging
-import shutil
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 

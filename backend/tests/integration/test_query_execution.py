@@ -370,9 +370,7 @@ class TestChatHistory:
 
         # Add messages
         msg1 = test_query_repository.add_chat_message(query.id, "user", "Help me write SQL")
-        msg2 = test_query_repository.add_chat_message(
-            query.id, "assistant", "Here's the query..."
-        )
+        msg2 = test_query_repository.add_chat_message(query.id, "assistant", "Here's the query...")
 
         assert msg1.id is not None
         assert msg1.role == "user"
@@ -418,9 +416,7 @@ class TestSQLHistory:
 
         # Restore older version
         older_version_id = history[1]["id"]  # "SELECT 2"
-        restored_sql = test_query_repository.restore_sql_from_history(
-            query.id, older_version_id
-        )
+        restored_sql = test_query_repository.restore_sql_from_history(query.id, older_version_id)
 
         assert restored_sql == "SELECT 2"
 

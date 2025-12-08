@@ -31,7 +31,7 @@ class BaseConnection(ABC):
     async def connect(self) -> bool:
         """
         Establish connection to the data source.
-        
+
         Returns:
             True if connection successful, False otherwise.
             If False, set self.connection_error with the error message.
@@ -47,7 +47,7 @@ class BaseConnection(ABC):
     async def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any]]]:
         """
         Execute a query and return results.
-        
+
         Returns:
             Tuple of (column_names, rows)
         """
@@ -62,7 +62,7 @@ class BaseConnection(ABC):
     async def get_metadata_lite(self) -> list[dict[str, str]]:
         """
         Get lightweight metadata (table/schema names only) from the data source.
-        
+
         Returns:
             List of dictionaries with schema_name and table_name keys
         """
@@ -72,7 +72,7 @@ class BaseConnection(ABC):
     async def collect_metadata(self) -> Any:
         """
         Collect full lightweight metadata structure for the data source.
-        
+
         Returns:
             ConnectionMetadataLite object with schemas and tables
         """
@@ -95,11 +95,11 @@ class BaseConnection(ABC):
     async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
         """
         Get detailed metadata for a specific table.
-        
+
         Args:
             schema_name: Schema name
             table_name: Table name
-            
+
         Returns:
             Dictionary with table metadata including columns and row count
         """
@@ -109,20 +109,22 @@ class BaseConnection(ABC):
     async def cleanup(self, duckdb_manager) -> None:
         """
         Cleanup resources when connection is deleted.
-        
+
         Args:
             duckdb_manager: DuckDB manager instance for cleanup operations
         """
         pass
 
-    def preserve_sensitive_fields(self, new_config: dict[str, Any], existing_config: dict[str, Any]) -> dict[str, Any]:
+    def preserve_sensitive_fields(
+        self, new_config: dict[str, Any], existing_config: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Preserve sensitive fields from existing config if they're empty in the new config.
-        
+
         Args:
             new_config: New configuration with potentially empty sensitive fields
             existing_config: Existing configuration with actual sensitive values
-            
+
         Returns:
             Updated config with sensitive fields preserved where appropriate
         """
@@ -132,10 +134,10 @@ class BaseConnection(ABC):
     def mask_sensitive_fields(self, config: dict[str, Any]) -> dict[str, Any]:
         """
         Mask sensitive fields in configuration for safe display.
-        
+
         Args:
             config: Configuration with sensitive values
-            
+
         Returns:
             Configuration with sensitive fields masked (empty strings)
         """
@@ -152,15 +154,17 @@ class ConnectionRegistry:
     def register(cls, connection_type: DataSourceType):
         """
         Decorator to register a connection class for a specific type.
-        
+
         Usage:
             @ConnectionRegistry.register(DataSourceType.POSTGRES)
             class PostgresConnection(BaseConnection):
                 ...
         """
+
         def decorator(connection_class: type[BaseConnection]):
             cls._registry[connection_type] = connection_class
             return connection_class
+
         return decorator
 
     @classmethod
@@ -183,4 +187,3 @@ class ConnectionRegistry:
 # New connection types can be added here
 from app.connections.postgres import PostgresConnection  # noqa: E402, F401
 from app.connections.s3 import S3Connection  # noqa: E402, F401
-

@@ -2,7 +2,7 @@ import uuid
 from typing import Any, Optional
 
 from app.connections import BaseConnection, ConnectionRegistry
-from app.models.schemas import ConnectionConfig, DataSourceType
+from app.models.schemas import ConnectionConfig
 from app.services.connection_repository import connection_repository
 from app.services.duckdb_manager import get_duckdb_manager
 from app.services.query_repository import query_repository
@@ -41,9 +41,7 @@ class ConnectionManager:
 
             # Instantiate the connection
             datasource = connection_class(
-                connection_id=connection_id,
-                connection_name=config.name,
-                config=config.config
+                connection_id=connection_id, connection_name=config.name, config=config.config
             )
 
             # Attempt to connect
@@ -99,9 +97,7 @@ class ConnectionManager:
 
             # Instantiate the connection
             datasource = connection_class(
-                connection_id=connection_id,
-                connection_name=config.name,
-                config=config.config
+                connection_id=connection_id, connection_name=config.name, config=config.config
             )
 
             # Attempt to connect
@@ -138,7 +134,7 @@ class ConnectionManager:
         Args:
             connection_id: The connection ID to disconnect
             delete_saved: Whether to also delete the saved configuration
-        
+
         Returns:
             True if the connection was found (in memory or saved) and disconnected
         """
@@ -150,18 +146,18 @@ class ConnectionManager:
         if delete_saved:
             # Check if connection exists in saved configurations
             connection_exists = connection_repository.exists(connection_id)
-            
+
             # Cleanup connection resources
             if datasource:
                 duckdb_manager = get_duckdb_manager()
                 await datasource.cleanup(duckdb_manager)
-            
+
             # Delete all query selections that reference this connection
             query_repository.delete_selections_by_connection(connection_id)
-            
+
             # Delete the connection configuration
             connection_repository.delete(connection_id)
-            
+
             # Return success if connection was in memory or in saved configs
             return datasource is not None or connection_exists
 
@@ -212,7 +208,10 @@ class ConnectionManager:
 
         # Prevent connection name changes as it would break SQL identifier references
         if config.name != existing.name:
-            return False, "Connection name cannot be changed as it would break existing queries. Please create a new connection instead."
+            return (
+                False,
+                "Connection name cannot be changed as it would break existing queries. Please create a new connection instead.",
+            )
 
         # Preserve sensitive fields using connection type-specific logic
         connection_class = ConnectionRegistry.get(config.type)

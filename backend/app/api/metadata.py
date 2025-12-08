@@ -30,7 +30,7 @@ async def get_all_connections_metadata():
                 connection_config = connection_repository.get(connection_data["id"])
                 if not connection_config:
                     continue
-                
+
                 metadata = await metadata_service.refresh_metadata(
                     connection_id=connection_data["id"],
                     connection_name=connection_config.name,
@@ -39,9 +39,7 @@ async def get_all_connections_metadata():
                 )
                 metadata_list.append(metadata)
             except Exception as e:
-                logger.error(
-                    f"Failed to get metadata for {connection_data['id']}: {e}"
-                )
+                logger.error(f"Failed to get metadata for {connection_data['id']}: {e}")
                 # Skip connections that fail to load metadata
                 continue
 

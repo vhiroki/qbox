@@ -35,9 +35,7 @@ class TestConnectionCRUD:
 class TestConnectionRepository:
     """Tests for connection repository operations (via direct repository access)."""
 
-    def test_save_and_get_connection(
-        self, test_connection_repository, sample_postgres_config
-    ):
+    def test_save_and_get_connection(self, test_connection_repository, sample_postgres_config):
         """Should save and retrieve a connection configuration."""
         from app.models.schemas import ConnectionConfig, DataSourceType
 
@@ -191,9 +189,7 @@ class TestIdentifierCollision:
 
         assert conflicting is None
 
-    def test_save_raises_on_collision(
-        self, test_connection_repository, sample_postgres_config
-    ):
+    def test_save_raises_on_collision(self, test_connection_repository, sample_postgres_config):
         """Should raise ValueError when saving connection with colliding identifier."""
         from app.models.schemas import ConnectionConfig, DataSourceType
 
@@ -345,9 +341,7 @@ class TestPostgresConnection:
         response = await test_client.get("/api/connections/saved")
         assert response.json()["connections"] == []
 
-    async def test_postgres_reconnect(
-        self, test_client: AsyncClient, postgres_connection_config
-    ):
+    async def test_postgres_reconnect(self, test_client: AsyncClient, postgres_connection_config):
         """Should be able to reconnect to a saved PostgreSQL connection."""
         # Create connection
         response = await test_client.post(

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
-    
+
     # Model to use - LiteLLM format examples:
     # OpenAI: "gpt-4o", "gpt-4", "gpt-3.5-turbo", "o1-preview", "o1-mini"
     #         or "openai/gpt-4o"
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Ollama: "ollama/llama2", "ollama/codellama", "ollama/mistral"
     # Full list: https://docs.litellm.ai/docs/providers
     AI_MODEL: str = "gpt-4o"
-    
+
     # AI Generation Settings
     AI_TEMPERATURE: float = 0.1  # Lower = more deterministic (0.0 - 2.0)
 

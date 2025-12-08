@@ -91,10 +91,12 @@ def test_connection_repository(test_db_path: Path, monkeypatch):
 
     # Also patch the reference in database.py which imports it at module level
     from app.services import database as db_mod
+
     monkeypatch.setattr(db_mod, "connection_repository", repo)
 
     # Reset S3 service singleton so it uses the patched repository
     from app.services import s3_service as s3_mod
+
     monkeypatch.setattr(s3_mod, "_s3_service", None)
 
     return repo
@@ -107,8 +109,8 @@ def test_query_repository(test_db_path: Path, monkeypatch):
     Uses the same temporary SQLite database as connection_repository.
     """
     from app.services import query_repository as query_repo_mod
-    from app.services.query_repository import QueryRepository
     from app.services.migration_service import MigrationService
+    from app.services.query_repository import QueryRepository
 
     # Ensure migrations are run (idempotent)
     migration_service = MigrationService(db_path=test_db_path)
@@ -358,8 +360,12 @@ def s3_test_bucket(localstack_container):
     s3_client.put_object(Bucket=bucket_name, Key="data/sample.json", Body=json_content)
 
     # Create a subfolder structure
-    s3_client.put_object(Bucket=bucket_name, Key="reports/2024/q1.csv", Body="quarter,revenue\nQ1,1000\n")
-    s3_client.put_object(Bucket=bucket_name, Key="reports/2024/q2.csv", Body="quarter,revenue\nQ2,1500\n")
+    s3_client.put_object(
+        Bucket=bucket_name, Key="reports/2024/q1.csv", Body="quarter,revenue\nQ1,1000\n"
+    )
+    s3_client.put_object(
+        Bucket=bucket_name, Key="reports/2024/q2.csv", Body="quarter,revenue\nQ2,1500\n"
+    )
 
     yield s3_client, bucket_name, endpoint_url
 

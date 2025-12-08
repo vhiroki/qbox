@@ -198,7 +198,7 @@ class QueryRepository:
             cursor = conn.execute(
                 """
                 DELETE FROM query_selections
-                WHERE query_id = ? AND connection_id = ? 
+                WHERE query_id = ? AND connection_id = ?
                     AND schema_name = ? AND table_name = ? AND source_type = ?
                 """,
                 (query_id, connection_id, schema_name, table_name, source_type),

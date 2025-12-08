@@ -6,8 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from app.models.schemas import ColumnMetadata
-
 
 class FileRepository:
     """Repository for file persistence and metadata."""

@@ -4,15 +4,14 @@ import logging
 import os
 from pathlib import Path
 
+from fastapi import APIRouter, HTTPException
+
 from app.config.settings import get_settings
 from app.models.schemas import AISettings, AISettingsUpdate
 from app.services import duckdb_manager
-from app.services.connection_repository import connection_repository
 from app.services.duckdb_manager import get_duckdb_manager
 from app.services.migration_service import run_migrations
-from app.services.query_repository import query_repository
 from app.services.settings_repository import settings_repository
-from fastapi import APIRouter, HTTPException
 
 logger = logging.getLogger(__name__)
 

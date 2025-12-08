@@ -6,16 +6,13 @@ These tests verify S3 functionality using LocalStack testcontainers:
 - Password/credential masking for saved connections
 """
 
-import pytest
 from httpx import AsyncClient
 
 
 class TestS3Connection:
     """Tests for S3 connection lifecycle using LocalStack."""
 
-    async def test_s3_connection_lifecycle(
-        self, test_client: AsyncClient, s3_connection_config
-    ):
+    async def test_s3_connection_lifecycle(self, test_client: AsyncClient, s3_connection_config):
         """Should create, connect to, and delete an S3 connection."""
         # Create connection
         response = await test_client.post(
@@ -55,9 +52,7 @@ class TestS3Connection:
         response = await test_client.get("/api/connections/saved")
         assert response.json()["connections"] == []
 
-    async def test_s3_reconnect(
-        self, test_client: AsyncClient, s3_connection_config
-    ):
+    async def test_s3_reconnect(self, test_client: AsyncClient, s3_connection_config):
         """Should be able to reconnect to a saved S3 connection."""
         # Create connection
         response = await test_client.post(
@@ -83,9 +78,7 @@ class TestS3Connection:
 class TestS3FileOperations:
     """Tests for S3 file listing and metadata operations."""
 
-    async def test_list_s3_files_root(
-        self, test_client: AsyncClient, s3_connection_config
-    ):
+    async def test_list_s3_files_root(self, test_client: AsyncClient, s3_connection_config):
         """Should list files and folders at the bucket root."""
         # Create connection
         response = await test_client.post(
@@ -114,9 +107,7 @@ class TestS3FileOperations:
             params={"delete_saved": True},
         )
 
-    async def test_list_s3_files_subfolder(
-        self, test_client: AsyncClient, s3_connection_config
-    ):
+    async def test_list_s3_files_subfolder(self, test_client: AsyncClient, s3_connection_config):
         """Should list files in a subfolder."""
         # Create connection
         response = await test_client.post(
@@ -146,9 +137,7 @@ class TestS3FileOperations:
             params={"delete_saved": True},
         )
 
-    async def test_list_s3_files_flat(
-        self, test_client: AsyncClient, s3_connection_config
-    ):
+    async def test_list_s3_files_flat(self, test_client: AsyncClient, s3_connection_config):
         """Should list all files with flat=True (no folder grouping)."""
         # Create connection
         response = await test_client.post(
@@ -183,9 +172,7 @@ class TestS3FileOperations:
             params={"delete_saved": True},
         )
 
-    async def test_get_s3_file_metadata(
-        self, test_client: AsyncClient, s3_connection_config
-    ):
+    async def test_get_s3_file_metadata(self, test_client: AsyncClient, s3_connection_config):
         """Should get metadata for a structured file in S3."""
         # Create connection
         response = await test_client.post(

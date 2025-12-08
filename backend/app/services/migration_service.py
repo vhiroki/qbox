@@ -61,8 +61,13 @@ class MigrationService:
 
             # Check for any of the expected QBox tables
             expected_tables = {
-                "connections", "queries", "query_selections",
-                "query_chat_history", "query_sql_history", "files", "settings"
+                "connections",
+                "queries",
+                "query_selections",
+                "query_chat_history",
+                "query_sql_history",
+                "files",
+                "settings",
             }
             return bool(expected_tables.intersection(tables))
 
@@ -94,7 +99,7 @@ class MigrationService:
                         INSERT OR IGNORE INTO _yoyo_migration (migration_hash, migration_id, applied_at_utc)
                         VALUES (?, ?, datetime('now'))
                         """,
-                        (initial_migration.hash, initial_migration.id)
+                        (initial_migration.hash, initial_migration.id),
                     )
                     conn.commit()
 

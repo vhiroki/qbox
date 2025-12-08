@@ -145,25 +145,22 @@ class PostgresConnection(BaseConnection):
         """Get lightweight metadata (table/schema names only) from PostgreSQL."""
         collector = PostgresMetadataCollector(self.postgres_config)
         metadata = await collector.collect_metadata(self.connection_id, self.connection_name)
-        
+
         # Flatten to list of {schema_name, table_name} dicts
         result = []
         for schema in metadata.schemas:
             for table in schema.tables:
-                result.append({
-                    "schema_name": schema.name,
-                    "table_name": table.name
-                })
+                result.append({"schema_name": schema.name, "table_name": table.name})
         return result
 
     async def collect_metadata(self) -> ConnectionMetadataLite:
         """Collect full lightweight metadata structure from PostgreSQL."""
         collector = PostgresMetadataCollector(self.postgres_config)
         metadata = await collector.collect_metadata(self.connection_id, self.connection_name)
-        
+
         # Set timestamp
         metadata.last_updated = datetime.utcnow().isoformat()
-        
+
         return metadata
 
     def attach_to_duckdb(self, duckdb_manager) -> str:
@@ -178,7 +175,7 @@ class PostgresConnection(BaseConnection):
         """Get detailed metadata for a specific table."""
         collector = PostgresMetadataCollector(self.postgres_config)
         table_metadata = await collector.get_table_details(schema_name, table_name)
-        
+
         # Convert to dict
         return {
             "name": table_metadata.name,
@@ -203,7 +200,9 @@ class PostgresConnection(BaseConnection):
             duckdb_manager.detach_source(identifier)
             duckdb_manager.remove_connection_from_cache(self.connection_id)
 
-    def preserve_sensitive_fields(self, new_config: dict[str, Any], existing_config: dict[str, Any]) -> dict[str, Any]:
+    def preserve_sensitive_fields(
+        self, new_config: dict[str, Any], existing_config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Preserve password if it's empty in the update."""
         if "password" in new_config and not new_config["password"]:
             if "password" in existing_config:
@@ -216,4 +215,3 @@ class PostgresConnection(BaseConnection):
         if "password" in safe_config:
             safe_config["password"] = ""
         return safe_config
-

@@ -5,16 +5,22 @@ from typing import Any, Optional
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from app.models.schemas import ColumnMetadata, DataSourceType
-from app.services.connection_repository import ConnectionRepository
 from app.services.duckdb_manager import get_duckdb_manager
 
 
 class S3Service:
     """Service for managing S3 file operations."""
 
-    def __init__(self):
-        self.connection_repo = ConnectionRepository()
-        self.duckdb_manager = get_duckdb_manager()
+    @property
+    def connection_repo(self):
+        """Get the connection repository dynamically for test isolation."""
+        from app.services.connection_repository import connection_repository
+        return connection_repository
+
+    @property
+    def duckdb_manager(self):
+        """Get the DuckDB manager dynamically for test isolation."""
+        return get_duckdb_manager()
 
 
     def _get_s3_client(self, connection_id: str):

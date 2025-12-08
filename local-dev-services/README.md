@@ -1,6 +1,6 @@
-# QBox Test Infrastructure
+# QBox Local Development Services
 
-This directory contains Docker Compose configuration to simulate data sources for **manual testing** of QBox connections.
+This directory contains Docker Compose configuration to run local data sources for **development and manual testing** of QBox connections.
 
 > **Note:** For automated tests (pytest), see `backend/tests/`. The pytest integration tests use testcontainers to automatically spin up ephemeral PostgreSQL and LocalStack containers - no manual Docker setup required.
 
@@ -51,7 +51,7 @@ Use this infrastructure to test QBox connection management, query building, and 
 
 ### Start All Services
 ```bash
-cd test-infrastructure
+cd local-dev-services
 docker compose up -d
 ```
 

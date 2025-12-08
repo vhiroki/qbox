@@ -98,10 +98,18 @@ npm run lint                          # Run linter
 **Testing:**
 ```bash
 cd backend
-pytest                                # Run all tests
+pytest                                # Run all tests (requires Docker for integration tests)
+pytest tests/integration/             # Run integration tests only
 pytest tests/test_specific.py         # Run specific test file
 pytest -k test_name                   # Run tests matching pattern
+pytest --cov=app --cov-report=term-missing  # Run with coverage
 ```
+
+**Test Infrastructure:**
+- Tests use testcontainers for PostgreSQL and LocalStack (S3)
+- Docker Desktop must be running for integration tests
+- All tests run in both local development and CI
+- Fixtures provide isolated databases and mocked services per test
 
 ### Linting and Formatting
 

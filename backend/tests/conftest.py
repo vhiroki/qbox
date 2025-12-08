@@ -119,8 +119,13 @@ def test_query_repository(test_db_path: Path, monkeypatch):
     # Create repository with test database
     repo = QueryRepository(db_path=test_db_path)
 
-    # Patch the global instance
+    # Patch the global instance in the query_repository module
     monkeypatch.setattr(query_repo_mod, "query_repository", repo)
+
+    # Also patch the reference in database.py which imports it at module level
+    from app.services import database as db_mod
+
+    monkeypatch.setattr(db_mod, "query_repository", repo)
 
     return repo
 

@@ -49,16 +49,14 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    // Windows installer (disabled - add icons first)
-    // new MakerSquirrel({
-    //   name: 'qbox',
-    //   authors: 'QBox Team',
-    //   description: 'Build SQL queries across multiple data sources - all locally',
-    //   iconUrl: 'https://example.com/icon.ico',
-    //   setupIcon: path.resolve(__dirname, 'assets', 'icons', 'icon.ico'),
-    //   loadingGif: undefined,
-    //   noMsi: true,
-    // }),
+    // Windows installer (Squirrel.Windows)
+    new MakerSquirrel({
+      name: 'qbox',
+      authors: 'QBox Team',
+      description: 'Build SQL queries across multiple data sources - all locally',
+      setupIcon: path.resolve(__dirname, 'assets', 'icons', 'icon.ico'),
+      noMsi: true,
+    }),
     // macOS DMG (for manual installation)
     new MakerDMG({
       name: 'QBox',

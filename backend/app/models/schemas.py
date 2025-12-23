@@ -34,12 +34,12 @@ class PostgresConnectionConfig(BaseModel):
     username: str
     password: str
     schema_names: Optional[list[str]] = Field(default=None, alias="schemas")
-    
+
     @model_validator(mode="before")
     @classmethod
     def convert_schemas_to_list(cls, data: Any) -> Any:
         """Convert schema/schemas field to list format.
-        
+
         Handles:
         - Legacy 'schema' field (single string)
         - 'schemas' as comma-separated string
@@ -56,7 +56,7 @@ class PostgresConnectionConfig(BaseModel):
                         data["schemas"] = [schema_value.strip()]
                 else:
                     data["schemas"] = None
-            
+
             # Handle 'schemas' as string (convert to list)
             elif "schemas" in data and isinstance(data["schemas"], str):
                 schema_value = data["schemas"]
@@ -67,9 +67,9 @@ class PostgresConnectionConfig(BaseModel):
                         data["schemas"] = [schema_value.strip()]
                 else:
                     data["schemas"] = None
-            
+
             # 'schemas' as list or None is already in correct format
-        
+
         return data
 
 
@@ -79,7 +79,7 @@ class S3ConnectionConfig(BaseModel):
     bucket: str
     credential_type: str = Field(
         default="default",
-        description="Either 'default' for AWS credential provider chain or 'manual' for explicit credentials"
+        description="Either 'default' for AWS credential provider chain or 'manual' for explicit credentials",
     )
     # Manual credentials (only required if credential_type == 'manual')
     aws_access_key_id: Optional[str] = None
@@ -88,9 +88,9 @@ class S3ConnectionConfig(BaseModel):
     region: Optional[str] = Field(default="us-east-1", description="AWS region")
     endpoint_url: Optional[str] = Field(
         default=None,
-        description="Custom S3 endpoint URL (e.g., http://localhost:4566 for LocalStack)"
+        description="Custom S3 endpoint URL (e.g., http://localhost:4566 for LocalStack)",
     )
-    
+
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3ConnectionConfig":
         """Validate that manual credentials are provided when credential_type is 'manual'."""

@@ -10,6 +10,11 @@ on:
         description: 'Version to release (e.g., 0.2.0) - leave empty to use package.json version'
         required: false
         type: string
+      skip_tests:
+        description: 'Skip tests (use with caution)'
+        required: false
+        type: boolean
+        default: false
 
 # Cancel in-progress runs for the same tag
 concurrency:
@@ -20,7 +25,16 @@ permissions:
   contents: write  # Required for creating releases
 
 jobs:
+  # Run tests before building
+  test:
+    name: Run Tests
+    if: ${{ !inputs.skip_tests }}
+    uses: ./.github/workflows/test.yml
+
   build:
+    needs: [test]
+    # Run build even if test job was skipped (when skip_tests is true)
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:

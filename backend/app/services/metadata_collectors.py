@@ -5,7 +5,6 @@ to extract schema metadata, avoiding the need to attach to DuckDB.
 """
 
 import logging
-from typing import Optional
 
 import psycopg
 from psycopg.rows import dict_row
@@ -51,7 +50,7 @@ class PostgresMetadataCollector:
             f"password={self.config.password} "
             f"connect_timeout=10"
         )
-        
+
         async with await psycopg.AsyncConnection.connect(conn_string) as conn:
             # Get schemas (lightweight)
             schemas = await self._get_schemas_lite(conn)
@@ -64,9 +63,7 @@ class PostgresMetadataCollector:
                 last_updated=None,  # Will be set by caller
             )
 
-    async def _get_schemas_lite(
-        self, conn: psycopg.AsyncConnection
-    ) -> list[SchemaMetadataLite]:
+    async def _get_schemas_lite(self, conn: psycopg.AsyncConnection) -> list[SchemaMetadataLite]:
         """Get all schemas with their tables (lightweight - names only).
 
         Args:
@@ -147,9 +144,7 @@ class PostgresMetadataCollector:
 
             return tables
 
-    async def get_table_details(
-        self, schema_name: str, table_name: str
-    ) -> TableMetadata:
+    async def get_table_details(self, schema_name: str, table_name: str) -> TableMetadata:
         """Get detailed metadata for a specific table.
 
         Args:
@@ -168,7 +163,7 @@ class PostgresMetadataCollector:
             f"password={self.config.password} "
             f"connect_timeout=10"
         )
-        
+
         async with await psycopg.AsyncConnection.connect(conn_string) as conn:
             # Get column information
             columns = await self._get_columns(conn, schema_name, table_name)
@@ -181,9 +176,7 @@ class PostgresMetadataCollector:
                     result = await cursor.fetchone()
                     row_count = result["count"] if result else None
             except Exception as e:
-                logger.warning(
-                    f"Could not get row count for {schema_name}.{table_name}: {e}"
-                )
+                logger.warning(f"Could not get row count for {schema_name}.{table_name}: {e}")
                 row_count = None
 
             return TableMetadata(
@@ -247,4 +240,3 @@ class PostgresMetadataCollector:
                 )
 
             return columns
-

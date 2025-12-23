@@ -28,6 +28,7 @@ AI-powered data query desktop application for building and managing SQL queries 
   - [Development Mode](#development-mode)
   - [Backend Development](#backend-development)
   - [Frontend Development](#frontend-development)
+  - [Testing](#testing)
 - [Configuration](#configuration)
   - [OpenAI API Key](#openai-api-key)
   - [Backend Environment (Optional)](#backend-environment-optional)
@@ -74,7 +75,8 @@ QBox is an Electron desktop application that lets you:
 ### Prerequisites
 
 - **Node.js** 18+ and npm (or pnpm)
-- **Python** 3.11+
+- **Python** 3.13+
+- **uv** - Python package manager ([install](https://docs.astral.sh/uv/getting-started/installation/))
 - **macOS, Linux, or Windows**
 
 ### Setup and Run
@@ -97,7 +99,7 @@ That's it! The app opens in an Electron window with DevTools enabled for develop
 
 ### What `setup.sh` Does
 
-- Creates Python virtual environment (uses `uv` if available, falls back to `pip`)
+- Creates Python 3.13 virtual environment using `uv`
 - Installs all backend dependencies (FastAPI, DuckDB, etc.)
 - Installs PyInstaller for building distributables
 - Installs frontend dependencies (uses `pnpm` if available, falls back to `npm`)
@@ -289,6 +291,34 @@ Component structure:
 - Try/catch with user-friendly error messages
 - API calls through `services/api.ts`
 
+### Testing
+
+Backend tests use pytest with isolated fixtures. Integration tests use testcontainers to automatically spin up PostgreSQL and LocalStack (S3) containers:
+
+**Prerequisites:** Docker Desktop must be running for integration tests.
+
+```bash
+cd backend
+
+# Run all tests (requires Docker for integration tests)
+uv run pytest -v
+
+# Run with coverage
+uv run pytest --cov=app --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/integration/test_query_execution.py -v
+
+# Run specific test by name
+uv run pytest -k test_execute_query -v
+```
+
+Test structure:
+- `tests/conftest.py` - Shared fixtures (isolated databases, mocked services, testcontainers)
+- `tests/integration/` - API and repository tests (connections, queries, S3)
+
+CI/CD runs all tests automatically on PRs and main branch.
+
 ## Configuration
 
 ### OpenAI API Key
@@ -373,9 +403,8 @@ Before distributing:
 **Dependencies missing:**
 ```bash
 cd backend
-source .venv/bin/activate
-pip install -e .
-pip install pyinstaller
+uv pip install -e .
+uv pip install pyinstaller
 ```
 
 **Frontend dependencies missing:**

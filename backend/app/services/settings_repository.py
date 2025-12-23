@@ -23,10 +23,7 @@ class SettingsRepository:
     def get(self, key: str) -> Optional[str]:
         """Get a setting value by key."""
         with sqlite3.connect(str(self.db_path)) as conn:
-            cursor = conn.execute(
-                "SELECT value FROM settings WHERE key = ?",
-                (key,)
-            )
+            cursor = conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
             row = cursor.fetchone()
             return row[0] if row else None
 
@@ -39,7 +36,7 @@ class SettingsRepository:
                 VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
-                (key, value)
+                (key, value),
             )
             conn.commit()
             logger.debug(f"Setting '{key}' updated")
@@ -81,28 +78,27 @@ class SettingsRepository:
                 self.set("openai_api_key", openai_api_key)
             else:
                 self.delete("openai_api_key")
-        
+
         if anthropic_api_key is not None:
             if anthropic_api_key:
                 self.set("anthropic_api_key", anthropic_api_key)
             else:
                 self.delete("anthropic_api_key")
-        
+
         if gemini_api_key is not None:
             if gemini_api_key:
                 self.set("gemini_api_key", gemini_api_key)
             else:
                 self.delete("gemini_api_key")
-        
+
         if ai_model is not None:
             self.set("ai_model", ai_model)
-        
+
         if ai_temperature is not None:
             self.set("ai_temperature", str(ai_temperature))
-        
+
         logger.info("AI settings updated")
 
 
 # Global settings repository instance
 settings_repository = SettingsRepository()
-

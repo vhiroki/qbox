@@ -33,7 +33,7 @@ class ConnectionRepository:
                 f"Connection identifier '{sanitized_id}' conflicts with existing connection '{conflicting_name}'. "
                 f"Please choose a different name."
             )
-        
+
         with sqlite3.connect(self.db_path) as conn:
             if existing:
                 # Update existing connection
@@ -117,10 +117,10 @@ class ConnectionRepository:
         to ensure collision detection works correctly.
         """
         # Convert to lowercase and replace spaces/special chars with underscores
-        sanitized = re.sub(r'[^a-z0-9]+', '_', name.lower())
+        sanitized = re.sub(r"[^a-z0-9]+", "_", name.lower())
 
         # Remove leading/trailing underscores
-        sanitized = sanitized.strip('_')
+        sanitized = sanitized.strip("_")
 
         # Ensure it doesn't start with a digit
         if sanitized and sanitized[0].isdigit():
@@ -128,11 +128,13 @@ class ConnectionRepository:
 
         # Truncate to reasonable length (50 chars)
         if len(sanitized) > 50:
-            sanitized = sanitized[:50].rstrip('_')
+            sanitized = sanitized[:50].rstrip("_")
 
         return sanitized
 
-    def check_identifier_collision(self, connection_name: str, exclude_id: Optional[str] = None) -> Optional[str]:
+    def check_identifier_collision(
+        self, connection_name: str, exclude_id: Optional[str] = None
+    ) -> Optional[str]:
         """Check if sanitized identifier would conflict with existing connections.
 
         Args:

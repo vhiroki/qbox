@@ -39,39 +39,31 @@ if [ ! -f ".env" ]; then
     fi
 fi
 
-# Check if uv is installed (preferred)
-if command -v uv &> /dev/null; then
-    echo "Using uv for Python package management..."
-    
-    # Create virtual environment if it doesn't exist
-    if [ ! -d ".venv" ]; then
-        echo "Creating Python virtual environment..."
-        uv venv
-    fi
-    
-    # Install Python dependencies
-    echo "Installing Python dependencies..."
-    uv pip install -e .
-    
-    # Install PyInstaller for building
-    echo "Installing PyInstaller..."
-    uv pip install pyinstaller
-else
-    echo "uv not found, using standard pip..."
-    
-    # Create virtual environment if it doesn't exist
-    if [ ! -d ".venv" ]; then
-        echo "Creating Python virtual environment..."
-        python3 -m venv .venv
-    fi
-    
-    # Activate and install
-    source .venv/bin/activate
-    echo "Installing Python dependencies..."
-    pip install --upgrade pip
-    pip install -e .
-    pip install pyinstaller
+# Check if uv is installed (required)
+if ! command -v uv &> /dev/null; then
+    echo "❌ uv not found. Please install uv first:"
+    echo ""
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo ""
+    echo "   Or visit: https://docs.astral.sh/uv/getting-started/installation/"
+    exit 1
 fi
+
+echo "Using uv for Python package management..."
+
+# Create virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo "Creating Python virtual environment..."
+    uv venv --python 3.13
+fi
+
+# Install Python dependencies (including dev/test dependencies)
+echo "Installing Python dependencies..."
+uv pip install -e ".[dev]"
+
+# Install PyInstaller for building
+echo "Installing PyInstaller..."
+uv pip install pyinstaller
 
 echo "✓ Backend setup complete"
 cd ..

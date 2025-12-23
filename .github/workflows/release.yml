@@ -97,6 +97,16 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Clean up any stale DMG volumes (macOS only)
+      - name: Cleanup stale DMG volumes
+        if: runner.os == 'macOS'
+        run: |
+          # Detach any existing QBox volumes to prevent conflicts
+          hdiutil detach /Volumes/QBox 2>/dev/null || true
+          hdiutil detach /Volumes/QBox\ 1 2>/dev/null || true
+          # List any remaining volumes for debugging
+          ls -la /Volumes/ || true
+
       - name: Package Electron app
         working-directory: frontend
         run: npm run make

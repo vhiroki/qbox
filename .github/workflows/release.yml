@@ -42,7 +42,7 @@ jobs:
           - os: macos-latest
             platform: macos
             arch: arm64
-          - os: macos-13  # Intel Mac
+          - os: macos-15-intel  # Intel Mac (macos-13 deprecated)
             platform: macos
             arch: x64
           - os: windows-latest
@@ -80,6 +80,8 @@ jobs:
       - name: Build backend with PyInstaller
         working-directory: backend
         run: uv run python build.py
+        env:
+          PYTHONIOENCODING: utf-8
 
       - name: Verify backend build (macOS/Linux)
         if: runner.os != 'Windows'

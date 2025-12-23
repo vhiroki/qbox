@@ -24,7 +24,10 @@ dependencies = [
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.2.0",
     "httpx>=0.25.0",
+    "testcontainers>=3.7.0",
     "black>=23.11.0",
     "ruff>=0.1.6",
 ]
@@ -43,9 +46,23 @@ target-version = ['py311']
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
-ignore = []
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"app/main.py" = ["E402"]  # Imports not at top (needed for PyInstaller fixes)
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+timeout = 120
+filterwarnings = [
+    # Ignore deprecation warnings from third-party libraries we can't control
+    "ignore:The default datetime adapter is deprecated:DeprecationWarning",
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning",
+    "ignore:The wait_for_logs function with string or callable predicates is deprecated:DeprecationWarning",
+]

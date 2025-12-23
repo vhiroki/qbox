@@ -43,24 +43,22 @@ class MetadataService:
             Detailed table metadata with columns and row count
         """
         from app.connections import ConnectionRegistry
-        
+
         # Get the connection class from registry
         connection_class = ConnectionRegistry.get(source_type)
         if not connection_class:
             raise NotImplementedError(f"Table details not implemented for {source_type}")
-        
+
         # Create a temporary connection instance to get table details
         connection = connection_class(
-            connection_id=connection_id,
-            connection_name=connection_name,
-            config=config
+            connection_id=connection_id, connection_name=connection_name, config=config
         )
-        
+
         # Get table details from the connection
         table_dict = await connection.get_table_details(schema_name, table_name)
-        
+
         # Convert to TableMetadata
-        from app.models.schemas import ColumnMetadata
+
         return TableMetadata(
             name=table_dict["name"],
             schema_name=table_dict["schema_name"],
@@ -87,19 +85,17 @@ class MetadataService:
             Updated lightweight metadata (table names only)
         """
         from app.connections import ConnectionRegistry
-        
+
         # Get the connection class from registry
         connection_class = ConnectionRegistry.get(source_type)
         if not connection_class:
             raise NotImplementedError(f"Metadata collection not implemented for {source_type}")
-        
+
         # Create a temporary connection instance to collect metadata
         connection = connection_class(
-            connection_id=connection_id,
-            connection_name=connection_name,
-            config=config
+            connection_id=connection_id, connection_name=connection_name, config=config
         )
-        
+
         # Delegate to connection-specific metadata collection
         return await connection.collect_metadata()
 
@@ -135,7 +131,6 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
     from app.services.file_repository import file_repository
     from app.services.query_repository import query_repository
 
-    metadata_service = get_metadata_service()
     duckdb_manager = get_duckdb_manager()
 
     # Get all selections for this query
@@ -173,24 +168,22 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
         try:
             # Get connection class from registry
             from app.connections import ConnectionRegistry
-            
+
             connection_class = ConnectionRegistry.get(connection_config.type)
             if not connection_class:
                 logger.warning(f"Unsupported connection type {connection_config.type}, skipping")
                 continue
-            
+
             # Create connection instance for metadata collection
             connection = connection_class(
                 connection_id=connection_id,
                 connection_name=connection_name,
-                config=connection_config.config
+                config=connection_config.config,
             )
-            
+
             # Attach to DuckDB using connection-specific logic
-            alias = connection.attach_to_duckdb(
-                duckdb_manager=duckdb_manager
-            )
-            
+            alias = connection.attach_to_duckdb(duckdb_manager=duckdb_manager)
+
         except Exception as e:
             logger.error(f"Failed to prepare connection {connection_id}: {e}")
             # Skip this entire connection if we can't set it up
@@ -226,23 +219,23 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
     # Process file selections
     for selection in file_selections:
         file_id = selection.connection_id  # For files, we store file_id in connection_id field
-        
+
         try:
             # Get file info
             file_info = file_repository.get_file(file_id)
             if not file_info:
                 logger.warning(f"File {file_id} not found, skipping")
                 continue
-            
+
             # Get the stored view_name from file_info
             view_name = file_info.get("view_name")
             if not view_name:
                 logger.warning(f"File {file_id} has no view_name, skipping")
                 continue
-            
+
             # Get file metadata from DuckDB using the stored view_name
             file_metadata = duckdb_manager.get_file_metadata_by_view_name(view_name)
-            
+
             query_metadata.append(
                 {
                     "source_type": "file",
@@ -263,7 +256,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                     "row_count": file_metadata.get("row_count"),
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to get metadata for file {file_id}: {e}")
             continue
@@ -286,6 +279,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
             # where the in-memory cache is empty but the secret exists in DuckDB)
             if not duckdb_manager.get_attached_identifier(connection_id):
                 from app.models.schemas import S3ConnectionConfig
+
                 s3_config = S3ConnectionConfig(**connection_config.config)
                 duckdb_manager.configure_s3_secret(
                     connection_id,
@@ -298,13 +292,13 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
 
             s3_service = get_s3_service()
             view_name = s3_service.get_file_view_name(connection_id, file_path)
-            
+
             # Get file metadata from DuckDB using the view name
             file_metadata = duckdb_manager.get_file_metadata_by_view_name(view_name)
-            
+
             # Extract file name from path
-            file_name = file_path.split('/')[-1]
-            
+            file_name = file_path.split("/")[-1]
+
             query_metadata.append(
                 {
                     "source_type": "s3",
@@ -326,7 +320,7 @@ async def get_query_metadata(query_id: str) -> list[dict[str, Any]]:
                     "row_count": file_metadata.get("row_count"),
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to get metadata for S3 file {file_path}: {e}")
             continue

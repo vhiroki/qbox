@@ -256,7 +256,7 @@ ORDER BY s.rating DESC, i.stock_level ASC;
 If you need to modify the Excel files:
 
 ```bash
-cd test-infrastructure/sample-files
+cd local-dev-services/sample-files
 # Edit generate_excel.py
 python3 generate_excel.py
 ```

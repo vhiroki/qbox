@@ -31,7 +31,7 @@ class AIService:
         """
         self.model = model
         self.temperature = temperature
-        
+
         # LiteLLM automatically reads API keys from environment variables
         # No need to set them manually - they're already set by pydantic-settings
 
@@ -61,7 +61,7 @@ class AIService:
         logger.debug(f"Current SQL length: {len(current_sql)} chars")
         logger.debug(f"Chat history: {len(chat_history)} messages")
         logger.debug(f"Query metadata: {len(query_metadata)} tables")
-        
+
         schema_context = self._format_schema_context(query_metadata)
         system_prompt = self._build_chat_system_prompt(schema_context, current_sql)
 
@@ -83,19 +83,21 @@ class AIService:
         # Add current user message
         messages.append({"role": "user", "content": user_message})
 
-        logger.debug(f"Total messages to LLM: {len(messages)} (system + {context_messages} context + 1 new)")
+        logger.debug(
+            f"Total messages to LLM: {len(messages)} (system + {context_messages} context + 1 new)"
+        )
 
         try:
             logger.debug(f"Calling LLM ({self.model})...")
             start_time = time.time()
-            
+
             # LiteLLM automatically handles provider differences
             response = await acompletion(
                 model=self.model,
                 messages=messages,
                 temperature=self.temperature,
             )
-            
+
             elapsed_time = time.time() - start_time
             logger.debug(f"LLM call completed in {elapsed_time:.2f} seconds")
 
@@ -104,11 +106,15 @@ class AIService:
             logger.debug("LLM Response:")
             logger.debug(content)
             logger.debug("-" * 80)
-            
+
             sql, explanation = self._parse_response(content)
-            
+
             logger.debug(f"Parsed SQL length: {len(sql)} chars")
-            logger.debug(f"Explanation: {explanation[:100]}..." if len(explanation) > 100 else f"Explanation: {explanation}")
+            logger.debug(
+                f"Explanation: {explanation[:100]}..."
+                if len(explanation) > 100
+                else f"Explanation: {explanation}"
+            )
             logger.debug("=" * 80)
 
             return {"sql": sql or current_sql, "explanation": explanation}
@@ -141,7 +147,7 @@ class AIService:
         logger.debug(f"Prompt: {prompt}")
         logger.debug(f"Query metadata: {len(query_metadata)} tables")
         logger.debug(f"Additional instructions: {additional_instructions}")
-        
+
         schema_context = self._format_schema_context(query_metadata)
         system_prompt = self._build_system_prompt(schema_context, additional_instructions)
 
@@ -153,7 +159,7 @@ class AIService:
         try:
             logger.debug(f"Calling LLM ({self.model})...")
             start_time = time.time()
-            
+
             # LiteLLM automatically handles provider differences
             response = await acompletion(
                 model=self.model,
@@ -163,7 +169,7 @@ class AIService:
                 ],
                 temperature=self.temperature,
             )
-            
+
             elapsed_time = time.time() - start_time
             logger.debug(f"LLM call completed in {elapsed_time:.2f} seconds")
 
@@ -172,11 +178,15 @@ class AIService:
             logger.debug("LLM Response:")
             logger.debug(content)
             logger.debug("-" * 80)
-            
+
             sql, explanation = self._parse_response(content)
-            
+
             logger.debug(f"Parsed SQL length: {len(sql)} chars")
-            logger.debug(f"Explanation: {explanation[:100]}..." if len(explanation) > 100 else f"Explanation: {explanation}")
+            logger.debug(
+                f"Explanation: {explanation[:100]}..."
+                if len(explanation) > 100
+                else f"Explanation: {explanation}"
+            )
             logger.debug("=" * 80)
 
             return {"sql": sql, "explanation": explanation}
@@ -344,24 +354,24 @@ I cannot generate the SQL you requested because [explain what tables/columns are
             source_type = table_meta.get("source_type", "connection")
             columns = table_meta.get("columns", [])
             row_count = table_meta.get("row_count", "unknown")
-            
+
             if source_type == "file":
                 # Format file metadata
                 view_name = table_meta.get("view_name", "unknown")
                 file_name = table_meta.get("file_name", "unknown")
                 file_type = table_meta.get("file_type", "unknown")
-                
+
                 table_info = f"\nFile: {view_name}"
                 table_info += f"\nOriginal File: {file_name}.{file_type}"
                 table_info += f"\nRow Count: {row_count}"
                 table_info += "\nColumns:"
-                
+
                 for col in columns:
                     col_name = col.get("name", "")
                     col_type = col.get("type", "")
                     nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
                     table_info += f"\n  - {col_name}: {col_type} {nullable}"
-                
+
                 context_parts.append(table_info)
             elif source_type == "s3":
                 # Format S3 file metadata
@@ -369,20 +379,20 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                 file_name = table_meta.get("file_name", "unknown")
                 file_path = table_meta.get("file_path", "unknown")
                 connection_name = table_meta.get("connection_name", "unknown")
-                
+
                 table_info = f"\nS3 File: {view_name}"
                 table_info += f"\nOriginal File: {file_name}"
                 table_info += f"\nS3 Path: {file_path}"
                 table_info += f"\nS3 Connection: {connection_name}"
                 table_info += f"\nRow Count: {row_count}"
                 table_info += "\nColumns:"
-                
+
                 for col in columns:
                     col_name = col.get("name", "")
                     col_type = col.get("type", "")
                     nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
                     table_info += f"\n  - {col_name}: {col_type} {nullable}"
-                
+
                 context_parts.append(table_info)
             else:
                 # Format database table metadata
@@ -390,22 +400,22 @@ I cannot generate the SQL you requested because [explain what tables/columns are
                 connection_name = table_meta.get("connection_name", "unknown")
                 schema_name = table_meta.get("schema_name", "public")
                 table_name = table_meta.get("table_name", "unknown")
-                
+
                 # Get the DuckDB identifier (generated from connection name)
-                identifier = table_meta.get("alias", connection_id.replace('-', '_'))
-                
+                identifier = table_meta.get("alias", connection_id.replace("-", "_"))
+
                 table_info = f"\nTable: {identifier}.{schema_name}.{table_name}"
                 table_info += f"\nConnection: {connection_name}"
                 table_info += f"\nRow Count: {row_count}"
                 table_info += "\nColumns:"
-                
+
                 for col in columns:
                     col_name = col.get("name", "")
                     col_type = col.get("type", "")
                     nullable = "NULL" if col.get("nullable", True) else "NOT NULL"
                     is_pk = " (PRIMARY KEY)" if col.get("is_primary_key", False) else ""
                     table_info += f"\n  - {col_name}: {col_type} {nullable}{is_pk}"
-                
+
                 context_parts.append(table_info)
 
         return "\n".join(context_parts)
@@ -416,7 +426,7 @@ def get_ai_service() -> AIService:
     # Get settings from database first, then fall back to config/env
     db_settings = settings_repository.get_ai_settings()
     config_settings = get_settings()
-    
+
     # Use database settings if available, otherwise fall back to config/env
     openai_key = db_settings.get("openai_api_key") or config_settings.OPENAI_API_KEY
     anthropic_key = db_settings.get("anthropic_api_key") or config_settings.ANTHROPIC_API_KEY
@@ -424,7 +434,7 @@ def get_ai_service() -> AIService:
     model = db_settings.get("ai_model") or config_settings.AI_MODEL
     temperature_str = db_settings.get("ai_temperature")
     temperature = float(temperature_str) if temperature_str else config_settings.AI_TEMPERATURE
-    
+
     # Set API keys in environment for LiteLLM to use
     if openai_key:
         os.environ["OPENAI_API_KEY"] = openai_key
@@ -432,29 +442,23 @@ def get_ai_service() -> AIService:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_key
     if gemini_key:
         os.environ["GEMINI_API_KEY"] = gemini_key
-    
+
     # Validate that appropriate API key is set for the model
     # Models can be prefixed with provider (e.g., "openai/gpt-4o") or not (e.g., "gpt-4o")
     model_lower = model.lower()
-    
+
     # OpenAI models
     if any(prefix in model_lower for prefix in ["openai/", "gpt-", "o1-", "o3-"]):
         if not openai_key:
-            raise RuntimeError(
-                "OPENAI_API_KEY not configured. Please set it in Settings."
-            )
+            raise RuntimeError("OPENAI_API_KEY not configured. Please set it in Settings.")
     # Anthropic models
     elif any(prefix in model_lower for prefix in ["anthropic/", "claude-"]):
         if not anthropic_key:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY not configured. Please set it in Settings."
-            )
+            raise RuntimeError("ANTHROPIC_API_KEY not configured. Please set it in Settings.")
     # Google models (Gemini or Vertex AI)
     elif any(prefix in model_lower for prefix in ["gemini/", "gemini-", "vertex_ai/"]):
         if not gemini_key:
-            raise RuntimeError(
-                "GEMINI_API_KEY not configured. Please set it in Settings."
-            )
+            raise RuntimeError("GEMINI_API_KEY not configured. Please set it in Settings.")
     # Local models (Ollama, etc.) don't need API keys
 
     return AIService(model=model, temperature=temperature)

@@ -1,7 +1,7 @@
 """AWS S3 connection module."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from app.connections import BaseConnection, ConnectionRegistry
 from app.models.schemas import (
@@ -17,7 +17,7 @@ from app.services.duckdb_manager import get_duckdb_manager
 class S3Connection(BaseConnection):
     """
     AWS S3 data source using DuckDB's httpfs extension.
-    
+
     Note: S3 is not "attached" like a database. Instead, we configure
     credentials as a DuckDB secret, and users query files directly using
     s3:// paths in their SQL queries (e.g., SELECT * FROM read_parquet('s3://bucket/file.parquet')).
@@ -35,46 +35,48 @@ class S3Connection(BaseConnection):
             from botocore.exceptions import ClientError, NoCredentialsError
 
             # First, validate that the bucket exists using boto3
-            session_kwargs: dict[str, Any] = {
-                'region_name': self.s3_config.region or 'us-east-1'
-            }
+            session_kwargs: dict[str, Any] = {"region_name": self.s3_config.region or "us-east-1"}
 
             # Configure credentials based on credential type
-            if self.s3_config.credential_type == 'manual':
-                session_kwargs['aws_access_key_id'] = self.s3_config.aws_access_key_id
-                session_kwargs['aws_secret_access_key'] = self.s3_config.aws_secret_access_key
+            if self.s3_config.credential_type == "manual":
+                session_kwargs["aws_access_key_id"] = self.s3_config.aws_access_key_id
+                session_kwargs["aws_secret_access_key"] = self.s3_config.aws_secret_access_key
                 if self.s3_config.aws_session_token:
-                    session_kwargs['aws_session_token'] = self.s3_config.aws_session_token
+                    session_kwargs["aws_session_token"] = self.s3_config.aws_session_token
 
             session = boto3.Session(**session_kwargs)
 
             # Configure S3 client with optional custom endpoint
             client_kwargs: dict[str, Any] = {}
             if self.s3_config.endpoint_url:
-                from botocore.client import Config
                 import re
+
+                from botocore.client import Config
+
                 # Strip whitespace and remove invisible characters
                 endpoint_url = self.s3_config.endpoint_url.strip()
-                endpoint_url = re.sub(r'[\u200B-\u200D\uFEFF\u2060]', '', endpoint_url)
-                client_kwargs['endpoint_url'] = endpoint_url
+                endpoint_url = re.sub(r"[\u200B-\u200D\uFEFF\u2060]", "", endpoint_url)
+                client_kwargs["endpoint_url"] = endpoint_url
                 # Use path-style addressing for custom endpoints
-                client_kwargs['config'] = Config(s3={'addressing_style': 'path'})
+                client_kwargs["config"] = Config(s3={"addressing_style": "path"})
 
-            s3_client = session.client('s3', **client_kwargs)
+            s3_client = session.client("s3", **client_kwargs)
 
             # Validate bucket exists by checking if we can access it
             try:
                 s3_client.head_bucket(Bucket=self.s3_config.bucket)
             except ClientError as e:
-                error_code = e.response['Error']['Code']
-                if error_code == '404':
+                error_code = e.response["Error"]["Code"]
+                if error_code == "404":
                     self.connection_error = f"Bucket '{self.s3_config.bucket}' does not exist"
                     return False
-                elif error_code == '403':
+                elif error_code == "403":
                     self.connection_error = f"Access denied to bucket '{self.s3_config.bucket}'. Check your credentials and permissions."
                     return False
                 else:
-                    self.connection_error = f"Failed to access bucket: {e.response['Error']['Message']}"
+                    self.connection_error = (
+                        f"Failed to access bucket: {e.response['Error']['Message']}"
+                    )
                     return False
             except NoCredentialsError:
                 self.connection_error = "AWS credentials not found or invalid"
@@ -97,7 +99,7 @@ class S3Connection(BaseConnection):
     async def disconnect(self) -> None:
         """
         Disconnect from S3.
-        
+
         Note: The secret remains in DuckDB. It will be dropped when the connection
         is deleted via the cleanup() method.
         """
@@ -106,7 +108,7 @@ class S3Connection(BaseConnection):
     async def execute_query(self, query: str) -> tuple[list[str], list[dict[str, Any]]]:
         """
         Execute a SQL query that may reference S3 files.
-        
+
         Example query: SELECT * FROM read_parquet('s3://my-bucket/data.parquet')
         """
         duckdb_manager = get_duckdb_manager()
@@ -115,7 +117,7 @@ class S3Connection(BaseConnection):
     async def get_schema(self) -> list[TableSchema]:
         """
         Get schema information from S3.
-        
+
         Note: S3 doesn't have a traditional schema like databases.
         Users query individual files using s3:// paths in their SQL.
         This returns an empty list.
@@ -125,7 +127,7 @@ class S3Connection(BaseConnection):
     async def get_metadata_lite(self) -> list[dict[str, str]]:
         """
         Get lightweight metadata from S3.
-        
+
         Note: S3 doesn't have a traditional schema like databases.
         Returns empty list.
         """
@@ -134,7 +136,7 @@ class S3Connection(BaseConnection):
     async def collect_metadata(self) -> ConnectionMetadataLite:
         """
         Collect full lightweight metadata structure from S3.
-        
+
         Note: S3 doesn't have a traditional schema like databases.
         Returns empty metadata structure.
         """
@@ -161,7 +163,7 @@ class S3Connection(BaseConnection):
     async def get_table_details(self, schema_name: str, table_name: str) -> dict[str, Any]:
         """
         Get detailed metadata for a specific S3 file.
-        
+
         Note: S3 doesn't have traditional tables.
         Raises NotImplementedError.
         """
@@ -175,7 +177,9 @@ class S3Connection(BaseConnection):
             duckdb_manager.drop_secret(identifier)
             duckdb_manager.remove_connection_from_cache(self.connection_id)
 
-    def preserve_sensitive_fields(self, new_config: dict[str, Any], existing_config: dict[str, Any]) -> dict[str, Any]:
+    def preserve_sensitive_fields(
+        self, new_config: dict[str, Any], existing_config: dict[str, Any]
+    ) -> dict[str, Any]:
         """Preserve AWS credentials if they're empty in the update."""
         # Get credential types
         new_cred_type = new_config.get("credential_type", "default")
@@ -217,4 +221,3 @@ class S3Connection(BaseConnection):
         if "aws_session_token" in safe_config:
             safe_config["aws_session_token"] = ""
         return safe_config
-

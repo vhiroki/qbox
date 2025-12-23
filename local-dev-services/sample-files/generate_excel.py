@@ -39,7 +39,7 @@ inventory_data = [
 for row in inventory_data:
     ws1.append(row)
 
-wb1.save("/Users/vhiroki/Repositories/qbox/test-infrastructure/sample-files/warehouse_inventory.xlsx")
+wb1.save("warehouse_inventory.xlsx")
 
 # Create employee performance Excel file
 wb2 = openpyxl.Workbook()
@@ -67,7 +67,7 @@ performance_data = [
 for row in performance_data:
     ws2.append(row)
 
-wb2.save("/Users/vhiroki/Repositories/qbox/test-infrastructure/sample-files/employee_performance.xlsx")
+wb2.save("employee_performance.xlsx")
 
 # Create product categories Excel file with multiple sheets
 wb3 = openpyxl.Workbook()
@@ -120,7 +120,7 @@ subcategories_data = [
 for row in subcategories_data:
     ws3_2.append(row)
 
-wb3.save("/Users/vhiroki/Repositories/qbox/test-infrastructure/sample-files/product_categories.xlsx")
+wb3.save("product_categories.xlsx")
 
 print("✓ Generated warehouse_inventory.xlsx")
 print("✓ Generated employee_performance.xlsx")

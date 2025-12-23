@@ -75,7 +75,8 @@ QBox is an Electron desktop application that lets you:
 ### Prerequisites
 
 - **Node.js** 18+ and npm (or pnpm)
-- **Python** 3.11+
+- **Python** 3.13+
+- **uv** - Python package manager ([install](https://docs.astral.sh/uv/getting-started/installation/))
 - **macOS, Linux, or Windows**
 
 ### Setup and Run
@@ -98,7 +99,7 @@ That's it! The app opens in an Electron window with DevTools enabled for develop
 
 ### What `setup.sh` Does
 
-- Creates Python virtual environment (uses `uv` if available, falls back to `pip`)
+- Creates Python 3.13 virtual environment using `uv`
 - Installs all backend dependencies (FastAPI, DuckDB, etc.)
 - Installs PyInstaller for building distributables
 - Installs frontend dependencies (uses `pnpm` if available, falls back to `npm`)
@@ -402,9 +403,8 @@ Before distributing:
 **Dependencies missing:**
 ```bash
 cd backend
-source .venv/bin/activate
-pip install -e .
-pip install pyinstaller
+uv pip install -e .
+uv pip install pyinstaller
 ```
 
 **Frontend dependencies missing:**

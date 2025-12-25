@@ -516,7 +516,11 @@ npm install
 
 ## License
 
-[Your License Here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Code Signing
+
+Windows and macOS releases are digitally signed. See [CODE_SIGNING.md](CODE_SIGNING.md) for details.
 
 ## Support
 

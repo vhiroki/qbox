@@ -40,8 +40,13 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            platform: macos
             arch: arm64
-          - os: macos-13  # Intel Mac
+          - os: macos-15-intel  # Intel Mac (macos-13 deprecated)
+            platform: macos
+            arch: x64
+          - os: windows-latest
+            platform: windows
             arch: x64
 
     runs-on: ${{ matrix.os }}
@@ -75,14 +80,32 @@ jobs:
       - name: Build backend with PyInstaller
         working-directory: backend
         run: uv run python build.py
+        env:
+          PYTHONIOENCODING: utf-8
 
-      - name: Verify backend build
+      - name: Verify backend build (macOS/Linux)
+        if: runner.os != 'Windows'
         run: ls -la backend/dist/qbox-backend
+
+      - name: Verify backend build (Windows)
+        if: runner.os == 'Windows'
+        run: dir backend\dist\qbox-backend.exe
+        shell: cmd
 
       # ========== Frontend Build ==========
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      # Clean up any stale DMG volumes (macOS only)
+      - name: Cleanup stale DMG volumes
+        if: runner.os == 'macOS'
+        run: |
+          # Detach any existing QBox volumes to prevent conflicts
+          hdiutil detach /Volumes/QBox 2>/dev/null || true
+          hdiutil detach /Volumes/QBox\ 1 2>/dev/null || true
+          # List any remaining volumes for debugging
+          ls -la /Volumes/ || true
 
       - name: Package Electron app
         working-directory: frontend
@@ -98,13 +121,45 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       # ========== Generate Update Metadata ==========
-      - name: Generate update metadata
+      - name: Generate update metadata (macOS/Linux)
+        if: runner.os != 'Windows'
         run: |
           chmod +x scripts/generate-update-yml.sh
           ./scripts/generate-update-yml.sh
 
+      - name: Generate update metadata (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Get version from package.json
+          $version = (Get-Content frontend/package.json | ConvertFrom-Json).version
+          $outDir = "frontend/out/make/squirrel.windows/x64"
+          
+          # Find the setup exe and nupkg files
+          $setupExe = Get-ChildItem -Path $outDir -Filter "*.exe" | Select-Object -First 1
+          $nupkg = Get-ChildItem -Path $outDir -Filter "*.nupkg" | Select-Object -First 1
+          
+          if ($setupExe -and $nupkg) {
+            # Generate latest.yml for Windows auto-updates
+            $yamlContent = @"
+          version: $version
+          files:
+            - url: $($setupExe.Name)
+              sha512: $((Get-FileHash -Path $setupExe.FullName -Algorithm SHA512).Hash.ToLower())
+              size: $($setupExe.Length)
+          path: $($setupExe.Name)
+          sha512: $((Get-FileHash -Path $setupExe.FullName -Algorithm SHA512).Hash.ToLower())
+          releaseDate: $(Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ")
+          "@
+            $yamlContent | Out-File -FilePath "$outDir/latest.yml" -Encoding utf8
+            Write-Host "Generated latest.yml for Windows"
+          } else {
+            Write-Host "Warning: Could not find setup exe or nupkg files"
+          }
+
       # ========== Upload Artifacts ==========
-      - name: Upload artifacts
+      - name: Upload macOS artifacts
+        if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: qbox-macos-${{ matrix.arch }}
@@ -112,6 +167,18 @@ jobs:
             frontend/out/make/**/*.dmg
             frontend/out/make/**/*.zip
             frontend/out/make/**/*.yml
+          if-no-files-found: error
+
+      - name: Upload Windows artifacts
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbox-windows-${{ matrix.arch }}
+          path: |
+            frontend/out/make/squirrel.windows/**/*.exe
+            frontend/out/make/squirrel.windows/**/*.nupkg
+            frontend/out/make/squirrel.windows/**/*.yml
+            frontend/out/make/squirrel.windows/**/RELEASES
           if-no-files-found: error
 
   # ========== Create GitHub Release ==========
@@ -132,25 +199,47 @@ jobs:
         run: |
           mkdir -p release-files
 
-          # Copy all DMG, ZIP, and YML files, renaming to include architecture
+          # ========== macOS Artifacts ==========
           for dir in artifacts/qbox-macos-*; do
-            arch=$(basename "$dir" | sed 's/qbox-macos-//')
+            if [ -d "$dir" ]; then
+              arch=$(basename "$dir" | sed 's/qbox-macos-//')
 
-            # Find and copy DMG files
-            find "$dir" -name "*.dmg" -exec sh -c '
-              for f; do
-                base=$(basename "$f" .dmg)
-                cp "$f" "release-files/${base}-'$arch'.dmg"
-              done
-            ' sh {} +
+              # Find and copy DMG files
+              find "$dir" -name "*.dmg" -exec sh -c '
+                for f; do
+                  base=$(basename "$f" .dmg)
+                  cp "$f" "release-files/${base}-'$arch'.dmg"
+                done
+              ' sh {} +
 
-            # Find and copy ZIP files (required for auto-updates)
-            # Note: ZIP files already include architecture in their name from Forge
-            find "$dir" -name "*.zip" -exec cp {} release-files/ \;
+              # Find and copy ZIP files (required for auto-updates)
+              # Note: ZIP files already include architecture in their name from Forge
+              find "$dir" -name "*.zip" -exec cp {} release-files/ \;
 
-            # Copy YML files (use arm64 version as the main one)
-            if [ "$arch" = "arm64" ]; then
-              find "$dir" -name "*.yml" -exec cp {} release-files/ \;
+              # Copy YML files (use arm64 version as the main one for macOS)
+              if [ "$arch" = "arm64" ]; then
+                find "$dir" -name "latest-mac.yml" -exec cp {} release-files/ \; 2>/dev/null || true
+                find "$dir" -name "*.yml" -exec cp {} release-files/ \; 2>/dev/null || true
+              fi
+            fi
+          done
+
+          # ========== Windows Artifacts ==========
+          for dir in artifacts/qbox-windows-*; do
+            if [ -d "$dir" ]; then
+              arch=$(basename "$dir" | sed 's/qbox-windows-//')
+
+              # Copy Windows setup exe
+              find "$dir" -name "*.exe" -exec cp {} release-files/ \;
+
+              # Copy nupkg for delta updates
+              find "$dir" -name "*.nupkg" -exec cp {} release-files/ \;
+
+              # Copy RELEASES file for Squirrel
+              find "$dir" -name "RELEASES" -exec cp {} release-files/ \;
+
+              # Copy latest.yml for Windows auto-updates
+              find "$dir" -name "latest.yml" -exec cp {} release-files/ \; 2>/dev/null || true
             fi
           done
 

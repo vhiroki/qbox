@@ -64,15 +64,23 @@ def build_backend():
             text=True,
         )
         
-        # Check if executable was created
+        # Check if executable was created (one-folder mode: dist/qbox-backend/qbox-backend)
         dist_dir = script_dir / "dist"
         exe_name = "qbox-backend.exe" if system == "windows" else "qbox-backend"
-        exe_path = dist_dir / exe_name
+        # One-folder mode creates a folder with the same name as the executable
+        exe_path = dist_dir / "qbox-backend" / exe_name
         
         if exe_path.exists():
             print(f"\n✅ Build successful!")
             print(f"📦 Executable: {exe_path}")
-            print(f"📏 Size: {exe_path.stat().st_size / (1024*1024):.1f} MB")
+            print(f"📏 Executable size: {exe_path.stat().st_size / (1024*1024):.1f} MB")
+            
+            # Calculate total folder size
+            folder_path = dist_dir / "qbox-backend"
+            total_size = sum(f.stat().st_size for f in folder_path.rglob('*') if f.is_file())
+            file_count = sum(1 for f in folder_path.rglob('*') if f.is_file())
+            print(f"📁 Bundle folder: {folder_path}")
+            print(f"📏 Total bundle size: {total_size / (1024*1024):.1f} MB ({file_count} files)")
         else:
             print(f"\n⚠️  Warning: Expected executable not found at {exe_path}")
             print("Check the dist directory for output files")

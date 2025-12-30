@@ -130,13 +130,13 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Use one-folder mode for faster startup (no extraction required)
+# One-file mode extracts ~80MB to temp on EVERY launch, taking 30+ seconds
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
+    [],  # Don't embed binaries/data in executable for one-folder mode
+    exclude_binaries=True,  # Keep binaries separate
     name='qbox-backend',
     debug=False,
     bootloader_ignore_signals=False,
@@ -150,5 +150,18 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+# Collect all files into a folder (one-folder mode)
+# This creates a 'qbox-backend' folder with the executable and all dependencies
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='qbox-backend',
 )
 

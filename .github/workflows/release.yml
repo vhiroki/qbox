@@ -45,9 +45,11 @@ jobs:
           - os: macos-15-intel  # Intel Mac (macos-13 deprecated)
             platform: macos
             arch: x64
-          - os: windows-latest
-            platform: windows
-            arch: x64
+          # Windows build temporarily disabled - waiting for SignPath.io code signing approval
+          # Uncomment when ready to enable Windows builds
+          # - os: windows-latest
+          #   platform: windows
+          #   arch: x64
 
     runs-on: ${{ matrix.os }}
     

@@ -227,7 +227,8 @@ export const api = {
   ): Promise<ChatResponse> {
     const response = await axiosInstance.post(
       `/queries/${queryId}/chat`,
-      request
+      request,
+      { timeout: 60000 } // 60 seconds for AI responses
     );
     return response.data;
   },

@@ -499,7 +499,7 @@ async def chat_with_ai(query_id: str, request: ChatRequest):
     request_start = time.time()
 
     logger.debug("=" * 100)
-    logger.debug(f"📨 Received chat request for query_id: {query_id}")
+    logger.debug(f"[CHAT] Received chat request for query_id: {query_id}")
     logger.debug(f"User message: {request.message}")
 
     # Verify query exists
@@ -573,7 +573,7 @@ async def chat_with_ai(query_id: str, request: ChatRequest):
     logger.debug("✓ Chat messages saved")
 
     total_elapsed = time.time() - request_start
-    logger.debug(f"✅ Request completed successfully in {total_elapsed:.2f}s")
+    logger.debug(f"[OK] Request completed successfully in {total_elapsed:.2f}s")
     logger.debug("=" * 100)
 
     return ChatResponse(

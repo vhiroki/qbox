@@ -21,9 +21,9 @@ def _setup_pyinstaller_fixes():
     if os.path.exists(cert_path):
         os.environ["SSL_CERT_FILE"] = cert_path
         os.environ["REQUESTS_CA_BUNDLE"] = cert_path
-        print(f"🔐 SSL certificates configured: {cert_path}")
+        print(f"[SSL] Certificates configured: {cert_path}")
     else:
-        print(f"⚠️ SSL certificate bundle not found at: {cert_path}")
+        print(f"[WARNING] SSL certificate bundle not found at: {cert_path}")
 
     # 2. Disable HTTP compression for PyInstaller bundles
     # This prevents "Error -3 while decompressing data: incorrect header check"
@@ -34,9 +34,9 @@ def _setup_pyinstaller_fixes():
         # Change Accept-Encoding from "gzip, deflate" to "identity"
         # This tells the server to send uncompressed responses
         httpx._client.ACCEPT_ENCODING = "identity"
-        print("📦 HTTP compression disabled for PyInstaller compatibility")
+        print("[HTTP] Compression disabled for PyInstaller compatibility")
     except Exception as e:
-        print(f"⚠️ Failed to disable HTTP compression: {e}")
+        print(f"[WARNING] Failed to disable HTTP compression: {e}")
 
 
 _setup_pyinstaller_fixes()
@@ -101,25 +101,25 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     # Startup
-    print("🚀 Starting QBox API...")
+    print("[STARTUP] Starting QBox API...")
 
     # Run database migrations
-    print("🔄 Checking database migrations...")
+    print("[MIGRATIONS] Checking database migrations...")
     try:
         applied = run_migrations()
         if applied > 0:
-            print(f"✅ Applied {applied} database migration(s)")
+            print(f"[OK] Applied {applied} database migration(s)")
         else:
-            print("✅ Database schema is up to date")
+            print("[OK] Database schema is up to date")
     except Exception as e:
-        print(f"⚠️  WARNING: Migration error: {e}")
+        print(f"[WARNING] Migration error: {e}")
         logger.exception("Migration failed")
         # Continue startup - this ensures backward compatibility
 
     logger.info(f"Logging level: {settings.LOG_LEVEL}")
     yield
     # Shutdown
-    print("👋 Shutting down QBox API...")
+    print("[SHUTDOWN] Shutting down QBox API...")
 
 
 # Create FastAPI application
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     host = os.environ.get("HOST", "127.0.0.1")
 
-    print(f"🚀 Starting QBox Backend on {host}:{port}")
+    print(f"[STARTUP] Starting QBox Backend on {host}:{port}")
 
     # Run uvicorn server
     uvicorn.run(

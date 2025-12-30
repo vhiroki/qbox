@@ -79,9 +79,9 @@ fi
 echo "🔨 Running PyInstaller..."
 python build.py
 
-# Verify backend was built
-if [ ! -f "dist/$BACKEND_EXEC" ]; then
-    echo "❌ Backend build failed - executable not found at dist/$BACKEND_EXEC"
+# Verify backend was built (one-folder mode: dist/qbox-backend/qbox-backend)
+if [ ! -f "dist/qbox-backend/$BACKEND_EXEC" ]; then
+    echo "❌ Backend build failed - executable not found at dist/qbox-backend/$BACKEND_EXEC"
     exit 1
 fi
 
@@ -104,10 +104,10 @@ if [ "$PLATFORM_NAME" == "macOS" ]; then
             --entitlements "$BACKEND_DIR/entitlements.plist" \
             --sign "$SIGNING_IDENTITY" \
             --timestamp \
-            "dist/$BACKEND_EXEC"
+            "dist/qbox-backend/$BACKEND_EXEC"
 
         # Verify the signature
-        if codesign --verify --verbose "dist/$BACKEND_EXEC" 2>&1; then
+        if codesign --verify --verbose "dist/qbox-backend/$BACKEND_EXEC" 2>&1; then
             echo "✅ Backend signature verified"
         else
             echo "⚠️  Backend signature verification failed, but continuing..."
@@ -127,9 +127,9 @@ echo "📋 Step 2/4: Copying backend to Electron resources..."
 BACKEND_RESOURCES_DIR="$FRONTEND_DIR/../backend/dist"
 mkdir -p "$BACKEND_RESOURCES_DIR"
 
-# The backend dist is already in the right place, just verify it
-if [ -f "$BACKEND_DIR/dist/$BACKEND_EXEC" ]; then
-    echo "✓ Backend executable ready at: $BACKEND_DIR/dist/$BACKEND_EXEC"
+# The backend dist is already in the right place, just verify it (one-folder mode)
+if [ -f "$BACKEND_DIR/dist/qbox-backend/$BACKEND_EXEC" ]; then
+    echo "✓ Backend bundle ready at: $BACKEND_DIR/dist/qbox-backend/"
 else
     echo "❌ Backend executable not found"
     exit 1

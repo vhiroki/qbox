@@ -22,6 +22,7 @@ export const config = {
 
     // In production, get the path from resources
     // Note: The backend/dist directory is copied as extraResource in forge.config.ts
+    // PyInstaller one-folder mode creates: dist/qbox-backend/qbox-backend[.exe]
     const resourcesPath = process.resourcesPath;
     const platform = process.platform;
     
@@ -30,7 +31,8 @@ export const config = {
       execName += '.exe';
     }
     
-    return path.join(resourcesPath, 'dist', execName);
+    // One-folder mode: executable is inside a folder with the same name
+    return path.join(resourcesPath, 'dist', 'qbox-backend', execName);
   },
 
   // App data directory
